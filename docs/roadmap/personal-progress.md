@@ -56,7 +56,22 @@
 - 真实演示（2026-11-02）：magpie 网关的 `auto/deepseek-v4.1-flash`，合成笔记，单次预算 20 次调用、6 万 token。验收路径走通，原文没有变。
 - 真实演示发现、已修复的缺陷：单条成果标题和正文重复；差异上下两行重复原文；用词“分叉”太术语。写浏览器测试时发现：回应理由只在回应者的私人记录里，作者看不到。改为发布时预填到“说明”，由本人决定是否公开。
 
+## G5 验收
+
+验收标准：非学习场景不改 Core 就能审阅、保存、检索和复用认知成果；文档与接口真实可运行。
+
+- 非学习场景：`apps/hypothesis`，约 140 行，Core 和 Application 的行为都没有改。没有页面，只有 REST 和 MCP。
+- 导出恢复：`pnpm workbench export <文件> [--graph <文件>]` 和 `pnpm workbench import <文件> --graph <新文件>`。文件带来源、构建、版本和校验和；被改动或损坏的文件、更新的版本、正在使用的图都会被拒绝；绝不覆盖已有文件，只导入到新文件。
+- 自动化：`tests/graph-export.test.ts`（材料、对话、理解、来源轨迹、发布内容往返，以及命令行）、`tests/hypothesis-scene.test.ts`（REST、MCP、SDK 读到同样的节点和状态，重启和导入后历史相同）。
+- 真实宿主（2026-11-02）：Claude Code 2.1.316，模型路由到 `auto/deepseek-v4.1-flash`，默认场景和假设场景各跑通，见[记录](../testing/host-e2e-log.md)。elicitation：声明支持，`-p` 模式自动取消，草稿留在队列。交互模式和 Codex 没有验证。
+- 真实宿主发现、mock 测不出的缺陷，已修复：已接受的主张被说成“没有记录过”，新会话的模型拒绝据此回答。
+- 审计：[边界审计](../architecture/boundary-audit.md)。MCP 工具说明里的 learner 已改；已持久化的 `learn-surface`、`learn-review` 没改，因为需要迁移。PRD 提到的 `EvaluationPolicy` 在代码里不存在。
+- SAIR：[候选贡献清单](sair-contribution-candidates.md)，只是提议，没有动团队仓。
+- 决策：[0005](../research/reuse-decisions/0005-export-and-boundary.md)。
+
 ## 已知问题
+
+- G5：导出是明文，含私人材料。导出时整个图读进内存，超大图没有测过。格式版本不一致直接拒绝，没有跨版本迁移。`session.ts` 忘记传场景时会静默用 `learnScene`。`recall` 的中文摘要写死，英文场景也会读到中文。带示例种子的图里，种子节点也算 `kept`。没有真人在 Claude Code 交互模式里走过 elicitation。
 
 - G4：作者看不到谁引用了自己，这是有意的。引用了旧版本后再引用新版本，旧条目不会自动退出，要本人撤回。发布页不支持带上对话摘要。搜索只匹配标题的子串。Cookie 没有 Secure 标记，要跨机器用需要放在 HTTPS 反向代理后面，这种部署没有测过。第一次发布会备份图谱文件，之后更早的构建打不开这张图。作者撤回全部发布后，名字显示为“另一位用户”。
 
@@ -65,7 +80,6 @@
 - 仓库根目录没有 LICENSE，公开仓库缺许可证声明。要由仓库所有者决定。
 - ADR 0018 仍为 proposed。
 - `learn-scene.ts`、`LearnSession` 别名、`learnProfile` 和决定通道 `learn-review` 仍在代码里，工作台暂时依赖 `learnScene`。
-- 没有 CLI 备份或可移植导出（计划在 G5）。
 - `docs/planning/mindlink-spec.md` 仍在仓库中，作为历史规划保留。
 - 只有关键词检索，没有向量检索。没有和向量检索对比过效果。
 - CJK PDF 提取未验证，夹具只有 ASCII。
@@ -74,4 +88,4 @@
 
 ## 下一步
 
-按[目标计划](personal-goal-plan.md)的依赖图推进 G5。
+按[目标计划](personal-goal-plan.md)的依赖图推进 G6：一轮可复现评测。

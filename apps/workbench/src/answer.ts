@@ -56,6 +56,15 @@ export interface Answer {
   /** Numbers the model cited that were not among the excerpts. */
   readonly invalidCitations: readonly number[]
   readonly model: { readonly name: string; readonly simulated: boolean }
+  /** What the person had already confirmed on this. Their own words, shown apart: it is never evidence. */
+  readonly recalled?: readonly RecalledUnderstanding[]
+}
+
+export interface RecalledUnderstanding {
+  readonly nodeId: string
+  readonly label: string
+  /** The person has an unresolved contradiction on it. */
+  readonly conflict: boolean
 }
 
 /** Below this share of a question's words, no passage is treated as being about it. */
@@ -92,11 +101,20 @@ export function citationsOf(hits: readonly SearchHit[]): readonly Citation[] {
   }))
 }
 
+function priorBlock(recalled: readonly RecalledUnderstanding[]): string {
+  if (recalled.length === 0) return ''
+  const lines = recalled.map(
+    ({ label, conflict }) => `- ${label}${conflict ? '（学习者认为这一条还有未解决的矛盾）' : ''}`,
+  )
+  return `<prior>\n${lines.join('\n')}\n</prior>\n上面 prior 里是学习者之前确认过的理解，不是材料：不能当依据，不能标编号。它和摘录不一致时，要明确指出不一致的地方。\n\n`
+}
+
 function promptFor(
   question: string,
   hits: readonly SearchHit[],
   history: readonly ModelMessage[],
   instruction?: string,
+  recalled: readonly RecalledUnderstanding[] = [],
 ): readonly ModelMessage[] {
   const excerpts = hits
     .map(({ material, chunk }, index) => {
@@ -111,7 +129,10 @@ function promptFor(
       content: instruction === undefined ? SYSTEM : `${SYSTEM}\n\n这一步的要求：${instruction}`,
     },
     ...history.slice(-MAX_HISTORY),
-    { role: 'user', content: `${excerpts}\n\n<question>${question}</question>` },
+    {
+      role: 'user',
+      content: `${excerpts}\n\n${priorBlock(recalled)}<question>${question}</question>`,
+    },
   ]
 }
 
@@ -254,6 +275,8 @@ export interface AskInput {
   readonly model: ModelClient
   /** What this step of a learning process asks for, after the rules on evidence, which it cannot lift. */
   readonly instruction?: string
+  /** What the person had already confirmed. The model is told it is not material. */
+  readonly recalled?: readonly RecalledUnderstanding[]
 }
 
 /** Answers from `hits`, or reports that the material does not cover the question. A model failure propagates. */
@@ -263,13 +286,16 @@ export async function answerFrom({
   history,
   model,
   instruction,
+  recalled = [],
 }: AskInput): Promise<Answer> {
+  const withRecalled = (answer: Answer): Answer =>
+    recalled.length === 0 ? answer : { ...answer, recalled }
   const usable = relevant(hits)
   if (usable.length === 0) {
-    return checkReply(INSUFFICIENT_MARK, [], model)
+    return withRecalled(checkReply(INSUFFICIENT_MARK, [], model))
   }
-  const reply = await model.complete(promptFor(question, usable, history, instruction))
-  return checkReply(reply.text, citationsOf(usable), model)
+  const reply = await model.complete(promptFor(question, usable, history, instruction, recalled))
+  return withRecalled(checkReply(reply.text, citationsOf(usable), model))
 }
 
 /** The answer as one line of plain text, with its marks: what a thread keeps and a later turn reads. */

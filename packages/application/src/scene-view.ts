@@ -23,6 +23,8 @@ export interface SceneView {
   historyOf(
     ...args: Parameters<CognitiveSession['historyOf']>
   ): ReturnType<CognitiveSession['historyOf']>
+  /** One node in full: its words, the caller's state, its visible neighbours and where it came from. */
+  expand(...args: Parameters<CognitiveSession['expand']>): ReturnType<CognitiveSession['expand']>
   vocabulary(): ReturnType<CognitiveSession['vocabulary']>
   pendingSuggestions(): ReturnType<CognitiveSession['pendingSuggestions']>
   /** The caller's own threads, newest first (ADR 0015). Never another person's. */
@@ -68,6 +70,7 @@ export function sceneViewOf(session: CognitiveSession): SceneView {
     understandingOf: (...args: Parameters<CognitiveSession['understandingOf']>) =>
       session.understandingOf(...args),
     historyOf: (...args: Parameters<CognitiveSession['historyOf']>) => session.historyOf(...args),
+    expand: (...args: Parameters<CognitiveSession['expand']>) => session.expand(...args),
     vocabulary: () => session.vocabulary(),
     pendingSuggestions: () => session.pendingSuggestions(),
     threads: (scope?: string) => session.threads(scope),

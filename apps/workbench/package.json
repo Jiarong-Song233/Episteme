@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@episteme/application": "workspace:*",
+    "@episteme/core": "workspace:*",
     "@episteme/distillation": "workspace:*",
     "@episteme/service": "workspace:*",
     "minisearch": "7.2.0",

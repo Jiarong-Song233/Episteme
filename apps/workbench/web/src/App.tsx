@@ -16,7 +16,8 @@ import {
   type WorkflowInfo,
 } from './api.js'
 import { PlanShelf, PlanView, StatusView } from './Learning.js'
-import { AgentTurn, messageOf } from './Turns.js'
+import { AgentTurn, LearnerTurn, Links, messageOf } from './Turns.js'
+import { UnderstandingPanel, wordsOf } from './Understanding.js'
 
 type SideTab = 'source' | 'pending' | 'understood' | 'status'
 type Pane = 'shelf' | 'talk' | 'side'
@@ -40,7 +41,9 @@ function remember(space: string): void {
   }
 }
 
-const NO_UNDERSTANDING: Understanding = { nodes: [], pending: [] }
+const NO_UNDERSTANDING: Understanding = { nodes: [], pending: [], challenges: [], dimensions: [] }
+/** A jump to a turn waits for the conversation it lies in to load, up to this many tries, 100 ms apart. */
+const FOCUS_TRIES = 30
 
 /** What the source panel shows: a material, and the passage a citation points at, if any. */
 interface SourceRequest {
@@ -74,8 +77,24 @@ export function App() {
   const [planId, setPlanId] = useState<string>()
   const [planNotice, setPlanNotice] = useState<string>()
   const [learned, setLearned] = useState(0)
+  const [selectedNode, setSelectedNode] = useState<string>()
+  const [focusedTurn, setFocusedTurn] = useState<string>()
 
   const space = spaces.find((candidate) => candidate.id === spaceId)
+  const threadInView =
+    planId === undefined ? threadId : plans.find((plan) => plan.id === planId)?.thread
+
+  useEffect(() => {
+    if (focusedTurn === undefined) return undefined
+    let tries = 0
+    const looking = setInterval(() => {
+      tries += 1
+      const found = document.getElementById(`turn-${focusedTurn}`)
+      if (found !== null) found.scrollIntoView?.({ block: 'center' })
+      if (found !== null || tries >= FOCUS_TRIES) clearInterval(looking)
+    }, 100)
+    return () => clearInterval(looking)
+  }, [focusedTurn])
 
   const guard = useCallback((work: () => Promise<unknown>): void => {
     setNotice(undefined)
@@ -102,6 +121,8 @@ export function App() {
 
   useEffect(() => {
     setSource(undefined)
+    setSelectedNode(undefined)
+    setFocusedTurn(undefined)
     if (spaceId === undefined) {
       setMaterials([])
       setSessions([])
@@ -153,6 +174,7 @@ export function App() {
     if (spaceId === undefined) return
     setAsking(true)
     setFailed(undefined)
+    setFocusedTurn(undefined)
     if (!retry) {
       setTurns((held) => [...held, { id: 'asking', speaker: 'learner', text: question }])
     }
@@ -198,131 +220,231 @@ export function App() {
     return made.message
   }
 
+  const offerTurn = async (thread: string, turn: string): Promise<string | undefined> => {
+    if (spaceId === undefined) return undefined
+    const made = await api.candidatesFromTurn(spaceId, thread, turn)
+    await refreshUnderstanding()
+    if (made.suggestions.length > 0) {
+      setTab('pending')
+      setPane('side')
+    }
+    return made.message
+  }
+
+  const openNode = (node: string): void => {
+    setSelectedNode(node)
+    setTab('understood')
+    setPane('side')
+  }
+
+  /** From an understanding back to the words it came from, in a conversation or a plan. */
+  const jumpTo = (thread: string, turn: string | undefined): void => {
+    const plan = plans.find((candidate) => candidate.thread === thread)
+    setFocusedTurn(turn)
+    setPane('talk')
+    if (plan !== undefined) {
+      setPlanId(plan.id)
+      return
+    }
+    setPlanId(undefined)
+    guard(() => openThread(thread))
+  }
+
+  const decided = async (): Promise<void> => {
+    await refreshUnderstanding()
+    setLearned((held) => held + 1)
+  }
+
   return (
-    <div className="desk" data-pane={pane}>
-      <Shelf
-        spaces={spaces}
-        current={spaceId}
-        materials={materials}
-        sessions={sessions.filter((session) => !plans.some((plan) => plan.thread === session.id))}
-        thread={planId === undefined ? threadId : undefined}
-        plans={
-          <PlanShelf
-            plans={plans}
-            current={planId}
-            workflows={library.workflows}
-            hasMaterial={materials.length > 0}
-            archived={space?.archived === true}
-            guard={guard}
-            onCreate={(topic, minutes, workflow) =>
-              api.createPlan(spaceId ?? '', topic, minutes, workflow)
-            }
-            onCreated={(plan, created) => {
-              setPlans((held) => [plan, ...held])
-              setPlanNotice(created)
-              setPlanId(plan.id)
-              setPane('talk')
-            }}
-            onSelect={(id) => {
-              setPlanNotice(undefined)
-              setPlanId(id)
-              setPane('talk')
-            }}
-          />
-        }
-        guard={guard}
-        onSpaces={(next, selected) => {
-          setSpaces(next)
-          if (selected !== undefined) setSpaceId(selected)
-        }}
-        onSelectSpace={(id) => {
-          setSpaceId(id)
-          setPane('talk')
-        }}
-        onMaterialsChanged={refreshMaterials}
-        onOpenMaterial={(material) =>
-          showSource({ materialId: material.id, title: material.title })
-        }
-        onSelectThread={(id) => {
-          setPlanId(undefined)
-          guard(() => openThread(id))
-          setPane('talk')
-        }}
-        onNewThread={() => {
-          setPlanId(undefined)
-          guard(() => openThread(undefined))
-          setPane('talk')
-        }}
-      />
-      <main className="talk">
-        {model?.simulated === true && (
-          <p className="banner">
-            现在用的是模拟模型：它只摘录材料原句，不会真正回答。配置 EPISTEME_MODEL_BASE_URL
-            后可接入真实模型。
-          </p>
-        )}
-        {notice !== undefined && (
-          <p className="banner banner-error" role="alert">
-            {notice}
-          </p>
-        )}
-        {planId === undefined ? (
-          <Conversation
-            space={space}
-            hasMaterial={materials.length > 0}
-            turns={turns}
-            asking={asking}
-            failed={failed}
-            onAsk={ask}
-            onCite={cite}
-            onCandidates={(reply) => makeCandidates(threadId, reply)}
-          />
-        ) : (
-          <PlanView
-            plan={planId}
-            blocks={library.blocks}
-            workflows={library.workflows}
-            notice={planNotice}
-            guard={guard}
-            onChanged={() => {
-              setLearned((held) => held + 1)
-              if (spaceId !== undefined) {
-                guard(async () => setPlans((await api.plans(spaceId)).plans))
+    <Links.Provider
+      value={{
+        nodes: understanding.nodes,
+        focused: focusedTurn,
+        openNode,
+        offer: offerTurn,
+      }}
+    >
+      <div className="desk" data-pane={pane}>
+        <Shelf
+          spaces={spaces}
+          current={spaceId}
+          materials={materials}
+          sessions={sessions.filter((session) => !plans.some((plan) => plan.thread === session.id))}
+          thread={planId === undefined ? threadId : undefined}
+          plans={
+            <PlanShelf
+              plans={plans}
+              current={planId}
+              workflows={library.workflows}
+              hasMaterial={materials.length > 0}
+              archived={space?.archived === true}
+              guard={guard}
+              onCreate={(topic, minutes, workflow) =>
+                api.createPlan(spaceId ?? '', topic, minutes, workflow)
               }
-            }}
-            onCite={cite}
-            onCandidates={makeCandidates}
-            onShowStatus={() => {
-              setTab('status')
-              setPane('side')
-            }}
-          />
-        )}
-      </main>
-      <Side
-        tab={tab}
-        onTab={setTab}
-        source={source}
-        understanding={understanding}
-        guard={guard}
-        onDecided={async () => {
-          await refreshUnderstanding()
-          setLearned((held) => held + 1)
+              onCreated={(plan, created) => {
+                setPlans((held) => [plan, ...held])
+                setPlanNotice(created)
+                setPlanId(plan.id)
+                setPane('talk')
+              }}
+              onSelect={(id) => {
+                setPlanNotice(undefined)
+                setPlanId(id)
+                setPane('talk')
+              }}
+            />
+          }
+          guard={guard}
+          onSpaces={(next, selected) => {
+            setSpaces(next)
+            if (selected !== undefined) setSpaceId(selected)
+          }}
+          onSelectSpace={(id) => {
+            setSpaceId(id)
+            setPane('talk')
+          }}
+          onMaterialsChanged={refreshMaterials}
+          onOpenMaterial={(material) =>
+            showSource({ materialId: material.id, title: material.title })
+          }
+          onSelectThread={(id) => {
+            setPlanId(undefined)
+            guard(() => openThread(id))
+            setPane('talk')
+          }}
+          onNewThread={() => {
+            setPlanId(undefined)
+            guard(() => openThread(undefined))
+            setPane('talk')
+          }}
+        />
+        <main className="talk">
+          {model?.simulated === true && (
+            <p className="banner">
+              现在用的是模拟模型：它只摘录材料原句，不会真正回答。配置 EPISTEME_MODEL_BASE_URL
+              后可接入真实模型。
+            </p>
+          )}
+          {notice !== undefined && (
+            <p className="banner banner-error" role="alert">
+              {notice}
+            </p>
+          )}
+          {planId === undefined ? (
+            <Conversation
+              space={space}
+              hasMaterial={materials.length > 0}
+              thread={threadId}
+              turns={turns}
+              asking={asking}
+              failed={failed}
+              onAsk={ask}
+              onCite={cite}
+              onCandidates={(reply) => makeCandidates(threadId, reply)}
+            />
+          ) : (
+            <PlanView
+              plan={planId}
+              blocks={library.blocks}
+              workflows={library.workflows}
+              notice={planNotice}
+              guard={guard}
+              onChanged={() => {
+                setLearned((held) => held + 1)
+                if (spaceId !== undefined) {
+                  guard(async () => setPlans((await api.plans(spaceId)).plans))
+                }
+              }}
+              onCite={cite}
+              onCandidates={makeCandidates}
+              onShowStatus={() => {
+                setTab('status')
+                setPane('side')
+              }}
+            />
+          )}
+        </main>
+        <Side
+          tab={tab}
+          onTab={setTab}
+          source={source}
+          understanding={understanding}
+          guard={guard}
+          onDecided={decided}
+          pending={
+            <ExtractFromThread
+              space={spaceId}
+              thread={threadInView}
+              onMade={refreshUnderstanding}
+            />
+          }
+          understood={
+            spaceId === undefined ? null : (
+              <UnderstandingPanel
+                space={spaceId}
+                understanding={understanding}
+                selected={selectedNode}
+                simulated={model?.simulated === true}
+                guard={guard}
+                onSelect={setSelectedNode}
+                onChanged={decided}
+                onJump={jumpTo}
+              />
+            )
+          }
+          status={<StatusView space={spaceId} version={learned} />}
+        />
+        <nav className="switcher" aria-label="切换页面">
+          <button type="button" aria-current={pane === 'shelf'} onClick={() => setPane('shelf')}>
+            空间
+          </button>
+          <button type="button" aria-current={pane === 'talk'} onClick={() => setPane('talk')}>
+            对话
+          </button>
+          <button type="button" aria-current={pane === 'side'} onClick={() => setPane('side')}>
+            原文与理解
+          </button>
+        </nav>
+      </div>
+    </Links.Provider>
+  )
+}
+
+/** Asks a model what in this conversation is worth keeping. What comes back still waits for the person. */
+function ExtractFromThread(props: {
+  space: string | undefined
+  thread: string | undefined
+  onMade: () => Promise<void>
+}) {
+  const [working, setWorking] = useState(false)
+  const [note, setNote] = useState<string>()
+  const { space, thread } = props
+  if (space === undefined || thread === undefined) return null
+  return (
+    <p className="extract">
+      <button
+        type="button"
+        className="link"
+        disabled={working}
+        onClick={() => {
+          setWorking(true)
+          setNote(undefined)
+          api
+            .candidatesFromThread(space, thread)
+            .then(async (made) => {
+              if (made.failure !== undefined) setNote(`${made.failure.message}可以再试一次。`)
+              else setNote(made.message)
+              await props.onMade()
+            })
+            .catch((error: unknown) => setNote(messageOf(error)))
+            .finally(() => setWorking(false))
         }}
-        status={<StatusView space={spaceId} version={learned} />}
-      />
-      <nav className="switcher" aria-label="切换页面">
-        <button type="button" aria-current={pane === 'shelf'} onClick={() => setPane('shelf')}>
-          空间
-        </button>
-        <button type="button" aria-current={pane === 'talk'} onClick={() => setPane('talk')}>
-          对话
-        </button>
-        <button type="button" aria-current={pane === 'side'} onClick={() => setPane('side')}>
-          原文与理解
-        </button>
-      </nav>
-    </div>
+      >
+        {working ? '正在读这段对话…' : '从当前对话提炼'}
+      </button>
+      {note !== undefined && <span className="hint"> {note}</span>}
+    </p>
   )
 }
 
@@ -594,6 +716,7 @@ function Shelf(props: {
 function Conversation(props: {
   space: Space | undefined
   hasMaterial: boolean
+  thread: string | undefined
   turns: readonly Turn[]
   asking: boolean
   failed: { question: string; failure: Failure } | undefined
@@ -638,9 +761,7 @@ function Conversation(props: {
         )}
         {turns.map((turn) =>
           turn.speaker === 'learner' ? (
-            <p key={turn.id} className="question">
-              {turn.text}
-            </p>
+            <LearnerTurn key={turn.id} turn={turn} thread={props.thread} />
           ) : (
             <AgentTurn
               key={turn.id}
@@ -697,13 +818,18 @@ function Side(props: {
   understanding: Understanding
   guard: (work: () => Promise<unknown>) => void
   onDecided: () => Promise<void>
+  pending: ReactNode
+  understood: ReactNode
   status: ReactNode
 }) {
   const { tab, understanding } = props
   const tabs: readonly (readonly [SideTab, string])[] = [
     ['source', '原文'],
     ['pending', `待确认（${understanding.pending.length}）`],
-    ['understood', `我的理解（${understanding.nodes.length}）`],
+    [
+      'understood',
+      `我的理解（${understanding.nodes.filter((node) => node.revisedTo === undefined && !node.withdrawn).length}）`,
+    ],
     ['status', '学习状态'],
   ]
   return (
@@ -725,22 +851,16 @@ function Side(props: {
         {tab === 'source' && <SourceView request={props.source} />}
         {tab === 'status' && props.status}
         {tab === 'pending' && (
-          <PendingList
-            pending={understanding.pending}
-            guard={props.guard}
-            onDecided={props.onDecided}
-          />
+          <>
+            {props.pending}
+            <PendingList
+              pending={understanding.pending}
+              guard={props.guard}
+              onDecided={props.onDecided}
+            />
+          </>
         )}
-        {tab === 'understood' &&
-          (understanding.nodes.length === 0 ? (
-            <p className="hint">这里只放你亲自确认过的内容。还没有。</p>
-          ) : (
-            <ul className="understood">
-              {understanding.nodes.map((node) => (
-                <li key={node.nodeId}>{node.label}</li>
-              ))}
-            </ul>
-          ))}
+        {tab === 'understood' && props.understood}
       </div>
     </aside>
   )
@@ -848,7 +968,11 @@ function PendingList(props: {
   onDecided: () => Promise<void>
 }) {
   if (props.pending.length === 0) {
-    return <p className="hint">没有待确认的内容。在回答下面点“提炼成待确认的理解”。</p>
+    return (
+      <p className="hint">
+        没有待确认的内容。可以点你说过的话旁边的“这是我的理解”，或回答下面的“提炼成待确认的理解”。
+      </p>
+    )
   }
   return (
     <ul className="pending">
@@ -871,12 +995,47 @@ function PendingItem(props: {
 }) {
   const { candidate, guard, onDecided } = props
   const [editing, setEditing] = useState(false)
-  const [label, setLabel] = useState(candidate.proposal.label)
+  const [label, setLabel] = useState(candidate.proposal.label ?? '')
+  const { link } = candidate
   const decide = (work: () => Promise<unknown>): void => {
     guard(async () => {
       await work()
       await onDecided()
     })
+  }
+  if (link !== undefined) {
+    const relation =
+      candidate.proposal.relation === 'evolves_to'
+        ? '修正为'
+        : candidate.proposal.relation === 'contradicts'
+          ? '和这一条矛盾：'
+          : '支持这一条：'
+    return (
+      <li>
+        <p className="candidate">{link.fromLabel}</p>
+        <p className="candidate">
+          <span className="hint">{relation}</span> {link.toLabel}
+        </p>
+        <p className="hint">{candidate.rationale}</p>
+        {!link.ready && <p className="hint">先确认它连着的两条，才能确认这个关系。</p>}
+        <p className="decisions">
+          <button
+            type="button"
+            disabled={!link.ready}
+            onClick={() => decide(() => api.accept(candidate.id))}
+          >
+            确认这个关系
+          </button>
+          <button
+            type="button"
+            className="link"
+            onClick={() => decide(() => api.dismiss(candidate.id))}
+          >
+            不要
+          </button>
+        </p>
+      </li>
+    )
   }
   return (
     <li>
@@ -890,7 +1049,10 @@ function PendingItem(props: {
       ) : (
         <p className="candidate">{candidate.proposal.label}</p>
       )}
-      <p className="hint">{candidate.rationale}</p>
+      <p className="hint">
+        {wordsOf(candidate.basis)}。{candidate.rationale}
+      </p>
+      {candidate.similar !== undefined && <p className="hint">和这一条相近：{candidate.similar}</p>}
       <p className="decisions">
         {editing ? (
           <button

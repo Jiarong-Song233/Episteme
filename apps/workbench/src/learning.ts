@@ -26,6 +26,7 @@ import {
   type Attempt,
 } from './practice.js'
 import { ANSWER_PREFIX, openSpaceOf, refuse, required, scopeOf, spaceOf, text } from './requests.js'
+import { heldNodes, stillHeld } from './understanding.js'
 import { coverage } from './tokens.js'
 
 /**
@@ -186,10 +187,8 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
       focusCount(workflow, minutes),
     )
     const scope = scopeOf(space.id)
-    const understood = view
-      .listNodes()
-      .filter((node) => node.tags.includes(`scope:${scope}`))
-      .map((node) => node.label)
+    // What was revised away or withdrawn is not something the person holds, so a plan does not skip it.
+    const understood = stillHeld(heldNodes(view, space.id)).map((node) => node.label)
     const thread = await writes.openThread({ title: `学习：${topic}`.slice(0, 80), scope })
     const plan: Plan = {
       id: `pl_${randomUUID()}`,
@@ -603,7 +602,6 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
       const checked = attempts.filter((attempt) => attempt.correct !== undefined)
       const count = (estimate: Attempt['estimate']): number =>
         attempts.filter((attempt) => attempt.estimate === estimate).length
-      const tag = `scope:${scopeOf(space.id)}`
       return {
         plans: plans.map((plan) => ({
           id: plan.id,
@@ -624,7 +622,7 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
             (attempt) => attempt.correct === undefined && attempt.estimate === undefined,
           ).length,
         },
-        confirmed: view.listNodes().filter((node) => node.tags.includes(tag)).length,
+        confirmed: stillHeld(heldNodes(view, space.id)).length,
         review: reviewSuggestions(attempts, now()),
       }
     }),

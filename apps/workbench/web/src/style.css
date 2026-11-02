@@ -165,7 +165,7 @@ textarea {
   background: var(--paper-raised);
 }
 
-button:not(.row, .link, .cite, [role="tab"]),
+button:not(.row, .link, .cite, .node-row, [role="tab"]),
 .upload {
   flex: none;
   padding: 5px 12px;
@@ -695,6 +695,224 @@ li[data-status="skipped"] > span:first-child {
 .status li {
   display: grid;
   padding: 4px 0;
+}
+
+.learner-turn .question {
+  margin-bottom: 2px;
+}
+
+.learner-turn {
+  margin-top: 24px;
+  max-width: 62ch;
+}
+
+/* Marker over the words someone came back to find. */
+[data-focused="true"] {
+  background: var(--marker);
+  box-shadow: 0 0 0 6px var(--marker);
+}
+
+.own-words {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.recalled {
+  margin-bottom: 10px;
+  padding-left: 12px;
+  border-left: 3px solid var(--rule);
+}
+
+.recalled li {
+  font-size: 14px;
+}
+
+.recalled button {
+  text-align: left;
+}
+
+.extract {
+  margin-bottom: 16px;
+}
+
+.node-row {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.node-row:hover {
+  text-decoration: underline;
+}
+
+.understood li[data-held="false"]::before {
+  border-color: var(--rule);
+}
+
+.understood li[data-held="false"] .node-row,
+.node-label[data-held="false"] {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-color: var(--rule);
+}
+
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.marks span {
+  background: var(--marker);
+  padding: 0 4px;
+}
+
+.past {
+  margin-top: 16px;
+}
+
+.past summary {
+  margin-bottom: 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.map {
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.map-edge {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+}
+
+.map-contradicts {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.map-arrow {
+  fill: var(--ink-soft);
+}
+
+.map-node {
+  cursor: pointer;
+}
+
+.map-node circle {
+  fill: var(--ink);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.map-node circle[data-held="false"] {
+  fill: var(--paper);
+  stroke: var(--ink-soft);
+}
+
+.map-node circle[data-conflict="true"] {
+  fill: var(--marker);
+}
+
+.map-node text {
+  fill: var(--ink);
+  font-size: 10px;
+}
+
+.map figcaption {
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.node-detail h4 {
+  margin: 20px 0 6px;
+  font-size: 13px;
+}
+
+.node-label {
+  margin: 10px 0 6px;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.challenge {
+  margin: 14px 0;
+  padding: 10px 12px;
+  background: var(--paper-raised);
+  border-left: 3px solid var(--ink);
+}
+
+.acting {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.acting label,
+.states label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.acting textarea,
+.acting input,
+.acting select {
+  width: 100%;
+}
+
+.states select,
+.acting select {
+  padding: 4px 6px;
+  border: 1px solid var(--rule);
+  background: var(--paper-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.states {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.relations li {
+  margin-bottom: 4px;
+}
+
+.trail {
+  padding-left: 14px;
+  list-style: none;
+  border-left: 1px solid var(--rule);
+}
+
+.trail li {
+  margin-bottom: 10px;
+}
+
+.trail time {
+  display: block;
+  font-size: 12px;
 }
 
 @media (max-width: 900px) {

@@ -289,6 +289,7 @@ describe('what an extension is handed', () => {
       expect(Object.keys(view).sort()).toEqual([
         'browsePublications',
         'distill',
+        'expand',
         'historyOf',
         'listNodes',
         'pendingSuggestions',

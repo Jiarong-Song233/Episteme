@@ -1,16 +1,28 @@
-import type { Answer, MaterialSummary, Plan, PublicQuestion, Space } from '@episteme/workbench'
+import type {
+  Answer,
+  Challenge,
+  HeldNode,
+  MaterialSummary,
+  Plan,
+  PublicQuestion,
+  Space,
+  TrailEntry,
+} from '@episteme/workbench'
 
 /** The page's only way to the graph: the same REST API any other client has. */
 
 export type {
   Answer,
+  Challenge,
   Citation,
   Evidence,
+  HeldNode,
   MaterialSummary,
   Plan,
   PublicQuestion,
   Space,
   Step,
+  TrailEntry,
 } from '@episteme/workbench'
 
 export interface Session {
@@ -51,22 +63,36 @@ export interface PendingCandidate {
   readonly id: string
   readonly proposal: {
     readonly kind: string
-    readonly label: string
+    readonly label?: string
+    readonly relation?: string
     readonly nodeType?: string
     readonly properties?: Readonly<Record<string, unknown>>
   }
   readonly rationale: string
   readonly basis?: string
+  /** A pending relation in words. It can be accepted only once both its ends are confirmed. */
+  /** Another wording, held or waiting, that says nearly the same. */
+  readonly similar?: string
+  readonly link?: { readonly fromLabel: string; readonly toLabel: string; readonly ready: boolean }
 }
 
-export interface Understood {
-  readonly nodeId: string
-  readonly label: string
+export interface Dimension {
+  readonly id: string
+  readonly labelZh: string
+  readonly levelLabelsZh: readonly { readonly level: string; readonly label: string }[]
 }
 
 export interface Understanding {
-  readonly nodes: readonly Understood[]
+  readonly nodes: readonly HeldNode[]
   readonly pending: readonly PendingCandidate[]
+  readonly challenges: readonly Challenge[]
+  readonly dimensions: readonly Dimension[]
+}
+
+export interface Offered {
+  readonly suggestions: readonly { readonly id: string }[]
+  readonly message?: string
+  readonly failure?: Failure
 }
 
 export interface WorkflowInfo {
@@ -215,10 +241,38 @@ export const api = {
       ...(retry ? { retry } : {}),
     }) as Promise<Asked>,
   candidates: (space: string, thread: string, reply: string) =>
-    scene('/candidates', { space, thread, reply }) as Promise<{
-      suggestions: readonly unknown[]
-      message?: string
+    scene('/candidates', { space, thread, reply }) as Promise<Offered>,
+  candidatesFromTurn: (space: string, thread: string, turn: string) =>
+    scene('/candidates/turn', { space, thread, turn }) as Promise<Offered>,
+  candidatesFromThread: (space: string, thread: string) =>
+    scene('/candidates/thread', { space, thread }) as Promise<Offered>,
+  trail: (space: string, node: string) =>
+    scene(`/understanding/trail?space=${encoded(space)}&node=${encoded(node)}`) as Promise<{
+      trail: readonly TrailEntry[]
     }>,
+  revise: (space: string, node: string, label: string, reason: string) =>
+    scene('/understanding/revise', {
+      space,
+      node,
+      label,
+      ...(reason === '' ? {} : { reason }),
+    }) as Promise<Offered>,
+  relate: (space: string, from: string, to: string, relation: 'contradicts' | 'supports') =>
+    scene('/understanding/relate', { space, from, to, relation }) as Promise<Offered>,
+  challenge: (space: string, node: string, text?: string) =>
+    scene('/understanding/challenge', {
+      space,
+      node,
+      ...(text === undefined ? {} : { text }),
+    }) as Promise<{ challenge?: Challenge; message?: string; failure?: Failure }>,
+  settleChallenge: (
+    challenge: string,
+    status: 'dismissed' | 'conflict' | 'revised',
+    extra: { reason?: string; revisedTo?: string },
+  ) => scene('/understanding/challenge/settle', { challenge, status, ...extra }),
+  // The person's own record of where they stand, through the API's own record route.
+  record: (target: string, dimensions: Readonly<Record<string, string>>, reason: string) =>
+    request('/record', { target, dimensions, reason }),
   workflows: () =>
     scene('/workflows') as Promise<{
       workflows: readonly WorkflowInfo[]

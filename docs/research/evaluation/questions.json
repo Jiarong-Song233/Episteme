@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "note": "direct shares words with the material; paraphrase avoids them on purpose, which should favour meaning over keywords; cross needs two documents; absent has no answer in the material.",
+  "questions": [
+    {
+      "id": "d1",
+      "kind": "direct",
+      "question": "潮汐缓存协议是谁提出的？",
+      "gold": "林望舒",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "d2",
+      "kind": "direct",
+      "question": "浅潮层的默认容量是多少？",
+      "gold": "64\\s*MB",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "d3",
+      "kind": "direct",
+      "question": "浅潮层的淘汰周期是多久？",
+      "gold": "17\\s*秒",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "d4",
+      "kind": "direct",
+      "question": "中潮层的日志保留多久？",
+      "gold": "9\\s*(个)?小时",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "d5",
+      "kind": "direct",
+      "question": "深潮层多久合并一次？",
+      "gold": "6\\s*(个)?小时",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "d6",
+      "kind": "direct",
+      "question": "什么条件下发出涨潮信号？",
+      "gold": "72\\s*%",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "d7",
+      "kind": "direct",
+      "question": "珊瑚调度器的时间片长度是多少？",
+      "gold": "23\\s*毫秒",
+      "source": "珊瑚调度器.md"
+    },
+    {
+      "id": "d8",
+      "kind": "direct",
+      "question": "海葵任务最多被抢占几次？",
+      "gold": "4\\s*次|四次",
+      "source": "珊瑚调度器.md"
+    },
+    {
+      "id": "d9",
+      "kind": "direct",
+      "question": "灯塔事故中断了多久？",
+      "gold": "41\\s*分钟",
+      "source": "灯塔事故复盘.md"
+    },
+    {
+      "id": "d10",
+      "kind": "direct",
+      "question": "灯塔事故的值班负责人是谁？",
+      "gold": "周砚",
+      "source": "灯塔事故复盘.md"
+    },
+    {
+      "id": "p1",
+      "kind": "paraphrase",
+      "question": "最靠近应用的那部分存储，一开始能放下多少数据？",
+      "gold": "64\\s*MB",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "p2",
+      "kind": "paraphrase",
+      "question": "系统空闲下来之后，要等多长时间存储空间才会收回？",
+      "gold": "5\\s*分钟",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "p3",
+      "kind": "paraphrase",
+      "question": "等候执行的工作最多能排多少个？",
+      "gold": "1024",
+      "source": "珊瑚调度器.md"
+    },
+    {
+      "id": "p4",
+      "kind": "paraphrase",
+      "question": "哪类工作绝不会被别的工作打断？",
+      "gold": "礁石",
+      "source": "珊瑚调度器.md"
+    },
+    {
+      "id": "p5",
+      "kind": "paraphrase",
+      "question": "那次宕机之后，定期整理数据的时间改到了什么时候？",
+      "gold": "凌晨\\s*3\\s*点|凌晨三点",
+      "source": "灯塔事故复盘.md"
+    },
+    {
+      "id": "p6",
+      "kind": "paraphrase",
+      "question": "同一份数据出现在两个位置时，应该相信哪一个？",
+      "gold": "较浅|更浅",
+      "source": "潮汐缓存协议.md"
+    },
+    {
+      "id": "c1",
+      "kind": "cross",
+      "question": "命中率持续偏低时，调度器会对批处理任务做什么？",
+      "gold": "暂停",
+      "source": "珊瑚调度器.md"
+    },
+    {
+      "id": "a1",
+      "kind": "absent",
+      "question": "深潮层的默认容量是多少？",
+      "gold": null,
+      "source": null
+    },
+    {
+      "id": "a2",
+      "kind": "absent",
+      "question": "潮汐缓存协议采用什么开源许可证？",
+      "gold": null,
+      "source": null
+    },
+    {
+      "id": "a3",
+      "kind": "absent",
+      "question": "珊瑚调度器支持哪些操作系统？",
+      "gold": null,
+      "source": null
+    },
+    { "id": "a4", "kind": "absent", "question": "周砚的工号是多少？", "gold": null, "source": null }
+  ]
+}

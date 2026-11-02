@@ -11,7 +11,7 @@ Thanks for helping build Episteme — open cognitive infrastructure for carrying
 ### Ways to contribute
 
 - **Bug reports & invariants** — state violations, invalid graph mutations, serialization bugs.
-- **RFC & Architecture** — open an issue before submitting non-trivial API or ontology changes.
+- **RFC & Architecture** — open a Draft PR or an ADR before non-trivial API or ontology changes.
 - **Domain extensions** — write pluggable domain packs that extend Episteme without modifying Core.
 - **Docs & benchmarks** — improve documentation, architectural decision records (ADRs), or evaluation suites.
 
@@ -20,11 +20,11 @@ Security issues: do not open a public issue. Report privately via GitHub Securit
 ### Development setup
 
 Requirements:
-- Node >= 22 (tested on Node 22 and Node 24)
+- Node >= 22.13 (CI tests Node 22 and 24 on Linux, Node 24 on Windows)
 - pnpm >= 11 (see `package.json` packageManager)
 
 ```bash
-git clone https://github.com/SAIR-club/Episteme.git
+git clone https://github.com/Jiarong-Song233/Episteme.git
 cd Episteme
 pnpm install
 pnpm build
@@ -69,18 +69,18 @@ Episteme is built around strict engineering invariants (see `AGENTS.md` for full
 ### 参与贡献方式
 
 - **缺陷反馈与不变量验证**：状态折叠错误、不合法图突变、持久化与序列化缺陷。
-- **架构提案与 RFC**：涉及公共 API 或核心本体模型变动前，先开 Issue 讨论。
+- **架构提案与 RFC**：涉及公共 API 或核心本体模型变动前，先开 Draft PR 或写 ADR 讨论。
 - **领域扩展包开发**：开发可插拔的领域 Pack（例如知识论坛、研究综述等），而非修改 Core。
 - **文档与测试用例**：完善架构决策记录（ADR）、基准评测集与双语说明。
 
 ### 开发环境搭建
 
 环境要求：
-- Node >= 22（CI 矩阵覆盖 Node 22 与 Node 24）
+- Node >= 22.13（CI 覆盖 Linux 上的 Node 22、24 和 Windows 上的 Node 24）
 - pnpm >= 11（查看 `package.json` 中的 packageManager）
 
 ```bash
-git clone https://github.com/SAIR-club/Episteme.git
+git clone https://github.com/Jiarong-Song233/Episteme.git
 cd Episteme
 pnpm install
 pnpm build

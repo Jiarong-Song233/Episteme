@@ -1,4 +1,4 @@
-import type { CognitiveSession } from './session.js'
+import type { CognitiveSession, SceneLog } from './session.js'
 
 /**
  * What a scene's own MCP tools and REST routes may do with a session (ADR 0013, scene extensions).
@@ -80,5 +80,35 @@ export function sceneViewOf(session: CognitiveSession): SceneView {
       list: (prefix?: string) => session.sceneRecords(session.scene.name, prefix),
       put: (key: string, value: unknown) => session.putSceneRecord(session.scene.name, key, value),
     }),
+  })
+}
+
+/**
+ * What a scene's REST route may write beside the view: the caller's own conversation, and the scene's own logs.
+ *
+ * Kept out of `SceneView`, so a scene's MCP tools stay without it. It grants a route nothing the REST API does not
+ * already grant its caller, and nothing here decides or reaches the graph. A log is one per scene, not per person,
+ * so the scene keeps people apart by `actor`.
+ */
+export interface SceneWrites {
+  readonly actor: string
+  openThread(
+    ...args: Parameters<CognitiveSession['openThread']>
+  ): ReturnType<CognitiveSession['openThread']>
+  appendTurn(
+    ...args: Parameters<CognitiveSession['appendTurn']>
+  ): ReturnType<CognitiveSession['appendTurn']>
+  log(name: string): SceneLog
+}
+
+/** The writes of `session` a scene's REST route receives, frozen for the same reason as the view. */
+export function sceneWritesOf(session: CognitiveSession): SceneWrites {
+  return Object.freeze({
+    actor: session.actorId,
+    openThread: (...args: Parameters<CognitiveSession['openThread']>) =>
+      session.openThread(...args),
+    appendTurn: (...args: Parameters<CognitiveSession['appendTurn']>) =>
+      session.appendTurn(...args),
+    log: (name: string) => session.sceneLog(name),
   })
 }

@@ -915,6 +915,171 @@ li[data-status="skipped"] > span:first-child {
   font-size: 12px;
 }
 
+.identity {
+  margin-bottom: 18px;
+}
+
+.identity .hint {
+  margin-bottom: 8px;
+}
+
+.sign-in {
+  max-width: 420px;
+  margin: 12vh auto 0;
+  padding: 0 16px;
+}
+
+.sign-in form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.sign-in label,
+.commons .acting legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 10px 0 18px;
+}
+
+.filters .link[aria-current="true"],
+.publication .link[aria-current="true"] {
+  background: var(--marker);
+  color: var(--ink);
+}
+
+.publications,
+.responses,
+.updates ul,
+.will-show {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.publications li,
+.responses li,
+.updates li,
+.will-show li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.publications .row {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  white-space: normal;
+  text-align: left;
+}
+
+.updates {
+  margin-bottom: 22px;
+  padding-left: 12px;
+  border-left: 4px solid var(--marker);
+}
+
+.published-node {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.published-label,
+.lineage-label {
+  margin: 0 0 4px;
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.publication h3 {
+  margin-top: 22px;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choices-row {
+  flex-flow: row wrap;
+  gap: 6px 16px;
+}
+
+.choices legend {
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.acting .choices label,
+.acting label.choice {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.acting .choices input,
+.acting label.choice input {
+  width: auto;
+}
+
+.lineage {
+  margin: 18px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--ink-soft);
+}
+
+.lineage ol {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.lineage li + li {
+  margin-top: 14px;
+}
+
+.difference {
+  margin: 0 0 2px;
+  font-family: var(--serif);
+  line-height: 1.7;
+}
+
+.difference del {
+  color: var(--ink-soft);
+}
+
+.publication {
+  margin-top: 14px;
+}
+
+.publication > .hint:last-child {
+  margin-top: 18px;
+}
+
+.difference ins {
+  background: var(--marker);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.withdraw {
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
 @media (max-width: 900px) {
   .desk {
     display: flex;

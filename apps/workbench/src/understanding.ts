@@ -17,10 +17,11 @@ import { coverage } from './tokens.js'
 
 const ORIGIN_PREFIX = 'origin/'
 const CHALLENGE_PREFIX = 'challenge/'
-const CANDIDATE_REF = 'cand:'
-const REQUESTED_BY = 'workbench'
-const MAX_WORDS = 400
-const MAX_REASON = 1000
+export const CANDIDATE_REF = 'cand:'
+export const REQUESTED_BY = 'workbench'
+export const MAX_WORDS = 400
+export const MAX_REASON = 1000
+const ADOPTED_PREFIX = 'adopted/'
 const MAX_THREAD_TURNS = 60
 const MAX_THREAD_ITEMS = 8
 const MAX_RECALLED = 3
@@ -28,19 +29,21 @@ const MAX_RECALLED = 3
 const MIN_RECALL_COVERAGE = 0.34
 const MARKS = /\[(?:\d+|推断)\]/g
 /** How a line of material names its speaker. Saying who the learner is lets distillation check what is `stated`. */
-const LEARNER = '学习者'
+export const LEARNER = '学习者'
 const AGENT = '助手'
 /**
  * A line nobody said, opening the material. Distillation reads material as a dialogue only from two turns up, and
  * without that one sentence of the person's own could not be told from prose, so could not be `stated`. It holds no
  * words of theirs, or a quote would be found twice.
  */
-const HEADER = '记录: 以下是原话\n'
+export const HEADER = '记录: 以下是原话\n'
 
 /** The state a person records about what they hold. `stance` is the workbench's own dimension (see `profile.ts`). */
 export const STANCE = 'stance'
 const CONFLICT = 'conflict'
 const REVISES = 'evolves_to'
+/** A person's own version of someone else's published item: their node, pointing at the original. */
+export const FORKS = 'forks_from'
 
 /** Where a candidate came from, kept beside the graph so the page can go back to the words. */
 export interface Origin {
@@ -52,6 +55,27 @@ export interface Origin {
   readonly turn?: string
   /** Why the person changed their mind, for a revision. */
   readonly reason?: string
+}
+
+/**
+ * That someone else's published item is held in this space. The adoption itself is a state event in the graph; this
+ * only says where the person put it, because a node belongs to its author's space, and it is the author's words.
+ */
+export interface Adoption {
+  readonly space: string
+  readonly node: string
+  readonly publication: string
+  readonly author: string
+  readonly at: number
+}
+
+export const adoptionKey = (space: string, node: string): string =>
+  `${ADOPTED_PREFIX}${space}/${node}`
+
+export function adoptionsOf(view: SceneView, space?: string): readonly Adoption[] {
+  return view.records
+    .list(space === undefined ? ADOPTED_PREFIX : `${ADOPTED_PREFIX}${space}/`)
+    .map((record) => record.value as Adoption)
 }
 
 export interface Challenge {
@@ -87,6 +111,14 @@ export interface HeldNode {
     readonly nodeId: string
     readonly label: string
   }[]
+  /** Relations to items outside this space: somebody else's published work, or their response to this one. */
+  readonly elsewhere: HeldNode['relations']
+  /** Set when this is someone else's published item, held here by citing it. Its words are not the person's. */
+  readonly adoptedFrom?: {
+    readonly publication: string
+    readonly author: string
+    readonly at: number
+  }
   /** The node that replaced this one. It stays, with its history, and is no longer reused. */
   readonly revisedTo?: string
   readonly withdrawn: boolean
@@ -127,6 +159,20 @@ export type TrailEntry =
       readonly reason?: string
     }
   | { readonly kind: 'challenged'; readonly at: number; readonly challenge: Challenge }
+  | {
+      readonly kind: 'adopted'
+      readonly at: number
+      readonly publication: string
+      readonly author: string
+    }
+  | {
+      readonly kind: 'forked_from' | 'forked_to'
+      readonly at: number
+      readonly node: string
+      readonly label: string
+      readonly author?: string
+      readonly reason?: string
+    }
 
 const THREAD_SYSTEM = `你从一段学习对话里挑出值得保留的理解单元。
 只输出一个 JSON 对象，不要任何别的文字：
@@ -225,43 +271,76 @@ function challengesOf(view: SceneView, node?: string): readonly Challenge[] {
 export function heldNodes(view: SceneView, space: string): readonly HeldNode[] {
   const tag = scopeTag(space)
   const challenges = challengesOf(view)
-  return view
+  const adoptions = new Map(adoptionsOf(view, space).map((adoption) => [adoption.node, adoption]))
+  const inSpace = view
     .listNodes()
-    .filter((node) => node.tags.includes(tag))
-    .flatMap((node): HeldNode[] => {
-      const expanded = view.expand(node.nodeId)
-      if (expanded === undefined) return []
-      const origin = originOf(view, node.fromSuggestion)
-      const provenance = expanded.origin as { readonly excerpt?: string } | undefined
-      const revisedTo = expanded.neighbours.find(
-        (neighbour) => neighbour.type === REVISES && neighbour.direction === 'out',
-      )?.nodeId
-      const conflict = levelOf(expanded.understanding, CONFLICT)
-      return [
-        {
-          nodeId: node.nodeId,
-          label: node.label,
-          type: node.type,
-          understanding: expanded.understanding,
-          author: expanded.author,
-          ...(node.fromSuggestion === undefined ? {} : { fromSuggestion: node.fromSuggestion }),
-          ...(provenance?.excerpt === undefined ? {} : { excerpt: provenance.excerpt }),
-          ...(origin === undefined ? {} : { origin }),
-          relations: expanded.neighbours.map(({ type, direction, nodeId, label }) => ({
-            type,
-            direction,
-            nodeId,
-            label,
-          })),
-          ...(revisedTo === undefined ? {} : { revisedTo }),
-          withdrawn: levelOf(expanded.understanding, STANCE) === 'withdrawn',
-          conflict: conflict === 'open' || conflict === 'suspected',
-          openChallenges: challenges.filter(
-            (challenge) => challenge.node === node.nodeId && challenge.status === 'open',
-          ).length,
-        },
-      ]
-    })
+    .filter((node) => node.tags.includes(tag) || adoptions.has(node.nodeId))
+  const here = new Set(inSpace.map((node) => node.nodeId))
+  const held = inSpace.flatMap((node): HeldNode[] => {
+    const expanded = view.expand(node.nodeId)
+    if (expanded === undefined) return []
+    const origin = originOf(view, node.fromSuggestion)
+    const provenance = expanded.origin as { readonly excerpt?: string } | undefined
+    const adoption = adoptions.get(node.nodeId)
+    // The author moving on does not move the person who cited them: that takes the person's own version, below.
+    const revisedTo =
+      adoption === undefined
+        ? expanded.neighbours.find(
+            (neighbour) => neighbour.type === REVISES && neighbour.direction === 'out',
+          )?.nodeId
+        : undefined
+    const conflict = levelOf(expanded.understanding, CONFLICT)
+    const relations = expanded.neighbours.map(({ type, direction, nodeId, label }) => ({
+      type,
+      direction,
+      nodeId,
+      label,
+    }))
+    return [
+      {
+        nodeId: node.nodeId,
+        label: node.label,
+        type: node.type,
+        understanding: expanded.understanding,
+        author: expanded.author,
+        ...(node.fromSuggestion === undefined ? {} : { fromSuggestion: node.fromSuggestion }),
+        ...(provenance?.excerpt === undefined ? {} : { excerpt: provenance.excerpt }),
+        ...(origin === undefined ? {} : { origin }),
+        relations: relations.filter((relation) => here.has(relation.nodeId)),
+        elsewhere: relations.filter((relation) => !here.has(relation.nodeId)),
+        ...(adoption === undefined
+          ? {}
+          : {
+              adoptedFrom: {
+                publication: adoption.publication,
+                author: adoption.author,
+                at: adoption.at,
+              },
+            }),
+        ...(revisedTo === undefined ? {} : { revisedTo }),
+        withdrawn: levelOf(expanded.understanding, STANCE) === 'withdrawn',
+        conflict: conflict === 'open' || conflict === 'suspected',
+        openChallenges: challenges.filter(
+          (challenge) => challenge.node === node.nodeId && challenge.status === 'open',
+        ).length,
+      },
+    ]
+  })
+  // A person's own version replaces what they cited for them, and only for them: the author reads this edge as
+  // pointing in, from someone else, and goes on holding their own words.
+  const ownVersions = new Map(
+    held.flatMap((node) =>
+      node.adoptedFrom === undefined
+        ? node.relations
+            .filter((relation) => relation.type === FORKS && relation.direction === 'out')
+            .map((relation) => [relation.nodeId, node.nodeId] as const)
+        : [],
+    ),
+  )
+  return held.map((node) => {
+    const version = node.adoptedFrom === undefined ? undefined : ownVersions.get(node.nodeId)
+    return version === undefined ? node : { ...node, revisedTo: version }
+  })
 }
 
 /** What a person still holds: not revised away, not withdrawn. */
@@ -305,7 +384,14 @@ export async function recalledFor(
     found.set(node.nodeId, node)
     if (found.size === MAX_RECALLED) break
   }
-  return [...found.values()].map(({ nodeId, label, conflict }) => ({ nodeId, label, conflict }))
+  return [...found.values()].map(({ nodeId, label, conflict, adoptedFrom }) => ({
+    nodeId,
+    label,
+    conflict,
+    ...(adoptedFrom === undefined
+      ? {}
+      : { from: { author: adoptedFrom.author, publication: adoptedFrom.publication } }),
+  }))
 }
 
 function trailOf(
@@ -318,16 +404,39 @@ function trailOf(
   const entries: TrailEntry[] = []
   const origin = node.origin
   // Before any state: a node without a kept origin still began before what was recorded about it.
-  const first = origin?.at ?? events[0]?.createdAt ?? 0
-  entries.push({
-    kind: 'proposed',
-    at: first,
-    speaker: origin?.speaker ?? 'learner',
-    ...(origin === undefined ? {} : { basis: origin.basis }),
-    ...(node.excerpt === undefined ? {} : { excerpt: node.excerpt }),
-    ...(origin?.thread === undefined ? {} : { thread: origin.thread }),
-    ...(origin?.turn === undefined ? {} : { turn: origin.turn }),
-  })
+  const first = origin?.at ?? node.adoptedFrom?.at ?? events[0]?.createdAt ?? 0
+  entries.push(
+    node.adoptedFrom === undefined
+      ? {
+          kind: 'proposed',
+          at: first,
+          speaker: origin?.speaker ?? 'learner',
+          ...(origin === undefined ? {} : { basis: origin.basis }),
+          ...(node.excerpt === undefined ? {} : { excerpt: node.excerpt }),
+          ...(origin?.thread === undefined ? {} : { thread: origin.thread }),
+          ...(origin?.turn === undefined ? {} : { turn: origin.turn }),
+        }
+      : {
+          kind: 'adopted',
+          at: first,
+          publication: node.adoptedFrom.publication,
+          author: node.adoptedFrom.author,
+        },
+  )
+  for (const relation of [...node.relations, ...node.elsewhere]) {
+    if (relation.type !== FORKS) continue
+    const other = byId.get(relation.nodeId)
+    const author = view.expand(relation.nodeId)?.author
+    const reason = relation.direction === 'out' ? origin?.reason : other?.origin?.reason
+    entries.push({
+      kind: relation.direction === 'out' ? 'forked_from' : 'forked_to',
+      at: relation.direction === 'out' ? first : (other?.origin?.at ?? first),
+      node: relation.nodeId,
+      label: relation.label,
+      ...(author === undefined ? {} : { author }),
+      ...(reason === undefined ? {} : { reason }),
+    })
+  }
   for (const relation of node.relations) {
     if (relation.type !== REVISES) continue
     const other = byId.get(relation.nodeId)
@@ -396,7 +505,7 @@ function linkEnds(
 }
 
 /** Why a candidate was not offered, in the person's terms. Anything not listed reads as a technical refusal. */
-function refusalMessage(refused: readonly { readonly code: string }[]): string | undefined {
+export function refusalMessage(refused: readonly { readonly code: string }[]): string | undefined {
   const [first] = refused
   if (first === undefined) return undefined
   switch (first.code) {
@@ -411,6 +520,61 @@ function refusalMessage(refused: readonly { readonly code: string }[]): string |
       return '这句话太短，不足以成为一条理解。'
     default:
       return '这条没能生成，可以换个说法。'
+  }
+}
+
+/** Hands items to the review queue, keeping where each node's words came from. */
+export async function submit(
+  view: SceneView,
+  space: string,
+  material: { readonly title: string; readonly text: string },
+  items: readonly HostItem[],
+  originFor: (label: string) => Origin,
+  keys: {
+    readonly session?: string
+    readonly submission?: string
+    readonly thread?: {
+      readonly id: string
+      readonly turns: readonly {
+        readonly id: string
+        readonly start: number
+        readonly end: number
+      }[]
+    }
+  } = {},
+) {
+  const outcome = await view.distill(material, {
+    scope: scopeOf(space),
+    requestedBy: REQUESTED_BY,
+    learner: LEARNER,
+    ...(keys.thread === undefined ? {} : { thread: keys.thread }),
+    host: {
+      candidates: items,
+      ...(keys.session === undefined ? {} : { hostSession: keys.session }),
+      ...(keys.submission === undefined ? {} : { submissionId: keys.submission }),
+    },
+  })
+  if (!outcome.ok) refuse(outcome.refusal.code, outcome.refusal.message)
+  for (const suggestion of outcome.suggestions) {
+    if (suggestion.proposal.kind !== 'node') continue
+    await view.records.put(`${ORIGIN_PREFIX}${suggestion.id}`, originFor(suggestion.proposal.label))
+  }
+  return outcome
+}
+
+export const replyOf = (outcome: {
+  readonly suggestions: readonly { readonly id: string; readonly proposal: unknown }[]
+  readonly refused: readonly {
+    readonly ref: string
+    readonly code: string
+    readonly message: string
+  }[]
+}) => {
+  const message = outcome.suggestions.length === 0 ? refusalMessage(outcome.refused) : undefined
+  return {
+    suggestions: outcome.suggestions.map(({ id, proposal }) => ({ id, proposal })),
+    refused: outcome.refused.map(({ ref, code, message: why }) => ({ ref, code, message: why })),
+    ...(message === undefined ? {} : { message }),
   }
 }
 
@@ -438,64 +602,6 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
         .pendingSuggestions()
         .filter((suggestion) => suggestion.scope === scope)
         .flatMap(({ proposal }) => (proposal.kind === 'node' ? [proposal.label] : [])),
-    }
-  }
-
-  /** Hands items to the review queue, keeping where each node's words came from. */
-  async function submit(
-    view: SceneView,
-    space: string,
-    material: { readonly title: string; readonly text: string },
-    items: readonly HostItem[],
-    originFor: (label: string) => Origin,
-    keys: {
-      readonly session?: string
-      readonly submission?: string
-      readonly thread?: {
-        readonly id: string
-        readonly turns: readonly {
-          readonly id: string
-          readonly start: number
-          readonly end: number
-        }[]
-      }
-    } = {},
-  ) {
-    const outcome = await view.distill(material, {
-      scope: scopeOf(space),
-      requestedBy: REQUESTED_BY,
-      learner: LEARNER,
-      ...(keys.thread === undefined ? {} : { thread: keys.thread }),
-      host: {
-        candidates: items,
-        ...(keys.session === undefined ? {} : { hostSession: keys.session }),
-        ...(keys.submission === undefined ? {} : { submissionId: keys.submission }),
-      },
-    })
-    if (!outcome.ok) refuse(outcome.refusal.code, outcome.refusal.message)
-    for (const suggestion of outcome.suggestions) {
-      if (suggestion.proposal.kind !== 'node') continue
-      await view.records.put(
-        `${ORIGIN_PREFIX}${suggestion.id}`,
-        originFor(suggestion.proposal.label),
-      )
-    }
-    return outcome
-  }
-
-  const replyOf = (outcome: {
-    readonly suggestions: readonly { readonly id: string; readonly proposal: unknown }[]
-    readonly refused: readonly {
-      readonly ref: string
-      readonly code: string
-      readonly message: string
-    }[]
-  }) => {
-    const message = outcome.suggestions.length === 0 ? refusalMessage(outcome.refused) : undefined
-    return {
-      suggestions: outcome.suggestions.map(({ id, proposal }) => ({ id, proposal })),
-      refused: outcome.refused.map(({ ref, code, message: why }) => ({ ref, code, message: why })),
-      ...(message === undefined ? {} : { message }),
     }
   }
 
@@ -702,6 +808,9 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
   async function revise({ view, body }: SceneRouteContext) {
     const space = openSpaceOf(view, text(body, 'space'))
     const node = nodeIn(view, space.id, text(body, 'node'))
+    if (node.adoptedFrom !== undefined) {
+      refuse('not_your_words', '这一条是别人发布的，不能直接修改。可以提出你自己的版本。')
+    }
     if (node.revisedTo !== undefined) {
       refuse('already_revised', '这一条已经修正过了。请修正最新的那一条。')
     }

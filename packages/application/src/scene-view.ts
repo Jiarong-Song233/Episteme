@@ -44,6 +44,8 @@ export interface SceneView {
    * and no adopter. `undefined` for an unknown publication, or a withdrawn one the caller did not write.
    */
   publicationView(id: string): ReturnType<CognitiveSession['publicationView']>
+  /** What the caller adopted that has a newer version, exactly as `GET /api/v1/updates` returns it. */
+  updates(): ReturnType<CognitiveSession['updates']>
   /** The caller's records in this scene's own namespace (ADR 0015, decision 7). Never understanding. */
   readonly records: {
     get(key: string): ReturnType<CognitiveSession['sceneRecord']>
@@ -78,6 +80,7 @@ export function sceneViewOf(session: CognitiveSession): SceneView {
     browsePublications: (...args: Parameters<CognitiveSession['browsePublications']>) =>
       session.browsePublications(...args),
     publicationView: (id: string) => session.publicationView(id),
+    updates: () => session.updates(),
     records: Object.freeze({
       get: (key: string) => session.sceneRecord(session.scene.name, key),
       list: (prefix?: string) => session.sceneRecords(session.scene.name, prefix),

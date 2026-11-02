@@ -149,6 +149,109 @@ export interface Status {
   }[]
 }
 
+export interface Me {
+  readonly actorId: string
+  readonly mode: 'local' | 'shared'
+  readonly sharing: boolean
+  readonly names: Readonly<Record<string, string>>
+}
+
+export interface PublicationSummary {
+  readonly id: string
+  readonly author: string
+  readonly createdAt: number
+  readonly rootLabel: string
+  readonly members: number
+  readonly version: number
+  readonly note?: string
+}
+
+export interface PublicNode {
+  readonly nodeId: string
+  readonly label: string
+  readonly author: string
+  readonly origin?: { readonly excerpt?: string }
+  readonly confirmation: 'person' | 'delegation'
+}
+
+export interface PublicationDetail {
+  readonly publication: {
+    readonly id: string
+    readonly actorId: string
+    readonly createdAt: number
+    readonly root: string
+    readonly note?: string
+  }
+  readonly live: boolean
+  readonly nodes: readonly PublicNode[]
+  readonly edges: readonly {
+    readonly id: string
+    readonly type: string
+    readonly from: string
+    readonly to: string
+  }[]
+  readonly versions: readonly string[]
+  readonly responses: readonly {
+    readonly publication: string
+    readonly author: string
+    readonly node: string
+    readonly label: string
+    readonly relation: string
+    readonly target: string
+    readonly note?: string
+  }[]
+  readonly answered: readonly {
+    readonly node: string
+    readonly label: string
+    readonly relation: string
+    readonly target: string
+    readonly space: string
+  }[]
+  readonly cited: readonly {
+    readonly node: string
+    readonly space: string
+    readonly publication: string
+  }[]
+}
+
+export interface PublicationPlan {
+  readonly public: { readonly nodes: readonly PublicNode[] }
+  readonly private: { readonly otherNodes: number }
+}
+
+export interface PublishChoices {
+  readonly related: readonly { readonly nodeId: string; readonly label: string }[]
+  readonly published?: string
+  readonly earlier?: { readonly id: string; readonly rootLabel: string }
+  /** Why the person answered as they did, so far only theirs: publishing it is their choice. */
+  readonly reason?: string
+}
+
+export interface PublicationUpdate {
+  readonly adopted: string
+  readonly newer: string
+  readonly author: string
+  readonly added: readonly { readonly nodeId: string; readonly label: string }[]
+  readonly removed: readonly { readonly nodeId: string; readonly label: string }[]
+}
+
+export interface LineageStep {
+  readonly nodeId?: string
+  readonly label?: string
+  readonly author: string
+  readonly publication?: string
+  readonly relation?: string
+  readonly reason?: string
+  readonly withdrawn?: true
+}
+
+interface PublishRequest {
+  readonly root: string
+  readonly include?: readonly string[]
+  readonly supersedes?: string
+  readonly note?: string
+}
+
 export class ApiError extends Error {
   constructor(
     readonly code: string,
@@ -171,9 +274,9 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   } catch {
     throw new ApiError('offline', '连不上服务。请确认它还在运行，然后重试。')
   }
-  // A session lives as long as the service: after a restart the page has to fetch a new one.
+  // A session lives as long as the service: after a restart the page has to fetch a new one, or sign in again.
   if (response.status === 401) {
-    throw new ApiError('signed_out', '服务重启过了。请刷新页面。')
+    throw new ApiError('signed_out', '需要重新进入：请刷新页面。')
   }
   const payload = (await response.json().catch(() => ({}))) as {
     readonly code?: string
@@ -203,6 +306,64 @@ function base64Of(file: File): Promise<string> {
 }
 
 export const api = {
+  me: () => request<Me>('/me'),
+  async signIn(token: string): Promise<void> {
+    try {
+      await request('/session', { token })
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'signed_out') {
+        throw new ApiError('bad_token', '这个令牌不对，或者已经被撤销。')
+      }
+      throw error
+    }
+  },
+  publications: (query: string, author: string | undefined) => {
+    const asked = new URLSearchParams()
+    if (query !== '') asked.set('q', query)
+    if (author !== undefined) asked.set('author', author)
+    return request<{ publications: readonly PublicationSummary[] }>(
+      `/publications${asked.size === 0 ? '' : `?${asked.toString()}`}`,
+    )
+  },
+  publication: (id: string) =>
+    scene(`/sharing/publication?id=${encoded(id)}`) as Promise<PublicationDetail>,
+  publishable: (space: string, node: string) =>
+    scene(
+      `/sharing/publishable?space=${encoded(space)}&node=${encoded(node)}`,
+    ) as Promise<PublishChoices>,
+  // Publishing, withdrawing and adopting are the person's, through the API's own routes. A scene route cannot do them.
+  previewPublication: (body: PublishRequest) =>
+    request<PublicationPlan>('/publications/preview', body),
+  publish: (body: PublishRequest) =>
+    request<{ publication: { id: string } }>('/publications', body),
+  withdrawPublication: (id: string) => request(`/publications/${encoded(id)}/withdraw`, {}),
+  adopt: (publication: string, node: string, dimensions: Readonly<Record<string, string>>) =>
+    request(`/publications/${encoded(publication)}/adopt`, { node, dimensions }),
+  placeCited: (space: string, publication: string, node: string) =>
+    scene('/sharing/cite', { space, publication, node }),
+  respond: (
+    space: string,
+    publication: string,
+    node: string,
+    label: string,
+    relation: 'forks' | 'contradicts' | 'supports',
+    reason: string,
+  ) =>
+    scene('/sharing/respond', {
+      space,
+      publication,
+      node,
+      label,
+      relation,
+      ...(reason === '' ? {} : { reason }),
+    }) as Promise<Offered>,
+  lineage: (node: string) =>
+    scene(`/sharing/lineage?node=${encoded(node)}`) as Promise<{
+      steps: readonly LineageStep[]
+    }>,
+  publicationUpdates: () =>
+    scene('/sharing/updates') as Promise<{ updates: readonly PublicationUpdate[] }>,
+  keepCited: (newer: string) => scene('/sharing/updates/keep', { newer }),
   model: () => scene('/model') as Promise<{ name: string; simulated: boolean }>,
   spaces: () => scene('/spaces') as Promise<{ spaces: readonly Space[] }>,
   createSpace: (name: string) => scene('/spaces', { name }) as Promise<{ space: Space }>,

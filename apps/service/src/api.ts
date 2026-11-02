@@ -291,6 +291,23 @@ export async function handleApi(
   async function route(): Promise<void> {
     const method = request.method ?? 'GET'
 
+    // Who is signed in, and what to call the people whose work they can read. Only those people: everyone else in
+    // the user file stays out of it, since being on a service does not make someone's name public.
+    if (path === `${API_PREFIX}/me` && method === 'GET') {
+      const names: Record<string, string> = {}
+      for (const id of [session.actorId, ...session.browsePublications().map((p) => p.author)]) {
+        const name = people?.nameOf(id)
+        if (name !== undefined) names[id] = name
+      }
+      sendJson(response, 200, {
+        actorId: session.actorId,
+        mode: people === undefined ? 'local' : 'shared',
+        sharing: session.sharingAllowed,
+        names,
+      })
+      return
+    }
+
     // The whole surface state in one read, so a Workspace renders from a single revision rather than from
     // several that could disagree.
     if (path === `${API_PREFIX}/state` && method === 'GET') {

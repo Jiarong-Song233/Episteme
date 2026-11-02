@@ -6,25 +6,35 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { GraphLockedError } from '@episteme/application'
-import { startService } from '@episteme/service'
+import { addPerson, addToken, startService } from '@episteme/service'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { modelFromEnvironment } from './model.js'
 import { workbenchProfile } from './profile.js'
 
 /** Starts the workbench: the service, its routes, and the page, on one graph file. */
 
-const { values } = parseArgs({
+const { values, positionals } = parseArgs({
   options: {
     graph: { type: 'string', short: 'g' },
     port: { type: 'string', short: 'p' },
+    shared: { type: 'boolean' },
+    users: { type: 'string' },
+    'public-origin': { type: 'string' },
+    sharing: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
   },
+  allowPositionals: true,
 })
 
 if (values.help === true) {
   process.stdout.write(
     `EPISTEME · 学习工作台\n\n  用法：pnpm workbench [--graph <文件>] [--port <端口>]\n\n` +
       `  默认图谱：~/.episteme/workbench.db；默认端口：4322。\n\n` +
+      `  分享（默认关闭，理解只有你自己能看到）：\n` +
+      `    --sharing                  允许发布已审阅的理解\n` +
+      `    --shared --users <文件>     多人使用同一图谱，每人用自己的令牌登录\n` +
+      `    --public-origin <地址>      别人访问这个服务用的地址，默认 http://127.0.0.1:<端口>\n` +
+      `    pnpm workbench add-person <名字> --users <文件>   添加一个人并生成登录令牌（只显示一次）\n\n` +
       `  模型（都不设置时用模拟模型，它只摘录材料，不是真正的回答）：\n` +
       `    EPISTEME_MODEL_BASE_URL    OpenAI 兼容地址，例如 http://127.0.0.1:11434/v1\n` +
       `    EPISTEME_MODEL_NAME        模型名\n` +
@@ -40,10 +50,28 @@ if (values.help === true) {
   process.exit(0)
 }
 
+const usersFile = values.users ?? process.env['EPISTEME_USERS']
+
+if (positionals[0] === 'add-person') {
+  const name = positionals[1]
+  if (name === undefined || usersFile === undefined) {
+    process.stderr.write('用法：pnpm workbench add-person <名字> --users <文件>\n')
+    process.exit(1)
+  }
+  const actorId = await addPerson(usersFile, name)
+  const token = await addToken(usersFile, actorId, 'human', 'workbench')
+  process.stdout.write(`已添加：${name}\n  登录令牌（只显示这一次）：\n  ${token}\n`)
+  process.exit(0)
+}
+
 const graph =
   values.graph ?? process.env['EPISTEME_FILE'] ?? join(homedir(), '.episteme', 'workbench.db')
 const port = Number.parseInt(values.port ?? process.env['PORT'] ?? '4322', 10)
 const page = join(dirname(fileURLToPath(import.meta.url)), '..', 'web', 'dist')
+if (values.shared === true && usersFile === undefined) {
+  process.stderr.write('多人使用需要用户文件：--shared --users <文件>。\n')
+  process.exit(1)
+}
 if (!existsSync(join(page, 'index.html'))) {
   process.stderr.write('页面还没有构建。请先运行 pnpm workbench:build。\n')
   process.exit(1)
@@ -74,10 +102,19 @@ try {
     port,
     profile: workbenchProfile({ model, library }),
     workspace: page,
+    ...(values.shared === true && usersFile !== undefined
+      ? {
+          mode: 'shared' as const,
+          users: usersFile,
+          publicOrigin: values['public-origin'] ?? `http://127.0.0.1:${port}`,
+        }
+      : {}),
+    ...(values.sharing === true ? { sharing: true } : {}),
   })
   process.stdout.write(
     `\nEPISTEME · 学习工作台\n\n  打开：${service.workspaceUrl ?? service.url}\n  图谱：${service.graph}\n` +
-      `  模型：${model.simulated ? '模拟模型（只摘录材料，不会真正回答）' : model.name}\n\n  按 Ctrl+C 停止。\n\n`,
+      `  模型：${model.simulated ? '模拟模型（只摘录材料，不会真正回答）' : model.name}\n` +
+      `  分享：${values.sharing === true ? '已开启，发布前都会让你确认' : '关闭'}\n\n  按 Ctrl+C 停止。\n\n`,
   )
   const stop = (): void => {
     service

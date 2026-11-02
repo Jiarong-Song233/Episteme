@@ -7,7 +7,7 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from 'd3-force'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useContext, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   api,
   type Challenge,
@@ -16,7 +16,8 @@ import {
   type TrailEntry,
   type Understanding,
 } from './api.js'
-import { messageOf } from './Turns.js'
+import { Lineage, PublishFlow } from './Commons.js'
+import { Links, messageOf } from './Turns.js'
 
 /** What a person holds: every item with where it came from, what happened to it, and what they can do about it. */
 
@@ -96,7 +97,9 @@ function NodeRow({ node, onSelect }: { node: HeldNode; onSelect: (node: string) 
 }
 
 function Marks({ node }: { node: HeldNode }) {
+  const links = useContext(Links)
   const marks = [
+    node.adoptedFrom === undefined ? undefined : `引用自 ${links.nameOf(node.adoptedFrom.author)}`,
     node.conflict ? '未解决的矛盾' : undefined,
     node.openChallenges > 0 ? `${node.openChallenges} 条质疑待回应` : undefined,
     node.revisedTo === undefined ? undefined : '已修正',
@@ -185,7 +188,9 @@ function UnderstandingMap({
               y1={inside(source.y, MAP_HEIGHT)}
               x2={inside(target.x, MAP_WIDTH)}
               y2={inside(target.y, MAP_HEIGHT)}
-              {...(edge.type === 'evolves_to' ? { markerEnd: 'url(#map-arrow)' } : {})}
+              {...(edge.type === 'evolves_to' || edge.type === 'forks_from'
+                ? { markerEnd: 'url(#map-arrow)' }
+                : {})}
             />
           )
         })}
@@ -208,7 +213,7 @@ function UnderstandingMap({
         })}
       </svg>
       <figcaption className="hint">
-        实线：支持。粗虚线：矛盾。箭头：修正。黄点：有未解决的矛盾。空心：已修正或撤回。
+        实线：支持。粗虚线：矛盾。箭头：修正或分叉。黄点：有未解决的矛盾。空心：已修正或撤回。
       </figcaption>
     </figure>
   )
@@ -218,9 +223,12 @@ type Acting =
   | { readonly kind: 'revise'; readonly challenge?: string }
   | { readonly kind: 'challenge' }
   | { readonly kind: 'contradict' }
+  | { readonly kind: 'publish' }
 
 function NodeDetail(props: PanelProps & { node: HeldNode }) {
   const { node, space, understanding, guard, onChanged } = props
+  const links = useContext(Links)
+  const [showLineage, setShowLineage] = useState(false)
   const [trail, setTrail] = useState<readonly TrailEntry[]>([])
   const [acting, setActing] = useState<Acting>()
   const [note, setNote] = useState<string>()
@@ -267,7 +275,18 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
 
   const saveRevision = (label: string, reason: string, challenge: string | undefined): void => {
     act(async () => {
-      const { suggestions } = await api.revise(space, node.nodeId, label, reason)
+      // Someone else's words are not revised. The person's own version goes beside them, pointing back.
+      const { suggestions } =
+        node.adoptedFrom === undefined
+          ? await api.revise(space, node.nodeId, label, reason)
+          : await api.respond(
+              space,
+              node.adoptedFrom.publication,
+              node.nodeId,
+              label,
+              'forks',
+              reason,
+            )
       // These are this person's own words and their own click, so the two decisions are made here, through the one
       // decision route: the new wording, then the edge from the old to it.
       for (const suggestion of suggestions) await api.accept(suggestion.id)
@@ -308,7 +327,20 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
       </h3>
       <Marks node={node} />
       <p className="hint">
-        {wordsOf(node.origin?.basis)}
+        {node.adoptedFrom === undefined ? (
+          wordsOf(node.origin?.basis)
+        ) : (
+          <>
+            {links.nameOf(node.adoptedFrom.author)} 发布的成果，不是你的原话。{' '}
+            <button
+              type="button"
+              className="link"
+              onClick={() => links.openPublication(node.adoptedFrom?.publication ?? '')}
+            >
+              看原来的成果
+            </button>
+          </>
+        )}
         {node.excerpt !== undefined && node.excerpt !== node.label && <>：“{node.excerpt}”</>}
         {node.origin?.thread !== undefined && (
           <>
@@ -372,6 +404,7 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
         <Revising
           initial={node.label}
           busy={busy}
+          adopted={node.adoptedFrom !== undefined}
           onCancel={() => setActing(undefined)}
           onSave={(label, reason) => saveRevision(label, reason, acting.challenge)}
         />
@@ -403,6 +436,19 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
         />
       )}
 
+      {acting?.kind === 'publish' && (
+        <PublishFlow
+          space={space}
+          node={node.nodeId}
+          fromModel={node.origin?.basis === 'inferred'}
+          onCancel={() => setActing(undefined)}
+          onDone={(publication) => {
+            setActing(undefined)
+            links.openPublication(publication)
+          }}
+        />
+      )}
+
       {note !== undefined && (
         <p className="hint" role="status">
           {note}
@@ -418,7 +464,17 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
         <p className="decisions">
           {held && (
             <button type="button" disabled={busy} onClick={() => setActing({ kind: 'revise' })}>
-              修正
+              {node.adoptedFrom === undefined ? '修正' : '提出我的版本'}
+            </button>
+          )}
+          {held && links.sharing && node.adoptedFrom === undefined && (
+            <button
+              type="button"
+              className="link"
+              disabled={busy}
+              onClick={() => setActing({ kind: 'publish' })}
+            >
+              发布
             </button>
           )}
           {held && (
@@ -501,6 +557,31 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
         </section>
       )}
 
+      {node.elsewhere.length > 0 && (
+        <section>
+          <h4>和别人成果的关系</h4>
+          <ul className="relations">
+            {node.elsewhere.map((relation) => (
+              <li key={`${relation.type}-${relation.direction}-${relation.nodeId}`}>
+                <span className="hint">{elsewhereWord(relation.type, relation.direction)}</span>{' '}
+                {relation.label}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(node.adoptedFrom !== undefined || isAnswer(node)) &&
+        (showLineage ? (
+          <Lineage node={node.nodeId} onClose={() => setShowLineage(false)} />
+        ) : (
+          <p>
+            <button type="button" className="link" onClick={() => setShowLineage(true)}>
+              看谱系和差异
+            </button>
+          </p>
+        ))}
+
       {held && dimensions.length > 0 && (
         <section>
           <h4>我的状态</h4>
@@ -543,7 +624,21 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
   )
 }
 
+/** Whether this node answers someone else's: it points at something outside what the person wrote. */
+const isAnswer = (node: HeldNode): boolean =>
+  [...node.relations, ...node.elsewhere].some(
+    (relation) => relation.type === 'forks_from' && relation.direction === 'out',
+  ) || node.elsewhere.some((relation) => relation.direction === 'out')
+
+function elsewhereWord(type: string, direction: 'in' | 'out'): string {
+  if (type === 'forks_from') return direction === 'out' ? '这是你对它的版本：' : '有人由此分叉：'
+  if (type === 'contradicts') return direction === 'out' ? '这一条反驳：' : '有人反驳它：'
+  if (type === 'supports') return direction === 'out' ? '这一条支持：' : '有人支持它：'
+  return `${type}：`
+}
+
 function relationWord(type: string, direction: 'in' | 'out'): string {
+  if (type === 'forks_from') return direction === 'out' ? '这是你的版本，原文是' : '你的版本是'
   if (type === 'evolves_to') return direction === 'out' ? '修正为' : '由这条修正而来'
   if (type === 'supports') return direction === 'out' ? '支持' : '得到它的支持'
   return RELATION_WORDS[type] ?? type
@@ -584,6 +679,7 @@ function TrailLine(props: {
   onJump: (thread: string, turn: string | undefined) => void
 }) {
   const { entry } = props
+  const links = useContext(Links)
   switch (entry.kind) {
     case 'proposed':
       return (
@@ -636,6 +732,22 @@ function TrailLine(props: {
     }
     case 'challenged':
       return <ChallengeLine challenge={entry.challenge} onSelect={props.onSelect} />
+    case 'adopted':
+      return <p>你引用了 {links.nameOf(entry.author)} 发布的这一条。</p>
+    case 'forked_from':
+      return (
+        <p>
+          这是你对 {entry.author === undefined ? '别人' : links.nameOf(entry.author)} 的“
+          {entry.label}”提出的版本。{entry.reason}
+        </p>
+      )
+    case 'forked_to':
+      return (
+        <p>
+          {entry.author === undefined ? '有人' : links.nameOf(entry.author)}由此分叉：{entry.label}
+          。{entry.reason}
+        </p>
+      )
   }
 }
 
@@ -660,6 +772,7 @@ function ChallengeLine(props: { challenge: Challenge; onSelect: (node: string) =
 function Revising(props: {
   initial: string
   busy: boolean
+  adopted: boolean
   onCancel: () => void
   onSave: (label: string, reason: string) => void
 }) {
@@ -679,13 +792,17 @@ function Revising(props: {
         为什么改（可不填）
         <input value={reason} onChange={(event) => setReason(event.target.value)} />
       </label>
-      <p className="hint">原来那条和它的经过都会留下。</p>
+      <p className="hint">
+        {props.adopted
+          ? '原作者的内容不会改变。你的版本先只有你能看到，发布后别人才看得到。'
+          : '原来那条和它的经过都会留下。'}
+      </p>
       <p className="decisions">
         <button
           type="submit"
           disabled={props.busy || label.trim() === '' || label.trim() === props.initial}
         >
-          保存修正
+          {props.adopted ? '保存我的版本' : '保存修正'}
         </button>
         <button type="button" className="link" onClick={props.onCancel}>
           取消

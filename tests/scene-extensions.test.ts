@@ -303,6 +303,7 @@ describe('what an extension is handed', () => {
         'threadView',
         'threads',
         'understandingOf',
+        'updates',
         'vocabulary',
       ])
       for (const forbidden of [

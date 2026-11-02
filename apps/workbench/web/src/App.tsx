@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   api,
+  ApiError,
   type BlockInfo,
   type Citation,
   type Evidence,
   type Failure,
   type MaterialSummary,
   type MaterialText,
+  type Me,
   type PendingCandidate,
   type Plan,
   type Session,
@@ -15,6 +17,7 @@ import {
   type Understanding,
   type WorkflowInfo,
 } from './api.js'
+import { Commons, SignIn } from './Commons.js'
 import { PlanShelf, PlanView, StatusView } from './Learning.js'
 import { AgentTurn, LearnerTurn, Links, messageOf } from './Turns.js'
 import { UnderstandingPanel, wordsOf } from './Understanding.js'
@@ -55,6 +58,61 @@ interface SourceRequest {
 }
 
 export function App() {
+  const [me, setMe] = useState<Me>()
+  const [signingIn, setSigningIn] = useState(false)
+  const [problem, setProblem] = useState<string>()
+
+  const enter = useCallback(() => {
+    setProblem(undefined)
+    api
+      .me()
+      .then((found) => {
+        setMe(found)
+        setSigningIn(false)
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.code === 'signed_out') setSigningIn(true)
+        else setProblem(messageOf(error))
+      })
+  }, [])
+
+  useEffect(enter, [enter])
+
+  if (signingIn) {
+    return (
+      <SignIn
+        onSignedIn={enter}
+        {...(me === undefined ? {} : { onCancel: () => setSigningIn(false) })}
+      />
+    )
+  }
+  if (problem !== undefined) {
+    return (
+      <p className="banner banner-error" role="alert">
+        {problem}
+      </p>
+    )
+  }
+  if (me === undefined) return null
+  return (
+    // Everything held on the page is one person's, so changing person starts it over.
+    <Desk key={me.actorId} me={me} onNames={setMe} onSignIn={() => setSigningIn(true)} />
+  )
+}
+
+function Desk({
+  me,
+  onNames,
+  onSignIn,
+}: {
+  me: Me
+  onNames: (me: Me) => void
+  onSignIn: () => void
+}) {
+  const [commons, setCommons] = useState(false)
+  const [publication, setPublication] = useState<string>()
+  /** A node to open once the space it lies in has loaded, because changing space clears the selection. */
+  const nodeAfterSwitch = useRef<string | undefined>(undefined)
   const [model, setModel] = useState<{ name: string; simulated: boolean }>()
   const [spaces, setSpaces] = useState<readonly Space[]>([])
   const [spaceId, setSpaceId] = useState<string>()
@@ -96,10 +154,20 @@ export function App() {
     return () => clearInterval(looking)
   }, [focusedTurn])
 
-  const guard = useCallback((work: () => Promise<unknown>): void => {
-    setNotice(undefined)
-    work().catch((error: unknown) => setNotice(messageOf(error)))
-  }, [])
+  const guard = useCallback(
+    (work: () => Promise<unknown>): void => {
+      setNotice(undefined)
+      work().catch((error: unknown) => {
+        // On a shared service a session ends with the run: the person signs in again.
+        if (me.mode === 'shared' && error instanceof ApiError && error.code === 'signed_out') {
+          onSignIn()
+          return
+        }
+        setNotice(messageOf(error))
+      })
+    },
+    [me.mode, onSignIn],
+  )
 
   const openThread = useCallback(async (thread: string | undefined) => {
     setThreadId(thread)
@@ -121,7 +189,8 @@ export function App() {
 
   useEffect(() => {
     setSource(undefined)
-    setSelectedNode(undefined)
+    setSelectedNode(nodeAfterSwitch.current)
+    nodeAfterSwitch.current = undefined
     setFocusedTurn(undefined)
     if (spaceId === undefined) {
       setMaterials([])
@@ -237,6 +306,19 @@ export function App() {
     setPane('side')
   }
 
+  const openPublication = (id: string): void => {
+    setCommons(true)
+    setPublication(id)
+    setPane('talk')
+  }
+
+  const refreshNames = useCallback(async () => {
+    onNames(await api.me())
+  }, [onNames])
+
+  const nameOf = (actor: string): string =>
+    actor === me.actorId ? '你' : (me.names[actor] ?? '另一位用户')
+
   /** From an understanding back to the words it came from, in a conversation or a plan. */
   const jumpTo = (thread: string, turn: string | undefined): void => {
     const plan = plans.find((candidate) => candidate.thread === thread)
@@ -261,6 +343,10 @@ export function App() {
         nodes: understanding.nodes,
         focused: focusedTurn,
         openNode,
+        nameOf,
+        refreshNames,
+        openPublication,
+        sharing: me.sharing,
         offer: offerTurn,
       }}
     >
@@ -289,6 +375,7 @@ export function App() {
                 setPane('talk')
               }}
               onSelect={(id) => {
+                setCommons(false)
                 setPlanNotice(undefined)
                 setPlanId(id)
                 setPane('talk')
@@ -296,12 +383,25 @@ export function App() {
             />
           }
           guard={guard}
+          identity={
+            <Identity
+              me={me}
+              commons={commons}
+              onCommons={() => {
+                setCommons(true)
+                setPublication(undefined)
+                setPane('talk')
+              }}
+              onSignIn={onSignIn}
+            />
+          }
           onSpaces={(next, selected) => {
             setSpaces(next)
             if (selected !== undefined) setSpaceId(selected)
           }}
           onSelectSpace={(id) => {
             setSpaceId(id)
+            setCommons(false)
             setPane('talk')
           }}
           onMaterialsChanged={refreshMaterials}
@@ -309,11 +409,13 @@ export function App() {
             showSource({ materialId: material.id, title: material.title })
           }
           onSelectThread={(id) => {
+            setCommons(false)
             setPlanId(undefined)
             guard(() => openThread(id))
             setPane('talk')
           }}
           onNewThread={() => {
+            setCommons(false)
             setPlanId(undefined)
             guard(() => openThread(undefined))
             setPane('talk')
@@ -331,7 +433,27 @@ export function App() {
               {notice}
             </p>
           )}
-          {planId === undefined ? (
+          {commons ? (
+            <Commons
+              me={me.actorId}
+              spaces={spaces}
+              current={spaceId}
+              dimensions={understanding.dimensions}
+              opened={publication}
+              onOpen={setPublication}
+              onChanged={decided}
+              onOpenNode={(space, node) => {
+                if (space === spaceId) {
+                  openNode(node)
+                  return
+                }
+                nodeAfterSwitch.current = node
+                setSpaceId(space)
+                setTab('understood')
+                setPane('side')
+              }}
+            />
+          ) : planId === undefined ? (
             <Conversation
               space={space}
               hasMaterial={materials.length > 0}
@@ -411,6 +533,39 @@ export function App() {
   )
 }
 
+/** Who is here, and the way to what people have published, when this service has either. */
+function Identity(props: {
+  me: Me
+  commons: boolean
+  onCommons: () => void
+  onSignIn: () => void
+}) {
+  const { me } = props
+  if (!me.sharing && me.mode !== 'shared') return null
+  return (
+    <section className="identity">
+      {me.mode === 'shared' && (
+        <p className="hint">
+          现在是 {me.names[me.actorId] ?? '你'}。{' '}
+          <button type="button" className="link" onClick={props.onSignIn}>
+            换一个身份
+          </button>
+        </p>
+      )}
+      {me.sharing && (
+        <button
+          type="button"
+          className="row"
+          aria-current={props.commons}
+          onClick={props.onCommons}
+        >
+          公开成果
+        </button>
+      )}
+    </section>
+  )
+}
+
 /** Asks a model what in this conversation is worth keeping. What comes back still waits for the person. */
 function ExtractFromThread(props: {
   space: string | undefined
@@ -456,6 +611,7 @@ function Shelf(props: {
   thread: string | undefined
   plans: ReactNode
   guard: (work: () => Promise<unknown>) => void
+  identity: ReactNode
   onSpaces: (spaces: readonly Space[], selected?: string) => void
   onSelectSpace: (id: string) => void
   onMaterialsChanged: () => Promise<void>
@@ -512,6 +668,7 @@ function Shelf(props: {
   return (
     <aside className="shelf" aria-label="空间">
       <h1 className="wordmark">学习工作台</h1>
+      {props.identity}
       <section>
         <h2>空间</h2>
         <ul className="list">

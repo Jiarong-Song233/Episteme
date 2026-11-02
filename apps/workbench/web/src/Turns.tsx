@@ -12,6 +12,12 @@ export interface TurnLinks {
   /** The turn a node's page sent the person back to. */
   readonly focused: string | undefined
   readonly openNode: (node: string) => void
+  /** What to call whoever wrote something. */
+  readonly nameOf: (actor: string) => string
+  readonly refreshNames: () => Promise<void>
+  readonly openPublication: (publication: string) => void
+  /** Whether this service allows publishing at all. */
+  readonly sharing: boolean
   readonly offer: (thread: string, turn: string) => Promise<string | undefined>
 }
 
@@ -19,6 +25,10 @@ export const Links = createContext<TurnLinks>({
   nodes: [],
   focused: undefined,
   openNode: () => undefined,
+  nameOf: () => '另一位用户',
+  refreshNames: () => Promise.resolve(),
+  openPublication: () => undefined,
+  sharing: false,
   offer: () => Promise.resolve(undefined),
 })
 
@@ -76,6 +86,19 @@ function Recalled({ answer }: { answer: Answer }) {
               {item.label}
             </button>
             {item.conflict && <span className="hint">（你还有未解决的矛盾）</span>}
+            {item.from !== undefined && (
+              <span className="hint">
+                （你引用的成果，作者：
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => links.openPublication(item.from?.publication ?? '')}
+                >
+                  {links.nameOf(item.from.author)}
+                </button>
+                ）
+              </span>
+            )}
           </li>
         ))}
       </ul>

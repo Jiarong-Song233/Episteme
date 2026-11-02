@@ -1631,6 +1631,11 @@ export class CognitiveSession {
     }
   }
 
+  /** Whether this service allows publishing at all (ADR 0014), so a page can leave it out when it does not. */
+  get sharingAllowed(): boolean {
+    return this.#parts.sharing
+  }
+
   #sharingRefusal(): MutationRefusal | undefined {
     if (this.#parts.sharing) return undefined
     return {

@@ -1,20 +1,24 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   api,
-  type Answer,
+  type BlockInfo,
   type Citation,
   type Evidence,
   type Failure,
   type MaterialSummary,
   type MaterialText,
   type PendingCandidate,
+  type Plan,
   type Session,
   type Space,
   type Turn,
   type Understanding,
+  type WorkflowInfo,
 } from './api.js'
+import { PlanShelf, PlanView, StatusView } from './Learning.js'
+import { AgentTurn, messageOf } from './Turns.js'
 
-type SideTab = 'source' | 'pending' | 'understood'
+type SideTab = 'source' | 'pending' | 'understood' | 'status'
 type Pane = 'shelf' | 'talk' | 'side'
 
 const LAST_SPACE = 'workbench.space'
@@ -35,9 +39,6 @@ function remember(space: string): void {
     return
   }
 }
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : '出了点问题。请重试。'
 
 const NO_UNDERSTANDING: Understanding = { nodes: [], pending: [] }
 
@@ -65,6 +66,14 @@ export function App() {
   const [notice, setNotice] = useState<string>()
   const [asking, setAsking] = useState(false)
   const [failed, setFailed] = useState<{ question: string; failure: Failure }>()
+  const [library, setLibrary] = useState<{
+    workflows: readonly WorkflowInfo[]
+    blocks: readonly BlockInfo[]
+  }>({ workflows: [], blocks: [] })
+  const [plans, setPlans] = useState<readonly Plan[]>([])
+  const [planId, setPlanId] = useState<string>()
+  const [planNotice, setPlanNotice] = useState<string>()
+  const [learned, setLearned] = useState(0)
 
   const space = spaces.find((candidate) => candidate.id === spaceId)
 
@@ -82,6 +91,7 @@ export function App() {
   useEffect(() => {
     guard(async () => {
       setModel(await api.model())
+      setLibrary(await api.workflows())
       const listed = (await api.spaces()).spaces
       setSpaces(listed)
       const open = listed.filter((candidate) => !candidate.archived)
@@ -96,22 +106,38 @@ export function App() {
       setMaterials([])
       setSessions([])
       setUnderstanding(NO_UNDERSTANDING)
+      setPlans([])
+      setPlanId(undefined)
       void openThread(undefined)
       return
     }
     remember(spaceId)
     guard(async () => {
-      const [listed, threads, held] = await Promise.all([
+      const [listed, threads, held, planned] = await Promise.all([
         api.materials(spaceId),
         api.sessions(spaceId),
         api.understanding(spaceId),
+        api.plans(spaceId),
       ])
       setMaterials(listed.materials)
       setSessions(threads.sessions)
       setUnderstanding(held)
-      // Coming back to a space picks up where the person left off.
-      const latest = [...threads.sessions].sort((a, b) => b.createdAt - a.createdAt)[0]
-      await openThread(latest?.id)
+      setPlans(planned.plans)
+      setPlanNotice(undefined)
+      // Coming back to a space picks up where the person left off, in a plan or a conversation.
+      const ownThreads = new Set(planned.plans.map((plan) => plan.thread))
+      const latest = threads.sessions
+        .filter((session) => !ownThreads.has(session.id))
+        .sort((a, b) => b.createdAt - a.createdAt)[0]
+      const unfinished = planned.plans
+        .filter((plan) => plan.status !== 'done')
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0]
+      const resume =
+        unfinished !== undefined && unfinished.updatedAt >= (latest?.createdAt ?? 0)
+          ? unfinished
+          : undefined
+      setPlanId(resume?.id)
+      await openThread(resume === undefined ? latest?.id : undefined)
     })
   }, [spaceId, guard, openThread])
 
@@ -149,9 +175,21 @@ export function App() {
     setPane('side')
   }
 
-  const makeCandidates = async (reply: string): Promise<string | undefined> => {
-    if (spaceId === undefined || threadId === undefined) return undefined
-    const made = await api.candidates(spaceId, threadId, reply)
+  const cite = (citation: Citation, evidence?: Evidence): void => {
+    showSource({
+      materialId: citation.materialId,
+      title: citation.title,
+      citation,
+      ...(evidence === undefined ? {} : { evidence }),
+    })
+  }
+
+  const makeCandidates = async (
+    thread: string | undefined,
+    reply: string,
+  ): Promise<string | undefined> => {
+    if (spaceId === undefined || thread === undefined) return undefined
+    const made = await api.candidates(spaceId, thread, reply)
     await refreshUnderstanding()
     if (made.suggestions.length > 0) {
       setTab('pending')
@@ -166,8 +204,32 @@ export function App() {
         spaces={spaces}
         current={spaceId}
         materials={materials}
-        sessions={sessions}
-        thread={threadId}
+        sessions={sessions.filter((session) => !plans.some((plan) => plan.thread === session.id))}
+        thread={planId === undefined ? threadId : undefined}
+        plans={
+          <PlanShelf
+            plans={plans}
+            current={planId}
+            workflows={library.workflows}
+            hasMaterial={materials.length > 0}
+            archived={space?.archived === true}
+            guard={guard}
+            onCreate={(topic, minutes, workflow) =>
+              api.createPlan(spaceId ?? '', topic, minutes, workflow)
+            }
+            onCreated={(plan, created) => {
+              setPlans((held) => [plan, ...held])
+              setPlanNotice(created)
+              setPlanId(plan.id)
+              setPane('talk')
+            }}
+            onSelect={(id) => {
+              setPlanNotice(undefined)
+              setPlanId(id)
+              setPane('talk')
+            }}
+          />
+        }
         guard={guard}
         onSpaces={(next, selected) => {
           setSpaces(next)
@@ -182,10 +244,12 @@ export function App() {
           showSource({ materialId: material.id, title: material.title })
         }
         onSelectThread={(id) => {
+          setPlanId(undefined)
           guard(() => openThread(id))
           setPane('talk')
         }}
         onNewThread={() => {
+          setPlanId(undefined)
           guard(() => openThread(undefined))
           setPane('talk')
         }}
@@ -202,23 +266,38 @@ export function App() {
             {notice}
           </p>
         )}
-        <Conversation
-          space={space}
-          hasMaterial={materials.length > 0}
-          turns={turns}
-          asking={asking}
-          failed={failed}
-          onAsk={ask}
-          onCite={(citation, evidence) =>
-            showSource({
-              materialId: citation.materialId,
-              title: citation.title,
-              citation,
-              ...(evidence === undefined ? {} : { evidence }),
-            })
-          }
-          onCandidates={makeCandidates}
-        />
+        {planId === undefined ? (
+          <Conversation
+            space={space}
+            hasMaterial={materials.length > 0}
+            turns={turns}
+            asking={asking}
+            failed={failed}
+            onAsk={ask}
+            onCite={cite}
+            onCandidates={(reply) => makeCandidates(threadId, reply)}
+          />
+        ) : (
+          <PlanView
+            plan={planId}
+            blocks={library.blocks}
+            workflows={library.workflows}
+            notice={planNotice}
+            guard={guard}
+            onChanged={() => {
+              setLearned((held) => held + 1)
+              if (spaceId !== undefined) {
+                guard(async () => setPlans((await api.plans(spaceId)).plans))
+              }
+            }}
+            onCite={cite}
+            onCandidates={makeCandidates}
+            onShowStatus={() => {
+              setTab('status')
+              setPane('side')
+            }}
+          />
+        )}
       </main>
       <Side
         tab={tab}
@@ -226,7 +305,11 @@ export function App() {
         source={source}
         understanding={understanding}
         guard={guard}
-        onDecided={refreshUnderstanding}
+        onDecided={async () => {
+          await refreshUnderstanding()
+          setLearned((held) => held + 1)
+        }}
+        status={<StatusView space={spaceId} version={learned} />}
       />
       <nav className="switcher" aria-label="切换页面">
         <button type="button" aria-current={pane === 'shelf'} onClick={() => setPane('shelf')}>
@@ -249,6 +332,7 @@ function Shelf(props: {
   materials: readonly MaterialSummary[]
   sessions: readonly Session[]
   thread: string | undefined
+  plans: ReactNode
   guard: (work: () => Promise<unknown>) => void
   onSpaces: (spaces: readonly Space[], selected?: string) => void
   onSelectSpace: (id: string) => void
@@ -480,6 +564,7 @@ function Shelf(props: {
               }}
             />
           </section>
+          {props.plans}
           <section>
             <h2>对话</h2>
             <ul className="list">
@@ -605,124 +690,6 @@ function Conversation(props: {
   )
 }
 
-function AgentTurn(props: {
-  turn: Turn
-  onCite: (citation: Citation, evidence?: Evidence) => void
-  onCandidates: (reply: string) => Promise<string | undefined>
-}) {
-  const { turn } = props
-  const [state, setState] = useState<'idle' | 'working' | 'done'>('idle')
-  const [note, setNote] = useState<string>()
-  if (turn.answer === undefined) return <p className="answer">{turn.text}</p>
-  const usable = turn.answer.segments.some(
-    (segment) => segment.basis === 'material' && segment.weak !== true,
-  )
-  return (
-    <article className="answer-block">
-      <AnswerBody answer={turn.answer} onCite={props.onCite} />
-      {note !== undefined && <p className="hint">{note}</p>}
-      {usable && (
-        <button
-          type="button"
-          className="link"
-          disabled={state !== 'idle'}
-          onClick={() => {
-            setState('working')
-            props
-              .onCandidates(turn.id)
-              .then((message) => {
-                setNote(message)
-                setState('done')
-              })
-              .catch((error: unknown) => {
-                setNote(messageOf(error))
-                setState('idle')
-              })
-          }}
-        >
-          {state === 'working' ? '正在提炼…' : state === 'done' ? '已提炼' : '提炼成待确认的理解'}
-        </button>
-      )}
-    </article>
-  )
-}
-
-function AnswerBody({
-  answer,
-  onCite,
-}: {
-  answer: Answer
-  onCite: (citation: Citation, evidence?: Evidence) => void
-}) {
-  if (answer.status === 'insufficient_evidence') {
-    return (
-      <p className="no-evidence">
-        材料里没有足够的依据回答这个问题。可以换个问法，或者上传相关材料。
-      </p>
-    )
-  }
-  const byNumber = new Map(answer.citations.map((citation) => [citation.n, citation]))
-  return (
-    <>
-      {answer.status === 'inference_only' && (
-        <p className="hint">这条回答没有一句能在材料里找到依据。下面全是模型的推断。</p>
-      )}
-      <p className="answer">
-        {answer.segments.map((segment, index) => {
-          const kind =
-            segment.basis === 'inference' ? 'inferred' : segment.weak === true ? 'weak' : 'sourced'
-          return (
-            // Segments never move: an answer is stored once and only read after that.
-            // biome-ignore lint: index is the identity here
-            <span key={index} className={kind}>
-              {kind === 'inferred' && <span className="visually-hidden">（模型推断）</span>}
-              {kind === 'weak' && <span className="visually-hidden">（引用待核对）</span>}
-              {segment.text}
-              {segment.citations.map((n) => {
-                const citation = byNumber.get(n)
-                return citation === undefined ? null : (
-                  <button
-                    type="button"
-                    key={n}
-                    className="cite"
-                    aria-label={`查看引用 ${n}：${citation.title}`}
-                    onClick={() =>
-                      onCite(
-                        citation,
-                        segment.evidence?.find((found) => found.n === n),
-                      )
-                    }
-                  >
-                    {n}
-                  </button>
-                )
-              })}
-            </span>
-          )
-        })}
-      </p>
-      {answer.invalidCitations.length > 0 && (
-        <p className="hint">
-          模型引用了不存在的片段（{answer.invalidCitations.join('、')}），相应的句子已按推断处理。
-        </p>
-      )}
-      <p className="legend">
-        {answer.citations.length > 0 && <span>角标：点开看原文</span>}
-        {answer.segments.some((segment) => segment.basis === 'inference') && (
-          <span>
-            <span className="inferred">波浪线</span>：模型的推断，材料里没有
-          </span>
-        )}
-        {answer.segments.some((segment) => segment.weak === true) && (
-          <span>
-            <span className="weak">虚线</span>：引用可能不对，请核对原文
-          </span>
-        )}
-      </p>
-    </>
-  )
-}
-
 function Side(props: {
   tab: SideTab
   onTab: (tab: SideTab) => void
@@ -730,12 +697,14 @@ function Side(props: {
   understanding: Understanding
   guard: (work: () => Promise<unknown>) => void
   onDecided: () => Promise<void>
+  status: ReactNode
 }) {
   const { tab, understanding } = props
   const tabs: readonly (readonly [SideTab, string])[] = [
     ['source', '原文'],
     ['pending', `待确认（${understanding.pending.length}）`],
     ['understood', `我的理解（${understanding.nodes.length}）`],
+    ['status', '学习状态'],
   ]
   return (
     <aside className="side" aria-label="原文与理解">
@@ -754,6 +723,7 @@ function Side(props: {
       </div>
       <div className="side-body">
         {tab === 'source' && <SourceView request={props.source} />}
+        {tab === 'status' && props.status}
         {tab === 'pending' && (
           <PendingList
             pending={understanding.pending}

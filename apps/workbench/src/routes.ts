@@ -1,11 +1,25 @@
 import { randomUUID } from 'node:crypto'
-import type { HostItem, SceneView, SceneWrites, Turn } from '@episteme/application'
-import { SessionRefusal } from '@episteme/application'
+import type { HostItem, SceneWrites, Turn } from '@episteme/application'
 import type { SceneRoute, SceneRouteContext } from '@episteme/service'
 import { answerFrom, answerText, relevant, type Answer } from './answer.js'
+import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
+import { learningRoutes } from './learning.js'
 import { MaterialStore } from './materials.js'
 import { ModelFailure, type ModelClient, type ModelMessage } from './model.js'
 import { MAX_MATERIAL_BYTES, MaterialRefusal, parseMaterial } from './parse.js'
+import {
+  ANSWER_PREFIX,
+  openSpaceOf,
+  refuse,
+  required,
+  scopeOf,
+  SPACE_PREFIX,
+  spaceOf,
+  text,
+  type Space,
+} from './requests.js'
+
+export { scopeOf, type Space } from './requests.js'
 
 /**
  * The workbench's REST routes, under `/api/v1/scene/<name>`.
@@ -14,56 +28,11 @@ import { MAX_MATERIAL_BYTES, MaterialRefusal, parseMaterial } from './parse.js'
  * person's decision goes through the API's own decision route.
  */
 
-export interface Space {
-  readonly id: string
-  readonly name: string
-  readonly archived: boolean
-  readonly createdAt: number
-}
-
-const SPACE_PREFIX = 'space/'
-const ANSWER_PREFIX = 'answer/'
 const MAX_NAME = 80
 const MAX_QUESTION = 4000
 const THREAD_TITLE = 40
 /** Base64 grows a file by a third; the rest of the body is a few short fields. */
 const MAX_UPLOAD_BODY = Math.ceil((MAX_MATERIAL_BYTES * 4) / 3) + 4096
-
-function refuse(code: string, message: string): never {
-  throw new SessionRefusal(code, message)
-}
-
-function text(body: Readonly<Record<string, unknown>>, field: string, max = 4096): string {
-  const value = body[field]
-  if (typeof value !== 'string' || value.trim() === '') {
-    refuse('invalid_request', `"${field}" must be a non-empty string`)
-  }
-  if (value.length > max) refuse('invalid_request', `"${field}" is longer than ${max} characters`)
-  return value
-}
-
-function required(query: URLSearchParams, field: string): string {
-  const value = query.get(field)
-  if (value === null || value === '') refuse('invalid_request', `"${field}" is required`)
-  return value
-}
-
-/** The scope every thread, suggestion and accepted node of a space carries. */
-export function scopeOf(space: string): string {
-  return `workbench:${space}`
-}
-
-function spaceOf(view: SceneView, id: string): Space {
-  const record = view.records.get(`${SPACE_PREFIX}${id}`)
-  if (record === undefined) refuse('unknown_space', '这个空间不存在。')
-  return record.value as Space
-}
-
-function openSpaceOf(view: SceneView, id: string): Space {
-  const space = spaceOf(view, id)
-  if (space.archived) refuse('space_archived', '这个空间已归档。请先恢复它。')
-  return space
-}
 
 function bytesOf(body: Readonly<Record<string, unknown>>): Uint8Array {
   const content = body['contentBase64']
@@ -99,12 +68,17 @@ export interface WorkbenchRouteOptions {
   readonly model: ModelClient
   /** Injected, so a test can fix the time. */
   readonly now?: () => number
+  /** The ways of learning on offer. Defaults to the built-in ones. */
+  readonly library?: Library
 }
 
 /** The routes over one graph. Make one set per service: its material store belongs to that graph's connection. */
 export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneRoute[] {
   const { model } = options
   const now = options.now ?? Date.now
+  const library = options.library ?? BUILT_IN_LIBRARY
+  const problems = libraryProblems(library)
+  if (problems.length > 0) throw new Error(`Invalid learning library: ${problems.join('; ')}`)
   let opened: Promise<MaterialStore> | undefined
   const materialsOf = (writes: SceneWrites): Promise<MaterialStore> => {
     opened ??= MaterialStore.open(writes.log('materials'))
@@ -229,6 +203,7 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
   }
 
   return [
+    ...learningRoutes({ model, library, now, materialsOf }),
     route('GET', '/model', () => ({ name: model.name, simulated: model.simulated })),
 
     route('GET', '/spaces', ({ view }) => ({

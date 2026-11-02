@@ -1,8 +1,17 @@
-import type { Answer, MaterialSummary, Space } from '@episteme/workbench'
+import type { Answer, MaterialSummary, Plan, PublicQuestion, Space } from '@episteme/workbench'
 
 /** The page's only way to the graph: the same REST API any other client has. */
 
-export type { Answer, Citation, Evidence, MaterialSummary, Space } from '@episteme/workbench'
+export type {
+  Answer,
+  Citation,
+  Evidence,
+  MaterialSummary,
+  Plan,
+  PublicQuestion,
+  Space,
+  Step,
+} from '@episteme/workbench'
 
 export interface Session {
   readonly id: string
@@ -58,6 +67,60 @@ export interface Understood {
 export interface Understanding {
   readonly nodes: readonly Understood[]
   readonly pending: readonly PendingCandidate[]
+}
+
+export interface WorkflowInfo {
+  readonly id: string
+  readonly title: string
+  readonly description: string
+}
+
+export interface BlockInfo {
+  readonly id: string
+  readonly title: string
+  readonly interaction: string
+  readonly maxRounds?: number
+}
+
+export interface PlanProposal {
+  readonly plan: Plan
+  readonly notice?: string
+}
+
+export interface PlanDetail {
+  readonly plan: Plan
+  readonly turns: readonly Turn[]
+  readonly question?: PublicQuestion
+}
+
+export interface PlanMove {
+  readonly plan: Plan
+  readonly question?: PublicQuestion
+  readonly failure?: Failure
+}
+
+export interface Status {
+  readonly plans: readonly {
+    readonly id: string
+    readonly topic: string
+    readonly status: Plan['status']
+    readonly done: number
+    readonly total: number
+  }[]
+  readonly checked: { readonly correct: number; readonly total: number }
+  readonly estimated: {
+    readonly correct: number
+    readonly partial: number
+    readonly wrong: number
+    readonly unjudged: number
+  }
+  readonly confirmed: number
+  readonly review: readonly {
+    readonly focus: string
+    readonly dueAt: number
+    readonly due: boolean
+    readonly reason: string
+  }[]
 }
 
 export class ApiError extends Error {
@@ -156,6 +219,28 @@ export const api = {
       suggestions: readonly unknown[]
       message?: string
     }>,
+  workflows: () =>
+    scene('/workflows') as Promise<{
+      workflows: readonly WorkflowInfo[]
+      blocks: readonly BlockInfo[]
+    }>,
+  plans: (space: string) =>
+    scene(`/plans?space=${encoded(space)}`) as Promise<{ plans: readonly Plan[] }>,
+  plan: (id: string) => scene(`/plan?id=${encoded(id)}`) as Promise<PlanDetail>,
+  createPlan: (space: string, topic: string, minutes: number, workflow: string) =>
+    scene('/plans', { space, topic, minutes, workflow }) as Promise<PlanProposal>,
+  updatePlan: (
+    plan: string,
+    change: { status?: 'active' | 'paused'; steps?: readonly unknown[] },
+  ) => scene('/plans/update', { plan, ...change }) as Promise<{ plan: Plan }>,
+  act: (plan: string, action: string, text: string | undefined, retry: boolean) =>
+    scene('/plans/act', {
+      plan,
+      action,
+      ...(text === undefined ? {} : { text }),
+      ...(retry ? { retry } : {}),
+    }) as Promise<PlanMove>,
+  status: (space: string) => scene(`/status?space=${encoded(space)}`) as Promise<Status>,
   understanding: (space: string) =>
     scene(`/understanding?space=${encoded(space)}`) as Promise<Understanding>,
   // The person's decision, through the API's own decision route. The workbench has no other way to make one.

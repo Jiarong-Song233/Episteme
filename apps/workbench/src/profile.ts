@@ -1,5 +1,6 @@
 import { learnScene } from '@episteme/application'
 import { BLANK_TOPIC, type SceneProfile } from '@episteme/service'
+import type { Library } from './blocks.js'
 import type { ModelClient } from './model.js'
 import { workbenchRoutes } from './routes.js'
 
@@ -13,6 +14,7 @@ export const WORKBENCH_SCENE = 'workbench'
 export function workbenchProfile(options: {
   readonly model: ModelClient
   readonly now?: () => number
+  readonly library?: Library
 }): SceneProfile {
   return {
     name: WORKBENCH_SCENE,

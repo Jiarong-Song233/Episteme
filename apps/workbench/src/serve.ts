@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { GraphLockedError } from '@episteme/application'
 import { startService } from '@episteme/service'
+import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { modelFromEnvironment } from './model.js'
 import { workbenchProfile } from './profile.js'
 
@@ -31,7 +33,9 @@ if (values.help === true) {
       `    EPISTEME_MODEL_MAX_OUTPUT_TOKENS  单次输出上限，默认 2048\n` +
       `    EPISTEME_MODEL_REASONING_EFFORT   思考强度；本地思考型模型回答为空时设为 none\n` +
       `    EPISTEME_MODEL_MAX_CALLS   每次运行的调用上限，默认 100\n` +
-      `    EPISTEME_MODEL_MAX_TOKENS  每次运行的 token 上限，默认 200000\n\n`,
+      `    EPISTEME_MODEL_MAX_TOKENS  每次运行的 token 上限，默认 200000\n\n` +
+      `  学习方式：\n` +
+      `    EPISTEME_WORKFLOWS         JSON 文件，增加学习活动（blocks）和工作流（workflows）\n\n`,
   )
   process.exit(0)
 }
@@ -45,12 +49,30 @@ if (!existsSync(join(page, 'index.html'))) {
   process.exit(1)
 }
 
+/** Ways of learning added by a file: more of what `blocks.ts` holds, as data, checked before anything starts. */
+async function libraryFromEnvironment(): Promise<Library> {
+  const file = process.env['EPISTEME_WORKFLOWS']
+  if (file === undefined || file === '') return BUILT_IN_LIBRARY
+  const added = JSON.parse(await readFile(file, 'utf8')) as Partial<Library>
+  const library: Library = {
+    blocks: [...BUILT_IN_LIBRARY.blocks, ...(added.blocks ?? [])],
+    workflows: [...BUILT_IN_LIBRARY.workflows, ...(added.workflows ?? [])],
+  }
+  const problems = libraryProblems(library)
+  if (problems.length > 0) {
+    process.stderr.write(`学习方式配置有误（${file}）：\n  ${problems.join('\n  ')}\n`)
+    process.exit(1)
+  }
+  return library
+}
+
 const model = modelFromEnvironment()
+const library = await libraryFromEnvironment()
 try {
   const service = await startService({
     graph,
     port,
-    profile: workbenchProfile({ model }),
+    profile: workbenchProfile({ model, library }),
     workspace: page,
   })
   process.stdout.write(

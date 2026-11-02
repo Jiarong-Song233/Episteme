@@ -10,7 +10,8 @@
 - G1 复用决策记录：[0001](../research/reuse-decisions/0001-learning-workbench.md)。
 - G1.2、G1.3 材料和带引用问答：[#4](https://github.com/Jiarong-Song233/Episteme/pull/4)。
 - G1.1、G1.4 空间、会话和候选路由：[#5](https://github.com/Jiarong-Song233/Episteme/pull/5)。
-- G1.5 Web 界面和浏览器端到端测试：`feat/workbench-web`。
+- G1.5 Web 界面和浏览器端到端测试：[#6](https://github.com/Jiarong-Song233/Episteme/pull/6)。
+- G2 学习计划、工作流、速通和深入、练习和学习状态：`feat/workbench-plans`，复用决策 [0002](../research/reuse-decisions/0002-learning-workflows.md)。
 
 ## G1 验收
 
@@ -23,6 +24,17 @@
   - 模型把角标写在句号前，句号被算成一句“推断”。
   - 短文档的引用会高亮整篇，改为定位到最接近的一句。
   - 机器上只有 `Source Han Serif SC` Heavy 字重时，整页变粗。
+
+## G2 验收
+
+用户路径：同一份材料分别走速通和深入 → 改计划 → 做题 → 收到反馈 → 暂停和恢复 → 看学习状态。下面都是我用脚本驱动浏览器做的，还没有真人用过。
+
+- 自动化：`tests/workbench-plans.test.ts` 和 `tests/workbench-web.test.ts`，模型是模拟模型或桩。
+- 真实演示（2026-11-02）：magpie 网关的 `auto/deepseek-v4.1-flash`，合成笔记，单次预算 50 次调用、12 万 token。速通 60 分钟 10 步走完，深入 30 分钟走到练习，手机宽度没有横向溢出。`EPISTEME_WORKFLOWS` 加的流程在真实进程里能选、能生成计划。
+- 第一轮真实演示发现、模拟测不出的缺陷，都已修复：Markdown 粗体原样显示；模型只说“证据不足”但材料其实讲过；小标题被标成推断；模型复述指令；重点写成长句，开场白读不通。
+- 第二轮真实演示里出现一次“模型没有返回内容”，页面保留进度，可以重发。没有自动重试。
+- 模型会在深入对话里补充材料以外的知识（比如偶数维用正弦），这些句子标成了推断。标注靠模型自报，只校验角标是否存在和用词重合度。
+- 练习题的“正确答案”由模型从摘录出题，没有人工校对；正确率只说明答题和这份答案的对照结果。
 
 ## 已知问题
 
@@ -38,4 +50,4 @@
 
 ## 下一步
 
-按[目标计划](personal-goal-plan.md)的依赖图推进 G2。
+按[目标计划](personal-goal-plan.md)的依赖图推进 G3。

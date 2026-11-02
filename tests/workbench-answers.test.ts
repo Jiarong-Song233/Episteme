@@ -146,6 +146,30 @@ describe('answers', () => {
 })
 
 describe('checking what a model claims', () => {
+  it('reads past Markdown bold, list markers and labels without calling them inference', async () => {
+    const answer = checkReply(
+      '**结论：** 位置编码把顺序告诉模型。[1]\n漏掉的地方：\n- 注意力本身不看顺序。[1]\n还想到什么？',
+      await offered(),
+      simulated,
+    )
+    expect(answer.segments.map(({ text, basis }) => [text, basis])).toEqual([
+      ['结论：位置编码把顺序告诉模型。', 'material'],
+      ['漏掉的地方：注意力本身不看顺序。', 'material'],
+      ['还想到什么？', 'question'],
+    ])
+  })
+
+  it('keeps what was answered when the model says only part of it is covered', async () => {
+    const answer = checkReply('位置编码把顺序告诉模型。[1] [证据不足]', await offered(), simulated)
+    expect(answer.status).toBe('answered')
+    expect(answer.segments).toHaveLength(1)
+  })
+
+  it('still reports a trailing label as unsupported, since nothing backs it', async () => {
+    const answer = checkReply('位置编码把顺序告诉模型。[1]\n另外：', await offered(), simulated)
+    expect(answer.segments.at(-1)).toMatchObject({ text: '另外：', basis: 'inference' })
+  })
+
   const offered = async () => {
     const store = await storeWith(['A', '位置编码把顺序告诉模型。'])
     return citationsOf(store.search('a', 's', '位置编码'))

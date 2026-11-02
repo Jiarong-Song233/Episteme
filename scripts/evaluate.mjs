@@ -31,6 +31,7 @@ import {
 const { values } = parseArgs({
   options: {
     out: { type: 'string' },
+    questions: { type: 'string', default: 'questions.json' },
     repeats: { type: 'string', default: '3' },
     systems: { type: 'string', default: 'episteme,model-only,paste-all' },
     'no-journey': { type: 'boolean', default: false },
@@ -42,7 +43,7 @@ const { values } = parseArgs({
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', 'docs', 'research', 'evaluation')
-const QUESTIONS = JSON.parse(readFileSync(join(ROOT, 'questions.json'), 'utf8'))
+const QUESTIONS = JSON.parse(readFileSync(join(ROOT, values.questions), 'utf8'))
 const FILES = readdirSync(join(ROOT, 'material'))
   .sort()
   .map((name) => ({ name, text: readFileSync(join(ROOT, 'material', name), 'utf8') }))
@@ -67,6 +68,9 @@ function score(question, answer) {
     citations: answer.citations.length,
     citationsOnSource: onSource.length,
     quoteChars: answer.citations.map((c) => c.quote.length),
+    // The one sentence a reader is pointed at. A system that points at nothing has none to check.
+    pointedAtGold: (answer.evidence ?? []).some((sentence) => gold.test(sentence)),
+    pointedChars: (answer.evidence ?? []).map((sentence) => sentence.length),
   }
 }
 
@@ -90,15 +94,27 @@ function summarize(runs) {
         rows.length,
       ),
       falselyAbstained: share(rows.filter((r) => r.score.falselyAbstained).length, rows.length),
+      correctAndPointed: share(
+        rows.filter((r) => r.score.correct && r.score.pointedAtGold).length,
+        rows.length,
+      ),
     }
   }
   const absent = of(['absent'])
-  const cited = of(['direct', 'paraphrase', 'cross'])
+  const cited = of(['direct', 'paraphrase', 'cross', 'heldout'])
   const citations = cited.reduce((sum, r) => sum + r.score.citations, 0)
   return {
     direct: answerable(['direct']),
     paraphrase: answerable(['paraphrase']),
     cross: answerable(['cross']),
+    heldout: answerable(['heldout']),
+    offtopic: {
+      n: of(['offtopic']).length,
+      abstained: share(
+        of(['offtopic']).filter((r) => r.score.abstained).length,
+        of(['offtopic']).length,
+      ),
+    },
     absent: {
       n: absent.length,
       abstained: share(absent.filter((r) => r.score.abstained).length, absent.length),
@@ -111,6 +127,10 @@ function summarize(runs) {
     // A citation that hands back a whole page is technically true and hard to check, so its size is part of its quality.
     medianQuoteChars: percentile(
       cited.flatMap((r) => r.score.quoteChars),
+      0.5,
+    ),
+    medianPointedChars: percentile(
+      cited.flatMap((r) => r.score.pointedChars),
       0.5,
     ),
     errors: runs.filter((run) => run.error !== undefined).length,
@@ -246,6 +266,12 @@ const SYSTEMS = {
           status: reply.answer.status,
           invalidCitations: reply.answer.invalidCitations,
           citations: reply.answer.citations.map((c) => ({ file: c.title, quote: c.quote })),
+          evidence: reply.answer.segments.flatMap((segment) =>
+            (segment.evidence ?? []).map(({ n, start, end }) => {
+              const title = reply.answer.citations.find((c) => c.n === n)?.title
+              return FILES.find((file) => file.name === title)?.text.slice(start, end) ?? ''
+            }),
+          ),
         }
       },
       close: () => bench.close(),
@@ -294,13 +320,15 @@ const SYSTEMS = {
         } catch {
           // No parsable citation line is a result, not a failure: the answer simply cites nothing.
         }
+        const citations = claimed.filter((c) =>
+          FILES.some(
+            (file) => stem(file.name) === stem(String(c.file)) && file.text.includes(c.quote),
+          ),
+        )
         return {
           text: line === '' ? text : text.replace(line, ''),
-          citations: claimed.filter((c) =>
-            FILES.some(
-              (file) => stem(file.name) === stem(String(c.file)) && file.text.includes(c.quote),
-            ),
-          ),
+          citations,
+          evidence: citations.map((c) => c.quote),
         }
       },
       async close() {},
@@ -389,7 +417,7 @@ async function runJourney() {
     for (let guard = 0; reply.plan.status !== 'done' && guard < 80; guard += 1) {
       const active = reply.plan.steps.find((step) => step.status === 'active')
       if (reply.failure !== undefined) {
-        failures.push(`${active?.block ?? 'none'}:${reply.failure.code}`)
+        failures.push(`${active?.block ?? 'none'}:${reply.failure.code}:${reply.failure.message}`)
         if (retried) {
           skippedAfterFailure.push(active?.block ?? 'none')
           request = { action: 'skip' }
@@ -646,7 +674,7 @@ if (values['retrieval-only']) {
 }
 
 const startedAt = new Date().toISOString()
-const names = values.systems.split(',')
+const names = values.systems.split(',').filter((name) => name !== '')
 const results = []
 for (const name of names) results.push(await runQuestions(name))
 const journey = values['no-journey'] ? null : await runJourney()

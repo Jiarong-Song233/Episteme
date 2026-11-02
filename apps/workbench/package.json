@@ -1,0 +1,25 @@
+{
+  "name": "@episteme/workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "An AI learning workbench on Episteme: spaces, material, cited answers, reviewed understanding.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@episteme/application": "workspace:*",
+    "@episteme/distillation": "workspace:*",
+    "@episteme/service": "workspace:*",
+    "minisearch": "7.2.0",
+    "openai": "7.47.0",
+    "unpdf": "2.1.0"
+  }
+}

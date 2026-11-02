@@ -24,11 +24,19 @@ export interface Citation {
   readonly quote: string
 }
 
+export interface Evidence {
+  readonly n: number
+  readonly start: number
+  readonly end: number
+}
+
 export interface AnswerSegment {
   readonly text: string
   /** `material` only when it cites an excerpt that exists. */
   readonly basis: 'material' | 'inference'
   readonly citations: readonly number[]
+  /** For each citation, the sentence of the excerpt closest to this one, as offsets into the material. */
+  readonly evidence?: readonly Evidence[]
   /** It cites an excerpt that shares almost none of its words, so the citation may be wrong. */
   readonly weak?: boolean
 }
@@ -102,13 +110,37 @@ function promptFor(
 
 const MARKS = /((?:\s*\[(?:\d+|推断)\])+)/
 const SENTENCE_END = /(?<=[。！？!?\n]|\.\s)/
+/** Models often put the mark before the stop, as in "……[1]。" That stop ends the sentence just marked. */
+const LEADING_STOPS = /^[\s。！？，、；：.!?,;:）)」』”’]+/
+const QUOTED_SENTENCE = /[^。！？.!?\n]+[。！？.!?]*/g
+
+/** The sentence of the excerpt that shares the most words with 	ext, if any shares one. */
+function closestSentence(text: string, citation: Citation): Evidence | undefined {
+  let best: Evidence | undefined
+  let bestScore = 0
+  for (const match of citation.quote.matchAll(QUOTED_SENTENCE)) {
+    const score = coverage(text, match[0])
+    // On a tie the longer sentence says more than, say, the heading above it.
+    const longer = best !== undefined && match[0].length > best.end - best.start
+    if (score > bestScore || (score > 0 && score === bestScore && longer)) {
+      bestScore = score
+      const start = citation.start + match.index
+      best = { n: citation.n, start, end: start + match[0].length }
+    }
+  }
+  return best
+}
 
 /** The reply as sentences with the marks each one ended on. A sentence with none has none. */
 function parse(reply: string): readonly { readonly text: string; readonly marks: string }[] {
   const pieces = reply.split(MARKS)
   const sentences: { text: string; marks: string }[] = []
   for (let index = 0; index < pieces.length; index += 2) {
-    const body = pieces[index] ?? ''
+    const raw = pieces[index] ?? ''
+    const stops = LEADING_STOPS.exec(raw)?.[0] ?? ''
+    const previous = sentences.at(-1)
+    if (previous !== undefined) previous.text += stops.trim()
+    const body = previous === undefined ? raw : raw.slice(stops.length)
     const marks = pieces[index + 1] ?? ''
     const parts = body.split(SENTENCE_END).filter((part) => part.trim() !== '')
     parts.forEach((part, position) => {
@@ -150,10 +182,17 @@ export function checkReply(
     if (valid.length === 0) return { text, basis: 'inference', citations: [] }
     for (const n of valid) used.add(n)
     const support = Math.max(...valid.map((n) => coverage(text, byNumber.get(n)?.quote ?? '')))
+    const evidence = valid
+      .map((n) => {
+        const citation = byNumber.get(n)
+        return citation === undefined ? undefined : closestSentence(text, citation)
+      })
+      .filter((found) => found !== undefined)
     return {
       text,
       basis: 'material',
       citations: valid,
+      ...(evidence.length === 0 ? {} : { evidence }),
       ...(support < MIN_SUPPORT ? { weak: true } : {}),
     }
   })

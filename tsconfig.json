@@ -4,6 +4,7 @@
   "references": [
     { "path": "apps/service" },
     { "path": "apps/workbench" },
+    { "path": "apps/workbench/web" },
     { "path": "packages/core" },
     { "path": "packages/storage-memory" },
     { "path": "packages/storage-sqlite" },

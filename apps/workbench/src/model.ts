@@ -56,6 +56,8 @@ export interface RemoteModelOptions {
   readonly apiKey?: string
   readonly timeoutMs?: number
   readonly maxOutputTokens?: number
+  /** Sent as `reasoning_effort`. A local thinking model can spend its whole allowance thinking; `none` stops it. */
+  readonly reasoningEffort?: string
 }
 
 function failureOf(error: unknown): ModelFailure {
@@ -83,6 +85,8 @@ function failureOf(error: unknown): ModelFailure {
 /** Models that think aloud put it in these tags. It is not the answer. */
 const THINKING = /<think>[\s\S]*?<\/think>/g
 
+const DEFAULT_OUTPUT_TOKENS = 2048
+
 /** A client for any OpenAI-compatible service, with a timeout and one retry so a failure is bounded. */
 export function remoteModel(options: RemoteModelOptions): ModelClient {
   const client = new OpenAI({
@@ -101,14 +105,28 @@ export function remoteModel(options: RemoteModelOptions): ModelClient {
         completion = await client.chat.completions.create({
           model: options.model,
           messages: messages.map(({ role, content }) => ({ role, content })),
-          max_tokens: options.maxOutputTokens ?? 1024,
+          max_tokens: options.maxOutputTokens ?? DEFAULT_OUTPUT_TOKENS,
           temperature: 0.2,
+          ...(options.reasoningEffort === undefined
+            ? {}
+            : {
+                // Whatever the configured service accepts: providers differ on these values.
+                reasoning_effort: options.reasoningEffort as OpenAI.ReasoningEffort & string,
+              }),
         })
       } catch (error) {
         throw failureOf(error)
       }
-      const text = (completion.choices[0]?.message.content ?? '').replace(THINKING, '').trim()
-      if (text === '') throw new ModelFailure('empty_reply', '模型没有返回内容。')
+      const choice = completion.choices[0]
+      const text = (choice?.message.content ?? '').replace(THINKING, '').trim()
+      if (text === '') {
+        throw new ModelFailure(
+          'empty_reply',
+          choice?.finish_reason === 'length'
+            ? '模型把输出额度用完了，还没写出回答，多半是都花在思考上了。请调高 EPISTEME_MODEL_MAX_OUTPUT_TOKENS，或把 EPISTEME_MODEL_REASONING_EFFORT 设为 none。'
+            : '模型没有返回内容。',
+        )
+      }
       const tokens = completion.usage?.total_tokens
       return tokens === undefined ? { text } : { text, tokens }
     },
@@ -161,6 +179,8 @@ export class SimulatedModel implements ModelClient {
     for (const match of last.matchAll(/<excerpt n="(\d+)"[^>]*>([\s\S]*?)<\/excerpt>/g)) {
       let best = { sentence: '', hits: 0 }
       for (const sentence of (match[2] ?? '').match(SENTENCE) ?? []) {
+        // A heading repeats the question's words and answers nothing.
+        if (sentence.trimStart().startsWith('#')) continue
         const hits = new Set(tokenize(sentence).filter((token) => wanted.has(token))).size
         if (hits > best.hits) best = { sentence: sentence.trim(), hits }
       }
@@ -187,12 +207,15 @@ export function modelFromEnvironment(environment: NodeJS.ProcessEnv = process.en
     return Number.isFinite(value) && value > 0 ? value : fallback
   }
   const apiKey = environment['EPISTEME_MODEL_API_KEY']
+  const reasoningEffort = environment['EPISTEME_MODEL_REASONING_EFFORT']
   return budgeted(
     remoteModel({
       baseUrl,
       model,
       ...(apiKey === undefined || apiKey === '' ? {} : { apiKey }),
+      ...(reasoningEffort === undefined || reasoningEffort === '' ? {} : { reasoningEffort }),
       timeoutMs: positive('EPISTEME_MODEL_TIMEOUT_MS', 60_000),
+      maxOutputTokens: positive('EPISTEME_MODEL_MAX_OUTPUT_TOKENS', DEFAULT_OUTPUT_TOKENS),
     }),
     {
       maxCalls: positive('EPISTEME_MODEL_MAX_CALLS', 100),

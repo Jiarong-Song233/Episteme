@@ -199,6 +199,37 @@ describe('checking what a model claims', () => {
   })
 })
 
+describe('habits of a real model', () => {
+  const offered = [
+    {
+      n: 1,
+      materialId: 'm',
+      title: 'a.md',
+      materialVersion: 1,
+      start: 10,
+      end: 40,
+      line: 1,
+      quote: '残差连接让梯度更好传播。位置编码把顺序告诉模型。',
+    },
+  ]
+  const model = new SimulatedModel()
+
+  it('treats a stop after the mark as the end of that sentence, not a sentence of its own', () => {
+    const answer = checkReply('位置编码把顺序告诉模型[1]。它有用[推断]。', offered, model)
+    expect(answer.segments.map((segment) => [segment.text, segment.basis])).toEqual([
+      ['位置编码把顺序告诉模型。', 'material'],
+      ['它有用。', 'inference'],
+    ])
+  })
+
+  it('points a citation at the closest sentence inside the passage', () => {
+    const answer = checkReply('位置编码把顺序告诉模型。[1]', offered, model)
+    const { start, end } = answer.segments[0]?.evidence?.[0] ?? { start: 0, end: 0 }
+    const quote = offered[0]!.quote
+    expect(quote.slice(start - 10, end - 10)).toBe('位置编码把顺序告诉模型。')
+  })
+})
+
 describe('the model client', () => {
   let server: Server | undefined
 
@@ -261,7 +292,7 @@ describe('the model client', () => {
     ])
     expect(reply).toEqual({ text: '答案[1]', tokens: 3 })
     expect(seen['model']).toBe('m')
-    expect(seen['max_tokens']).toBe(1024)
+    expect(seen['max_tokens']).toBe(2048)
     expect(auth).toBe('Bearer sk-test')
   })
 
@@ -303,6 +334,40 @@ describe('the model client', () => {
       .catch((error: unknown) => error)
     expect((gone as ModelFailure).code).toBe('unavailable')
   }, 20_000)
+
+  it('says so when a thinking model spends its allowance before answering', async () => {
+    const seen: Record<string, unknown>[] = []
+    const baseUrl = await serviceAnswering((body) => {
+      seen.push(body)
+      return {
+        status: 200,
+        body: {
+          id: 'c',
+          object: 'chat.completion',
+          created: 0,
+          model: 'm',
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'length',
+              message: { role: 'assistant', content: '', reasoning: '首先，用户的问题是' },
+            },
+          ],
+        },
+      }
+    })
+    const failure = await remoteModel({
+      baseUrl,
+      model: 'm',
+      maxOutputTokens: 200,
+      reasoningEffort: 'none',
+    })
+      .complete([{ role: 'user', content: 'q' }])
+      .catch((error: unknown) => error)
+    expect((failure as ModelFailure).code).toBe('empty_reply')
+    expect((failure as ModelFailure).message).toContain('EPISTEME_MODEL_REASONING_EFFORT')
+    expect(seen[0]).toMatchObject({ max_tokens: 200, reasoning_effort: 'none' })
+  })
 
   it('stops calling once the budget is spent', async () => {
     const inner = scripted('好')

@@ -28,6 +28,8 @@ if (values.help === true) {
       `    EPISTEME_MODEL_NAME        模型名\n` +
       `    EPISTEME_MODEL_API_KEY     密钥，本地模型不需要\n` +
       `    EPISTEME_MODEL_TIMEOUT_MS  单次超时，默认 60000\n` +
+      `    EPISTEME_MODEL_MAX_OUTPUT_TOKENS  单次输出上限，默认 2048\n` +
+      `    EPISTEME_MODEL_REASONING_EFFORT   思考强度；本地思考型模型回答为空时设为 none\n` +
       `    EPISTEME_MODEL_MAX_CALLS   每次运行的调用上限，默认 100\n` +
       `    EPISTEME_MODEL_MAX_TOKENS  每次运行的 token 上限，默认 200000\n\n`,
   )

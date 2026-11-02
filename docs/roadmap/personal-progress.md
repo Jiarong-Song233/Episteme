@@ -5,21 +5,37 @@
 ## 已完成（已提交 Draft PR，未合并）
 
 - G0.2 个人仓 PR 检查：[#1](https://github.com/Jiarong-Song233/Episteme/pull/1)。
-- G0.1 单 SQLite 存储基线和跨进程持有者测试：[#2](https://github.com/Jiarong-Song233/Episteme/pull/2)。本地 506 个测试通过。
+- G0.1 单 SQLite 存储基线和跨进程持有者测试：[#2](https://github.com/Jiarong-Song233/Episteme/pull/2)。
+- 路线和计划文档：[#3](https://github.com/Jiarong-Song233/Episteme/pull/3)。
 - G1 复用决策记录：[0001](../research/reuse-decisions/0001-learning-workbench.md)。
+- G1.2、G1.3 材料和带引用问答：[#4](https://github.com/Jiarong-Song233/Episteme/pull/4)。
+- G1.1、G1.4 空间、会话和候选路由：[#5](https://github.com/Jiarong-Song233/Episteme/pull/5)。
+- G1.5 Web 界面和浏览器端到端测试：`feat/workbench-web`。
+
+## G1 验收
+
+用户路径：启动服务 → 建空间 → 上传材料 → 带引用问答 → 审阅并保存理解 → 退出重启 → 找回材料、对话和理解。
+
+- 自动化：`tests/workbench-web.test.ts` 用真实浏览器（系统 Edge 或 Chrome）走完整路径，含拒收文件、模型失败重试、删除材料、手机宽度。模型是模拟模型或桩。
+- 真实演示（2026-11-02）：`serve.js` 进程接 magpie 网关的 `auto/deepseek-v4.1-flash`，合成笔记，Edge 操作页面，进程重启后三项都找回。回答 2 到 5 秒；无关问题 13 毫秒拒答，没有调模型。
+- 真实演示发现、模拟测不出的缺陷，都已修复并补了回归测试：
+  - 思考型本地模型把输出额度花完后正文为空。
+  - 模型把角标写在句号前，句号被算成一句“推断”。
+  - 短文档的引用会高亮整篇，改为定位到最接近的一句。
+  - 机器上只有 `Source Han Serif SC` Heavy 字重时，整页变粗。
 
 ## 已知问题
 
 - 仓库根目录没有 LICENSE，公开仓库缺许可证声明。要由仓库所有者决定。
 - ADR 0018 仍为 proposed。
-- `learn-scene.ts`、`LearnSession` 别名、`learnProfile` 和决定通道 `learn-review` 仍在代码里。
+- `learn-scene.ts`、`LearnSession` 别名、`learnProfile` 和决定通道 `learn-review` 仍在代码里，工作台暂时依赖 `learnScene`。
 - 没有 CLI 备份或可移植导出（计划在 G5）。
 - `docs/planning/mindlink-spec.md` 仍在仓库中，作为历史规划保留。
+- 只有关键词检索，没有向量检索。没有和向量检索对比过效果。
+- CJK PDF 提取未验证，夹具只有 ASCII。
+- 模型预算只按单次运行计，重启后清零。
+- 候选由回答句子直接生成，每句一条，没有合并或概念抽取。
 
 ## 下一步
 
-按[目标计划](personal-goal-plan.md)的依赖图推进 S1 → S5。
-
-## 最后验证
-
-- 提交 `e2c3a9a`（`feat/sqlite-only`）：`pnpm check` 通过，本地 Windows，Node 24。
+按[目标计划](personal-goal-plan.md)的依赖图推进 G2。

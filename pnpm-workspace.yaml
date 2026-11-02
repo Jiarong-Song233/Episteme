@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
   - 'apps/*'
+  - 'apps/workbench/web'
   - 'tests'
 
 # pnpm blocks dependency build scripts by default. Each allowance is explicit instead of

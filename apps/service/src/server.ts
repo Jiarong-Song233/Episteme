@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { CognitiveSession } from '@episteme/application'
+import { CognitiveSession, UnreadableGraphError } from '@episteme/application'
 import { createMcpEndpoint } from '@episteme/mcp'
 import { API_PREFIX, handleApi, operationOf, sendJson } from './api.js'
 import { boundaryRefusal } from './boundary.js'
@@ -74,8 +74,8 @@ export async function startService(options: ServiceOptions = {}): Promise<Episte
   // Graphs used to be JSONL beside this same name. Opening would start a new, empty one and read as lost work.
   const older = graph.replace(/\.db$/, '.jsonl')
   if (older !== graph && !existsSync(graph) && existsSync(older)) {
-    throw new Error(
-      `found the older graph "${older}" and nothing at "${graph}". This build does not read JSONL and did not change it; keep it, and name another file to start a new graph.`,
+    throw new UnreadableGraphError(
+      `found the older graph "${older}" and nothing at "${graph}". This build does not read JSONL and did not change it; keep it, and name another file to start a new graph. "graph convert" carries it into a new file.`,
     )
   }
   const profile = options.profile ?? learnProfile()

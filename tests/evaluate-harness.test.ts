@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -77,4 +78,65 @@ describe('the evaluation harness', () => {
       await rm(directory, { recursive: true, force: true })
     }
   }, 120_000)
+
+  it('does not count an answer from elsewhere as staying within the material', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'episteme-evaluate-test-'))
+    try {
+      const saved = join(directory, 'saved.json')
+      const out = join(directory, 'rescored.json')
+      const run_ = (text: string) => ({
+        id: 'o1',
+        kind: 'offtopic',
+        repeat: 0,
+        ms: 1,
+        answer: { text, citations: [] },
+      })
+      await writeFile(
+        saved,
+        JSON.stringify({
+          results: [
+            {
+              system: 'x',
+              runs: [
+                run_('材料里没有。'),
+                run_('材料里没有相关内容，按常识回答：法国的首都是巴黎。'),
+              ],
+            },
+          ],
+        }),
+      )
+      const done = run('--rescore', saved, '--questions', 'questions-round-3.json', '--out', out)
+      expect(done.status).toBe(0)
+      const report = JSON.parse(await readFile(out, 'utf8')) as {
+        results: { summary: { offtopic: { abstained: number; answeredAnyway: number } } }[]
+      }
+      expect(report.results[0]?.summary.offtopic).toEqual({
+        n: 2,
+        abstained: 1,
+        answeredAnyway: 0.5,
+      })
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a citation number as the file Open WebUI numbered, not as a passage', async () => {
+    const adapter = pathToFileURL(
+      join(import.meta.dirname, '..', 'scripts', 'evaluate-openwebui.mjs'),
+    )
+    const { readAnswer } = (await import(adapter.href)) as {
+      readAnswer: (body: unknown) => { citations: unknown[]; retrieved: unknown[] }
+    }
+    const answer = readAnswer({
+      choices: [{ message: { content: '答案是 B [2]。' } }],
+      sources: [
+        {
+          document: ['甲一', '乙', '甲二'],
+          metadata: [{ source: '甲.md' }, { source: '乙.md' }, { source: '甲.md' }],
+        },
+      ],
+    })
+    expect(answer.citations).toEqual([{ file: '乙.md', quote: '乙' }])
+    expect(answer.retrieved).toHaveLength(3)
+  })
 })

@@ -27,6 +27,7 @@ import {
   SimulatedModel,
   workbenchProfile,
 } from '../apps/workbench/dist/index.js'
+import { openWebUI } from './evaluate-openwebui.mjs'
 
 const { values } = parseArgs({
   options: {
@@ -38,6 +39,8 @@ const { values } = parseArgs({
     'retrieval-only': { type: 'boolean', default: false },
     'max-calls': { type: 'string', default: '300' },
     simulated: { type: 'boolean', default: false },
+    'openwebui-home': { type: 'string' },
+    rescore: { type: 'string' },
   },
 })
 
@@ -57,7 +60,12 @@ const stem = (name) => name.replace(/\.[a-z]+$/i, '')
 /** The same rules for every system, on nothing but what a person would see. */
 function score(question, answer) {
   if (question.gold === null) {
-    return { abstained: ABSTAINS.test(answer.text), citedAnything: answer.citations.length > 0 }
+    return {
+      abstained: ABSTAINS.test(answer.text),
+      citedAnything: answer.citations.length > 0,
+      // "The material does not cover this, but Paris" passes the wording check and is still an answer from elsewhere.
+      answeredAnyway: question.known !== undefined && new RegExp(question.known).test(answer.text),
+    }
   }
   const gold = new RegExp(question.gold)
   const onSource = answer.citations.filter((c) => stem(c.file) === stem(question.source))
@@ -112,6 +120,10 @@ function summarize(runs) {
       n: of(['offtopic']).length,
       abstained: share(
         of(['offtopic']).filter((r) => r.score.abstained).length,
+        of(['offtopic']).length,
+      ),
+      answeredAnyway: share(
+        of(['offtopic']).filter((r) => r.score.answeredAnyway).length,
         of(['offtopic']).length,
       ),
     },
@@ -334,11 +346,47 @@ const SYSTEMS = {
       async close() {},
     }
   },
+  /** A mature product, run rather than read about, as a person installs it. */
+  'open-webui': (client, spent) =>
+    openWebUISystem(client, spent, 'Open WebUI 默认配置：英文嵌入模型，向量检索', {}),
+  /** The first thing a person with Chinese material would change, so the default is not the only thing judged. */
+  'open-webui-zh': (client, spent) =>
+    openWebUISystem(client, spent, 'Open WebUI，换成多语言嵌入模型', {
+      RAG_EMBEDDING_MODEL: MULTILINGUAL_EMBEDDING,
+    }),
+  /** As above, with its keyword and vector hybrid switched on, which is the nearest it comes to what Episteme does. */
+  'open-webui-zh-hybrid': (client, spent) =>
+    openWebUISystem(client, spent, 'Open WebUI，多语言嵌入模型加混合检索', {
+      RAG_EMBEDDING_MODEL: MULTILINGUAL_EMBEDDING,
+      ENABLE_RAG_HYBRID_SEARCH: 'True',
+    }),
+  /** Episteme hands the model up to six passages and Open WebUI three by default, so this removes that difference. */
+  'open-webui-zh-k6': (client, spent) =>
+    openWebUISystem(client, spent, 'Open WebUI，多语言嵌入模型，取 6 段', {
+      RAG_EMBEDDING_MODEL: MULTILINGUAL_EMBEDDING,
+      RAG_TOP_K: '6',
+    }),
+}
+
+const MULTILINGUAL_EMBEDDING = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+
+function openWebUISystem(client, spent, describe, settings) {
+  const home = values['openwebui-home']
+  if (home === undefined) throw new Error('pass --openwebui-home: round-3.md shows the install')
+  return openWebUI({
+    venv: join(home, 'venv'),
+    home,
+    settings,
+    describe,
+    model: client.name,
+    limit: Number(values['max-calls']),
+    spent,
+  })
 }
 
 async function runQuestions(name) {
   const { client, spent } = metered()
-  const system = await SYSTEMS[name](client)
+  const system = await SYSTEMS[name](client, spent)
   await system.prepare(FILES)
   const runs = []
   for (let repeat = 0; repeat < Number(values.repeats); repeat += 1) {
@@ -668,6 +716,36 @@ async function runRetrieval() {
   })
 }
 
+/** Applies today's scoring to reports already on disk, so a stricter rule costs no model calls and hides nothing. */
+function rescore(paths) {
+  const byId = new Map(QUESTIONS.questions.map((question) => [question.id, question]))
+  const reports = paths.map((path) => JSON.parse(readFileSync(path, 'utf8')))
+  const results = reports.flatMap((report) => report.results)
+  for (const result of results) {
+    for (const run of result.runs) {
+      if (run.answer !== undefined) run.score = score(byId.get(run.id), run.answer)
+    }
+    result.summary = summarize(result.runs)
+  }
+  return {
+    ...reports[0],
+    round: QUESTIONS.version,
+    questionSet: QUESTIONS.version,
+    finishedAt: reports.at(-1).finishedAt,
+    rescoredFrom: paths.length,
+    results,
+  }
+}
+
+if (values.rescore !== undefined) {
+  const report = rescore(values.rescore.split(','))
+  if (values.out !== undefined) writeFileSync(values.out, `${JSON.stringify(report, null, 2)}\n`)
+  for (const result of report.results) {
+    process.stdout.write(`${JSON.stringify({ system: result.system, ...result.summary })}\n`)
+  }
+  process.exit(0)
+}
+
 if (values['retrieval-only']) {
   process.stdout.write(`${(await runRetrieval()).map((row) => JSON.stringify(row)).join('\n')}\n`)
   process.exit(0)
@@ -681,7 +759,7 @@ const journey = values['no-journey'] ? null : await runJourney()
 const retrieval = await runRetrieval()
 
 const report = {
-  round: 1,
+  round: QUESTIONS.version,
   startedAt,
   finishedAt: new Date().toISOString(),
   simulated: values.simulated,

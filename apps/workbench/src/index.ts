@@ -1,6 +1,7 @@
 export * from './answer.js'
 export * from './blocks.js'
 export * from './chunk.js'
+export * from './evidence.js'
 export * from './materials.js'
 export * from './model.js'
 export * from './parse.js'

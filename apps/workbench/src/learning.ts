@@ -34,7 +34,7 @@ import { coverage } from './tokens.js'
  * any point leaves a plan that carries on from its last step: there is nothing else to recover.
  */
 
-const PLAN_PREFIX = 'plan/'
+export const PLAN_PREFIX = 'plan/'
 const PLAN_VERSION_PREFIX = 'plan-version/'
 const ATTEMPT_PREFIX = 'attempt/'
 const WORKBENCH_AUTHOR = 'workbench'
@@ -215,6 +215,9 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
     const paused: Partial<Pick<Plan, 'status'>> =
       status === 'active' || status === 'paused' ? { status } : {}
     const edits = body['steps']
+    if (Array.isArray(edits) && plan.origin === 'host') {
+      refuse('host_driven', '这个计划由你的 Agent 带着走。可以暂停，步骤请让 Agent 改。')
+    }
     if (!Array.isArray(edits))
       return { plan: await save(view, { ...plan, ...paused, updatedAt: now() }) }
     const steps = editedSteps(plan, edits as unknown[], library)
@@ -441,6 +444,7 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
   async function act({ view, writes, body }: SceneRouteContext): Promise<Outcome> {
     const plan = planOf(view, text(body, 'plan'))
     const action = text(body, 'action')
+    if (plan.origin === 'host') refuse('host_driven', '这个计划由你的 Agent 带着走，不在这里推进。')
     if (plan.status === 'done') refuse('plan_done', '这个计划已经结束。')
     if (plan.status === 'paused') refuse('plan_paused', '这个计划已暂停。请先继续。')
     openSpaceOf(view, plan.space)

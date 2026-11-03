@@ -3,6 +3,7 @@ import type { SceneWrites, Turn } from '@episteme/application'
 import type { SceneRoute, SceneRouteContext } from '@episteme/service'
 import { answerFrom, answerText, relevant, type Answer } from './answer.js'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
+import { objectivesOf, sessionsOf, unlinkedIn } from './evidence.js'
 import { learningRoutes } from './learning.js'
 import { MaterialStore } from './materials.js'
 import { ModelFailure, type ModelClient, type ModelMessage } from './model.js'
@@ -154,6 +155,15 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     ...understandingRoutes({ model, now, materialsOf }),
     ...sharingRoutes({ now }),
     route('GET', '/model', () => ({ name: model.name, simulated: model.simulated })),
+    // What came of learning, session by session. No turn text: reaching the words is a separate step.
+    route('GET', '/outcomes', ({ view, query }) => {
+      const space = spaceOf(view, required(query, 'space'))
+      return {
+        objectives: objectivesOf(view, space.id),
+        unlinked: unlinkedIn(view, space.id).length,
+        sessions: sessionsOf(view, space.id),
+      }
+    }),
 
     route('GET', '/spaces', ({ view }) => ({
       spaces: view.records

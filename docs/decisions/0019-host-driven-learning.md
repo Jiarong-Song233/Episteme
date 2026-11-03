@@ -70,7 +70,7 @@ interface LearningEvidence {
   /** The recording agent's judgement, always marked as such. */
   readonly assessment?: {
     readonly verdict: 'supports' | 'partial' | 'contradicts' | 'unclear'
-    readonly method: 'agent' | 'mechanical'
+    readonly method: 'agent' | 'model' | 'mechanical'
     readonly reason: string
     readonly diagnosis?: string
   }
@@ -80,7 +80,8 @@ interface LearningEvidence {
 ```
 
 Records live in the scene's namespace under `evidence/`, one per person. `method` is set by the server: an MCP caller
-always records `agent`.
+always records `agent`. A page plan's answers are not rewritten. They read as evidence through an adapter: a checked
+choice or blank as `mechanical`, the service's estimate of a free answer as `model`.
 
 ### 3. The server keeps the rules; the host keeps the choices
 
@@ -90,13 +91,14 @@ Prompts carry teaching. They carry no rule. These hold whatever the host does, a
 | ----------------------------------------------------------------------------------- | ----------------------- |
 | A step goes pending → active → done or skipped; one active at a time; none reopens  | `invalid_transition`    |
 | Done needs an `attempt` or `statement` on that step; otherwise it can only be skipped | `no_evidence`           |
+| An attempt needs a `move` on that objective first, and a new one after an answer not judged to support | `no_move` |
 | `attempt` and `statement` need a source; the quote must occur in a learner turn      | `quote_not_found`       |
 | The source's thread is the caller's, in this space                                  | `thread_outside_space`  |
 | The step belongs to the plan, the objective to the plan's space                     | `objective_outside_plan` |
 | A candidate names a suggestion of this person, in this space                        | `unknown_suggestion`    |
 | Every write carries the plan version it read                                        | `version_conflict`      |
 | Every write carries a submission id; the same one with other content is refused     | `submission_conflict`   |
-| A plan the host runs cannot be moved by the page's model routes                     | `host_driven`           |
+| A plan the host runs cannot be moved or re-stepped by the page; a person can pause it | `host_driven`           |
 
 A write repeated with the same submission id returns the first result and changes nothing. Checks and the write run
 one at a time per person, so a version check cannot be overtaken.
@@ -125,7 +127,7 @@ type Confirmation = 'none' | 'pending' | 'delegated' | 'person'
 No field or word for mastery exists in this model, and no combination of the two readings produces one. As on the
 understanding page already: confirming is not mastering.
 
-### 5. Five tools, with the built-ins for the rest
+### 5. Six tools, with the built-ins for the rest
 
 The first draft had eight. Reads merge, because they share a permission and a shape. Writes stay apart wherever their
 checks and their log lines differ, because a host logs the tool name and a flat `action` field would blur it; a union
@@ -134,7 +136,8 @@ at the top of a schema is also not accepted by every host (see `proposalFrom`).
 | tool                | read only | does                                                                   |
 | ------------------- | --------- | ---------------------------------------------------------------------- |
 | `learn_context`     | yes       | spaces, activities, objectives with gaps, the running plan and its step |
-| `learn_plan_start`  | no        | a space if needed, objectives, ordered steps, on a thread of this space |
+| `learn_space_open`  | no        | finds or starts a space, and gives the scope `thread_open` needs        |
+| `learn_plan_start`  | no        | objectives, ordered steps, on a thread of this space                   |
 | `learn_plan_change` | no        | adds or skips steps ahead; earlier ones stay, by the existing edit rules |
 | `learn_step`        | no        | `enter`, `complete` or `skip` the current step                         |
 | `learn_observe`     | no        | appends one piece of evidence                                          |
@@ -159,9 +162,11 @@ here" is wanted, it is a change to a permission boundary and gets its own review
 An elicitation answer rests on the local host showing the form to someone (ADR 0012, decision 4). The first loop
 confirms on the web page, the stronger path. Whether a real host shows the form is measured, not assumed.
 
+A suggestion only reaches an objective if the host ties it there, and the first real run showed a host forgetting to. Proposing stays one path: `propose` is where elicitation happens, and a second way in from a scene tool would step around it. So a forgotten link is made visible rather than made impossible: the answers of `learn_observe` and `learn_step`, and `learn_context`, list what is tied to nothing, and the page counts it. Confirming one still makes it the person's; it just does not read on any objective.
+
 ### 7. The web page shows results, not the transcript
 
-`GET /api/v1/scene/workbench/sessions?space=` gives, per plan: topic, objectives, gaps, candidates, what the person
+`GET /api/v1/scene/workbench/outcomes?space=` gives, per plan: topic, objectives, gaps, candidates, what the person
 confirmed, open questions and corrections. No turn text. Reaching the words is a deliberate step through the existing
 thread view, and only for the owner.
 

@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { startService, type EpistemeService } from '@episteme/service'
 import {
@@ -36,7 +36,8 @@ if (browser === undefined && process.env['CI'] !== undefined) {
   throw new Error('CI needs Edge or Chrome for the workbench journey')
 }
 
-const web = resolve(import.meta.dirname, '../apps/workbench/web')
+// A browser context can take longer than the default ten seconds while other test files are building.
+const HOOK_TIMEOUT = 60_000
 
 const NOTES = `# 位置编码
 
@@ -48,6 +49,7 @@ const NOTES = `# 位置编码
 `
 
 describe.skipIf(browser === undefined)('the workbench in a browser', () => {
+  let built: string
   let directory: string
   let graph: string
   let service: EpistemeService | undefined
@@ -59,7 +61,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
       graph,
       port: 0,
       profile: workbenchProfile({ model }),
-      workspace: join(web, 'dist'),
+      workspace: built,
     })
     await page.goto(service.workspaceUrl ?? '')
   }
@@ -89,11 +91,16 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
   }
 
   beforeAll(async () => {
-    await promisify(exec)('pnpm --filter @episteme/workbench-web build')
+    // Its own copy: another file's build empties a shared dist under a page that is still loading.
+    built = await mkdtemp(join(tmpdir(), 'episteme-web-build-'))
+    await promisify(exec)(
+      `pnpm --filter @episteme/workbench-web exec vite build --outDir "${built}" --emptyOutDir`,
+    )
   }, 180_000)
 
   afterAll(async () => {
     await browser?.close()
+    await rm(built, { recursive: true, force: true, maxRetries: 5 })
   })
 
   beforeEach(async () => {
@@ -102,14 +109,14 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     errors.length = 0
     page = await (await browser!.newContext()).newPage()
     page.on('pageerror', (error) => errors.push(error.message))
-  })
+  }, HOOK_TIMEOUT)
 
   afterEach(async () => {
     await page.context().close()
     await close()
     await rm(directory, { recursive: true, force: true, maxRetries: 5 })
     expect(errors).toEqual([])
-  })
+  }, HOOK_TIMEOUT)
 
   it('takes a new person from nothing to saved understanding, and back after a restart', async () => {
     await open()

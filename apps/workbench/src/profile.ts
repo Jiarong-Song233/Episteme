@@ -3,6 +3,7 @@ import { asId, defineDomainPack, type DimensionId } from '@episteme/core'
 import { BLANK_TOPIC, type SceneProfile } from '@episteme/service'
 import type { Library } from './blocks.js'
 import type { ModelClient } from './model.js'
+import { WORKBENCH_PROPOSING_ROUTES } from './route-access.js'
 import { workbenchRoutes } from './routes.js'
 import { STANCE } from './understanding.js'
 
@@ -56,6 +57,7 @@ export function workbenchProfile(options: {
 }): SceneProfile {
   return {
     name: WORKBENCH_SCENE,
+    proposingRoutes: WORKBENCH_PROPOSING_ROUTES,
     seed: BLANK_TOPIC,
     scene: workbenchScene,
     routes: workbenchRoutes(options),

@@ -78,6 +78,7 @@ export class SqliteStorageAdapter extends RecordStorage {
     // `timeout: 0`: a held graph is refused at once rather than waited for.
     const db = new Database(this.#filePath, { timeout: 0 })
     try {
+      this.#refuseWhatIsNotAGraph(db)
       this.#take(db)
       const rows = db.prepare('SELECT seq, body FROM records ORDER BY seq').all() as {
         seq: number
@@ -151,6 +152,33 @@ export class SqliteStorageAdapter extends RecordStorage {
       )
     }
     return this.#db
+  }
+
+  /**
+   * Looks before anything writes: taking the file changes its header, and laying it out adds tables. A file that is
+   * not ours, or is a graph from another build, must come out of a refusal byte for byte as it went in.
+   */
+  #refuseWhatIsNotAGraph(db: Database.Database): void {
+    let version: number
+    let tables: number
+    try {
+      version = db.pragma('user_version', { simple: true }) as number
+      tables = (db.prepare('SELECT COUNT(*) AS n FROM sqlite_master').get() as { n: number }).n
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== 'SQLITE_NOTADB') throw error
+      throw new EpistemeError(
+        'guard_rejected',
+        `storage "${this.#filePath}" is not a database, so not an Episteme graph. A JSONL graph from an older build is not read by this one; nothing was changed.`,
+      )
+    }
+    if (version === 0 ? tables > 0 : version !== SQLITE_FORMAT_VERSION) {
+      throw new EpistemeError(
+        'guard_rejected',
+        version === 0
+          ? `storage "${this.#filePath}" is a SQLite file of something else, not an Episteme graph; nothing was changed`
+          : `storage "${this.#filePath}" has format version ${version}; this build reads version ${SQLITE_FORMAT_VERSION}; nothing was changed`,
+      )
+    }
   }
 
   /** Locks the file for this connection alone and lays it out if it is new. */

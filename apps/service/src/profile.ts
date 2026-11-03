@@ -87,6 +87,11 @@ export interface SceneProfile {
   readonly mcpTools?: readonly SceneTool[]
   /** Routes the scene adds to the REST API, served under `/api/v1/scene/<name>`. */
   readonly routes?: readonly SceneRoute[]
+  /**
+   * The paths of the `POST` routes an agent may also use, because all they do is add something for the person to look
+   * at, in nobody's voice (ADR 0020). Every other `POST` needs the person's own credential.
+   */
+  readonly proposingRoutes?: readonly string[]
 }
 
 /** What a scene's route receives: a view of the session that cannot decide or write, and the request. */

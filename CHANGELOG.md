@@ -9,6 +9,10 @@
 - **存储只用 SQLite**（[ADR 0018](docs/decisions/0018-sqlite-only.md)）：一个图谱就是一个 SQLite 文件，旁边的建议、材料、对话和场景记录也存在这个文件里，不再有 `.jsonl` 文件和 `.lock` 文件。`@episteme/storage-local`（JSONL）已删除，`graph import` / `graph export` 一并删除；旧的 JSONL 图谱不能再打开，也没有导入工具。默认图谱改为 `~/.episteme/learn.db`。
 - **需要 Node 22 或更高版本**：Node 20 已于 2026 年 4 月停止维护；SQLite 驱动升级到 `better-sqlite3` 13。
 
+### 修复
+
+- **Agent 令牌不能再动场景里的高影响操作**（[ADR 0020](docs/decisions/0020-scene-route-capabilities.md)）：之前 Agent 令牌，以及本机上不带任何凭证的请求，都能删除材料、归档或改名学习空间。现在场景的写操作默认只有本人能做，Agent 只能使用明确开放的提议类操作（新建空间、添加材料、起草计划、生成待审候选）。依赖这些旧行为的脚本需要改用本人的令牌，托管的 Workspace 不受影响。
+
 ## [0.1.0] - 2026-10-09
 
 **First Real Learning Loop**，第一个开发预览版（Developer Preview），不是面向普通用户的稳定版本。发布说明见 [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md)。

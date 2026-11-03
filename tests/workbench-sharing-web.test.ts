@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { addPerson, addToken, startService, type EpistemeService } from '@episteme/service'
 import { SimulatedModel, workbenchProfile } from '@episteme/workbench'
@@ -30,7 +30,8 @@ if (browser === undefined && process.env['CI'] !== undefined) {
   throw new Error('CI needs Edge or Chrome for the sharing journey')
 }
 
-const web = resolve(import.meta.dirname, '../apps/workbench/web')
+// A browser context can take longer than the default ten seconds while other test files are building.
+const HOOK_TIMEOUT = 60_000
 
 const NOTES = `# 位置编码
 
@@ -40,6 +41,7 @@ const NOTES = `# 位置编码
 const WEIS_VERSION = '位置编码把序列的顺序告诉模型，正弦版本不需要训练。'
 
 describe.skipIf(browser === undefined)('sharing in a browser', () => {
+  let built: string
   let directory: string
   let service: EpistemeService
   let tokens: { lin: string; wei: string }
@@ -88,11 +90,16 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
   }
 
   beforeAll(async () => {
-    await promisify(exec)('pnpm --filter @episteme/workbench-web build')
+    // Its own copy: another file's build empties a shared dist under a page that is still loading.
+    built = await mkdtemp(join(tmpdir(), 'episteme-web-build-'))
+    await promisify(exec)(
+      `pnpm --filter @episteme/workbench-web exec vite build --outDir "${built}" --emptyOutDir`,
+    )
   }, 180_000)
 
   afterAll(async () => {
     await browser?.close()
+    await rm(built, { recursive: true, force: true, maxRetries: 5 })
   })
 
   beforeEach(async () => {
@@ -106,20 +113,20 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
       port: 0,
       graph: join(directory, 'shared.db'),
       profile: workbenchProfile({ model: new SimulatedModel() }),
-      workspace: join(web, 'dist'),
+      workspace: built,
       mode: 'shared',
       users,
       publicOrigin: 'https://workbench.example.edu',
       sharing: true,
     })
-  })
+  }, HOOK_TIMEOUT)
 
   afterEach(async () => {
     for (const page of pages.splice(0)) await page.context().close()
     await service.close()
     await rm(directory, { recursive: true, force: true, maxRetries: 5 })
     expect(errors).toEqual([])
-  })
+  }, HOOK_TIMEOUT)
 
   it('goes from one person publishing to another answering, and the original stays whole', async () => {
     const lin = await enter(tokens.lin)
@@ -173,7 +180,7 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
     await wei.locator('.node-detail', { hasText: WEIS_VERSION }).waitFor()
     await publishOpened(wei)
     await wei.getByText('它回应的成果').waitFor()
-    await wei.getByRole('button', { name: '看谱系和差异' }).click()
+    await wei.getByRole('main').getByRole('button', { name: '看谱系和差异' }).click()
     await wei.locator('.difference ins', { hasText: '正弦版本' }).waitFor()
 
     // The first author sees the answer with its author's name, and their own words unchanged.
@@ -181,7 +188,7 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
     await lin.getByRole('button', { name: '公开成果' }).click()
     await lin.locator('.publications .row', { hasText: original ?? '' }).click()
     await lin.locator('.responses', { hasText: '魏' }).getByText(WEIS_VERSION).waitFor()
-    await lin.getByRole('button', { name: '看谱系和差异' }).click()
+    await lin.getByRole('main').getByRole('button', { name: '看谱系和差异' }).click()
     await lin.locator('.lineage').getByText('魏提出了自己的版本：林没有说正弦版本').waitFor()
     expect(await lin.locator('.publication h2').textContent()).toBe(original)
 

@@ -38,6 +38,9 @@ if (browser === undefined && process.env['CI'] !== undefined) {
 
 const web = resolve(import.meta.dirname, '../apps/workbench/web')
 
+// A browser context can take longer than the default ten seconds while other test files are building.
+const HOOK_TIMEOUT = 60_000
+
 const NOTES = `# 位置编码
 
 位置编码把序列的顺序告诉模型。
@@ -102,14 +105,14 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     errors.length = 0
     page = await (await browser!.newContext()).newPage()
     page.on('pageerror', (error) => errors.push(error.message))
-  })
+  }, HOOK_TIMEOUT)
 
   afterEach(async () => {
     await page.context().close()
     await close()
     await rm(directory, { recursive: true, force: true, maxRetries: 5 })
     expect(errors).toEqual([])
-  })
+  }, HOOK_TIMEOUT)
 
   it('takes a new person from nothing to saved understanding, and back after a restart', async () => {
     await open()

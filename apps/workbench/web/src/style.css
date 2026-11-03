@@ -1142,3 +1142,64 @@ li[data-status="skipped"] > span:first-child {
     font-weight: 600;
   }
 }
+
+.outcomes {
+  display: grid;
+  gap: 2.25rem;
+}
+
+.outcomes h3 {
+  margin: 0 0 0.75rem;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.outcomes h4 {
+  margin: 1rem 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.outcomes ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reading {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem 0 0.6rem 0.8rem;
+  border-left: 3px solid var(--rule);
+}
+
+.reading + .reading {
+  margin-top: 0.5rem;
+}
+
+.reading[data-gap="open"] {
+  border-left-color: var(--red);
+}
+
+.reading strong {
+  font-weight: 600;
+}
+
+.outcome-session[data-focused="true"] > h3 {
+  background: linear-gradient(transparent 62%, var(--marker) 62%);
+  width: fit-content;
+}
+
+.outcome-session li {
+  padding: 0.2rem 0;
+}
+
+.outcome-session li[data-kind="attempt"][data-verdict="contradicts"] b,
+.outcome-session li[data-kind="attempt"][data-verdict="partial"] b {
+  color: var(--red);
+}
+
+.outcome-session b {
+  font-weight: 600;
+}

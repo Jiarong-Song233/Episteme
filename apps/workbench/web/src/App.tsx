@@ -19,6 +19,7 @@ import {
 } from './api.js'
 import { Commons, SignIn } from './Commons.js'
 import { PlanShelf, PlanView, StatusView } from './Learning.js'
+import { Outcomes } from './Outcomes.js'
 import { AgentTurn, LearnerTurn, Links, messageOf } from './Turns.js'
 import { UnderstandingPanel, wordsOf } from './Understanding.js'
 
@@ -139,8 +140,8 @@ function Desk({
   const [focusedTurn, setFocusedTurn] = useState<string>()
 
   const space = spaces.find((candidate) => candidate.id === spaceId)
-  const threadInView =
-    planId === undefined ? threadId : plans.find((plan) => plan.id === planId)?.thread
+  const planInView = plans.find((plan) => plan.id === planId)
+  const threadInView = planId === undefined ? threadId : planInView?.thread
 
   useEffect(() => {
     if (focusedTurn === undefined) return undefined
@@ -230,6 +231,24 @@ function Desk({
       await openThread(resume === undefined ? latest?.id : undefined)
     })
   }, [spaceId, guard, openThread])
+
+  // A host agent writes while this page sits in the background, so coming back to it reads again.
+  useEffect(() => {
+    const reread = (): void => {
+      void (async () => {
+        const listed = (await api.spaces()).spaces
+        setSpaces(listed)
+        setSpaceId((held) => held ?? listed.find((candidate) => !candidate.archived)?.id)
+        if (spaceId === undefined) return
+        const [planned, held] = await Promise.all([api.plans(spaceId), api.understanding(spaceId)])
+        setPlans(planned.plans)
+        setUnderstanding(held)
+        setLearned((count) => count + 1)
+      })().catch(() => undefined)
+    }
+    window.addEventListener('focus', reread)
+    return () => window.removeEventListener('focus', reread)
+  }, [spaceId])
 
   const refreshMaterials = async (): Promise<void> => {
     if (spaceId !== undefined) setMaterials((await api.materials(spaceId)).materials)
@@ -324,7 +343,7 @@ function Desk({
     const plan = plans.find((candidate) => candidate.thread === thread)
     setFocusedTurn(turn)
     setPane('talk')
-    if (plan !== undefined) {
+    if (plan !== undefined && plan.origin !== 'host') {
       setPlanId(plan.id)
       return
     }
@@ -464,6 +483,19 @@ function Desk({
               onAsk={ask}
               onCite={cite}
               onCandidates={(reply) => makeCandidates(threadId, reply)}
+            />
+          ) : planInView?.origin === 'host' && spaceId !== undefined ? (
+            <Outcomes
+              space={spaceId}
+              name={space?.name ?? ''}
+              focus={planId}
+              version={learned}
+              blocks={library.blocks}
+              onReview={() => {
+                setTab('pending')
+                setPane('side')
+              }}
+              onOpenThread={(thread) => jumpTo(thread, undefined)}
             />
           ) : (
             <PlanView

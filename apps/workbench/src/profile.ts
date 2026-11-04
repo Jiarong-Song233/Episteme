@@ -1,7 +1,8 @@
 import { learnScene, recordableDimensions, type SessionScene } from '@episteme/application'
 import { asId, defineDomainPack, type DimensionId } from '@episteme/core'
 import { BLANK_TOPIC, type SceneProfile } from '@episteme/service'
-import type { Library } from './blocks.js'
+import { BUILT_IN_LIBRARY, type Library } from './blocks.js'
+import { hostLearningTools } from './host-learning.js'
 import type { ModelClient } from './model.js'
 import { WORKBENCH_PROPOSING_ROUTES } from './route-access.js'
 import { workbenchRoutes } from './routes.js'
@@ -61,5 +62,9 @@ export function workbenchProfile(options: {
     seed: BLANK_TOPIC,
     scene: workbenchScene,
     routes: workbenchRoutes(options),
+    mcpTools: hostLearningTools({
+      library: options.library ?? BUILT_IN_LIBRARY,
+      now: options.now ?? Date.now,
+    }),
   }
 }

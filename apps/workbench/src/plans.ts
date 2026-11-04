@@ -11,6 +11,8 @@ export interface Step {
   readonly id: string
   readonly block: string
   readonly focus: string
+  /** The objective it is about (ADR 0019). Older steps have none, and map to one by their focus. */
+  readonly objective?: string
   readonly minutes: number
   readonly status: StepStatus
   readonly note?: string
@@ -32,8 +34,8 @@ export interface Plan {
   readonly minutes: number
   readonly workflow: string
   readonly thread: string
-  /** Where the focuses came from: the model, or the material's own outline when no model could say. */
-  readonly origin: 'model' | 'outline'
+  /** Where the focuses came from: the model, the material's own outline when no model could say, or a host agent. */
+  readonly origin: 'model' | 'outline' | 'host'
   readonly status: PlanStatus
   /** Goes up with every edit. Earlier versions are kept. */
   readonly version: number

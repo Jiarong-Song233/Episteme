@@ -495,6 +495,208 @@ mark {
   transform: rotate(40deg);
 }
 
+/* A plan: what lies ahead, and the one thing to do now. */
+.plan-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.minutes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.minutes input {
+  width: 72px;
+}
+
+.modes,
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.options {
+  flex-direction: column;
+}
+
+.modes input,
+.options input {
+  width: auto;
+  margin-right: 6px;
+}
+
+.plan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: -14px 0 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.plan-steps {
+  max-width: 62ch;
+  margin-bottom: 16px;
+}
+
+.plan-steps summary {
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.plan-steps ol,
+.plan-editor ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.plan-steps li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 0;
+}
+
+.plan-steps li .hint {
+  flex: none;
+  max-width: 40%;
+  text-align: right;
+}
+
+li[data-status="done"] {
+  color: var(--ink-soft);
+}
+
+li[data-status="active"] {
+  font-weight: 600;
+}
+
+li[data-status="active"]::marker {
+  color: var(--ink);
+}
+
+li[data-status="skipped"] > span:first-child {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
+.plan-editor {
+  max-width: 62ch;
+  margin-bottom: 16px;
+}
+
+.plan-editor li {
+  margin-bottom: 10px;
+}
+
+.plan-editor select,
+.plan-editor input {
+  margin: 0 6px 4px 0;
+}
+
+.plan-editor select {
+  padding: 5px 4px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper-raised);
+  color: inherit;
+  font: inherit;
+}
+
+.plan-editor input:not(.step-minutes) {
+  width: min(100%, 22em);
+}
+
+.plan-editor .step-minutes {
+  width: 72px;
+}
+
+.plan-controls {
+  align-items: center;
+}
+
+.plan-controls p {
+  flex: 1;
+}
+
+.step-title {
+  color: var(--ink-soft);
+}
+
+.control-form {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  max-width: 62ch;
+}
+
+.control-form textarea {
+  resize: vertical;
+}
+
+.control-form .decisions {
+  margin-top: 0;
+}
+
+.exercise {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+/* The record so far. Three kinds of evidence, kept in separate rows. */
+.status dl {
+  margin: 0 0 12px;
+}
+
+.status dl > div {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.status dt {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.status dd {
+  margin: 0;
+}
+
+.status dd:not(.hint) {
+  font-family: var(--serif);
+  font-size: 20px;
+}
+
+.status section {
+  margin-top: 20px;
+}
+
+.status h3 {
+  margin-bottom: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.status li {
+  display: grid;
+  padding: 4px 0;
+}
+
 @media (max-width: 900px) {
   .desk {
     display: flex;

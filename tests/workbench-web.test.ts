@@ -10,7 +10,7 @@ import {
   workbenchProfile,
   type ModelClient,
 } from '@episteme/workbench'
-import { chromium, type Browser, type Page } from 'playwright-core'
+import { chromium, type Browser, type Locator, type Page } from 'playwright-core'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 /**
@@ -219,6 +219,125 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await cite.click()
     await page.getByText('这份材料已被删除').waitFor()
     await page.locator('.kept-quote', { hasText: '位置编码' }).waitFor()
+  }, 60_000)
+
+  /** Moves through a plan until `target` shows, with the buttons a person has. */
+  const advanceTo = async (target: Locator): Promise<void> => {
+    for (let guard = 0; guard < 80; guard += 1) {
+      if ((await target.count()) > 0) return
+      const next = page.getByRole('button', { name: '下一步', exact: true })
+      if ((await next.count()) > 0 && (await next.isEnabled())) await next.click()
+      await page.waitForTimeout(100)
+    }
+    await target.waitFor({ timeout: 1000 })
+  }
+
+  const newPlan = async (topic: string, minutes: number, mode: string): Promise<void> => {
+    await page.getByLabel('想学什么').fill(topic)
+    await page.getByLabel('可用时间').fill(String(minutes))
+    await page.getByRole('radio', { name: mode }).check()
+    await page.getByRole('button', { name: '生成计划' }).click()
+    await page.getByRole('heading', { name: topic }).waitFor()
+  }
+
+  it('learns one material both ways: edits, answers, pauses, restarts and sees the record', async () => {
+    await open()
+    await newSpace('机器学习')
+    await upload('a.md', NOTES)
+    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+
+    // A speedrun, and the person changes the plan before starting.
+    await newPlan('位置编码', 30, '速通')
+    await page.getByRole('button', { name: '修改计划' }).click()
+    await page.getByLabel('第 2 步的分钟数').fill('12')
+    await page.getByRole('button', { name: '删除第 5 步' }).click()
+    await page.getByRole('button', { name: '保存计划' }).click()
+    await page.locator('.plan-steps li', { hasText: '12 分钟' }).waitFor()
+    await expect.poll(() => page.locator('.plan-steps li').count()).toBe(5)
+
+    await page.getByRole('button', { name: '开始学习' }).click()
+    await page
+      .getByRole('button', { name: /查看引用 1/ })
+      .first()
+      .waitFor()
+    await advanceTo(page.getByLabel('你的答案'))
+    await page.getByLabel('你的答案').fill('不知道')
+    await page.getByRole('button', { name: '提交答案' }).click()
+    await page.getByText('没答对。正确答案是').waitFor()
+
+    // What the plan said can go to review, like any answer.
+    await page.getByRole('button', { name: '提炼成待确认的理解' }).first().click()
+    await page.getByRole('tab', { name: /待确认（[1-9]/ }).waitFor()
+
+    // Pausing survives a reload.
+    await page.getByRole('button', { name: '暂停', exact: true }).click()
+    await page.getByText('已暂停。进度都保存着。').waitFor()
+    await page.reload()
+    await page.getByText('已暂停。进度都保存着。').waitFor()
+    await page.getByRole('button', { name: '继续学习' }).click()
+
+    await advanceTo(page.getByText('这个计划结束了'))
+    await page.getByRole('button', { name: '看学习状态' }).click()
+    await page.locator('.status').getByText('0 / 1').waitFor()
+    await page.getByText('建议回头看').waitFor()
+    await page.getByText('不等于你实际理解了多少').waitFor()
+
+    // The same material, deep, and a restart in the middle of it.
+    await newPlan('注意力', 30, '深入')
+    await page.getByRole('button', { name: '开始学习' }).click()
+    await advanceTo(page.getByLabel('你的想法'))
+    await page.locator('.answer', { hasText: '用你自己的话' }).waitFor()
+    await page.getByLabel('你的想法').fill('注意力让词元彼此关联')
+    await page.getByRole('button', { name: '回复' }).click()
+    await page.locator('.question', { hasText: '彼此关联' }).waitFor()
+    await page
+      .getByRole('button', { name: /查看引用 1/ })
+      .last()
+      .waitFor()
+    await page.getByRole('button', { name: '直接讲给我听' }).click()
+    await page.getByRole('button', { name: '这一步够了' }).click()
+    await page.locator('.answer', { hasText: '举一个例子' }).waitFor()
+
+    await close()
+    await open()
+    await page.getByRole('heading', { name: '注意力' }).waitFor()
+    await page.locator('.answer', { hasText: '举一个例子' }).waitFor()
+    await page.getByRole('button', { name: '这一步够了' }).click()
+    await page.getByLabel('你的答案').waitFor()
+    await page.getByRole('button', { name: '不答了，往下走' }).click()
+    await page.getByLabel('你的想法').waitFor()
+    await page.getByRole('button', { name: '这一步够了' }).click()
+    await page.getByText('这个计划结束了').waitFor()
+    await expect.poll(() => page.locator('li[data-status="skipped"]').count()).toBe(1)
+    expect(errors).toEqual([])
+  }, 120_000)
+
+  it('offers a retry when the model fails on a step, and keeps the place', async () => {
+    let fail = false
+    const simulated = new SimulatedModel()
+    await open({
+      name: 'flaky',
+      simulated: true,
+      complete(messages) {
+        return fail
+          ? Promise.reject(new ModelFailure('timeout', '模型超时没有回应。'))
+          : simulated.complete(messages)
+      },
+    })
+    await newSpace('机器学习')
+    await upload('a.md', NOTES)
+    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await newPlan('位置编码', 15, '速通')
+    fail = true
+    await page.getByRole('button', { name: '开始学习' }).click()
+    await page.getByText('进度已保留').waitFor()
+    fail = false
+    await page.getByRole('button', { name: '重试' }).click()
+    await page
+      .getByRole('button', { name: /查看引用 1/ })
+      .first()
+      .waitFor()
+    await expect.poll(() => page.getByText('进度已保留').count()).toBe(0)
   }, 60_000)
 
   it('fits a phone', async () => {

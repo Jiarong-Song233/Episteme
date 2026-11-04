@@ -9,6 +9,7 @@ import type {
   SessionOutcome,
   Space,
   TrailEntry,
+  WordsBy,
 } from '@episteme/workbench'
 
 /** The page's only way to the graph: the same REST API any other client has. */
@@ -28,6 +29,7 @@ export type {
   Space,
   Step,
   TrailEntry,
+  WordsBy,
 } from '@episteme/workbench'
 
 export interface Session {
@@ -41,6 +43,9 @@ export interface Turn {
   readonly speaker: 'learner' | 'agent'
   readonly text: string
   readonly answer?: Answer
+  /** Absent only on a turn still being sent. */
+  readonly by?: string
+  readonly writtenWith?: 'person' | 'agent'
 }
 
 export interface MaterialText {
@@ -75,6 +80,7 @@ export interface PendingCandidate {
   }
   readonly rationale: string
   readonly basis?: string
+  readonly wordsBy?: WordsBy
   /** A pending relation in words. It can be accepted only once both its ends are confirmed. */
   /** Another wording, held or waiting, that says nearly the same. */
   readonly similar?: string

@@ -66,12 +66,26 @@ function evidenceWords(objective: ObjectiveReading): string {
   return `缺口之后的回答被判断为答对（${JUDGED_BY[gap.supportedBy?.method ?? 'agent']}）。这不等于已经掌握`
 }
 
+/** Only for words that rest on a turn; what the person answered on the page itself has none. */
+const ANSWER_SOURCE: Readonly<Record<string, string>> = {
+  agent: '回答由 Agent 转述。',
+  unrecorded: '回答的来源未记录。',
+}
+
+const STATEMENT: Readonly<Record<string, string>> = {
+  person: '你说了自己的想法，原话在对话里。',
+  agent: 'Agent 转述了你的想法，原话在对话里。',
+  unrecorded: '记下了一段你的想法，来源未记录，原话在对话里。',
+}
+
 function Event(props: { event: SessionEvent; blocks: readonly BlockInfo[] }) {
   const { event, blocks } = props
   const { assessment, move, candidate } = event
   if (event.kind === 'attempt') {
+    const source = ANSWER_SOURCE[event.wordsBy ?? '']
     return (
       <>
+        {source !== undefined && <span className="hint">{source} </span>}
         {assessment === undefined ? (
           '答了一次，没有判断。'
         ) : (
@@ -84,7 +98,7 @@ function Event(props: { event: SessionEvent; blocks: readonly BlockInfo[] }) {
       </>
     )
   }
-  if (event.kind === 'statement') return <>你说了自己的想法，原话在对话里。</>
+  if (event.kind === 'statement') return <>{STATEMENT[event.wordsBy ?? 'unrecorded']}</>
   if (event.kind === 'feedback') return <>反馈：{assessment?.reason}</>
   if (move !== undefined) {
     const title = blocks.find((block) => block.id === move.activity)?.title ?? move.activity

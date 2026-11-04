@@ -15,6 +15,7 @@ import {
   type HeldNode,
   type TrailEntry,
   type Understanding,
+  type WordsBy,
 } from './api.js'
 import { Lineage, PublishFlow } from './Commons.js'
 import { Links, messageOf } from './Turns.js'
@@ -37,8 +38,19 @@ const whenOf = (at: number): string =>
 
 const byWhom = (by: string): string => (by === 'self' ? '你自己' : '模型')
 
-export const wordsOf = (basis: string | undefined): string =>
-  basis === 'stated' ? '你的原话' : basis === 'inferred' ? '模型的话' : '来源未记录'
+/** Whose words these are, as far as the record can say. Relayed words stay usable, and the person judges them. */
+export function wordsOf(basis: string | undefined, wordsBy: WordsBy | undefined): string {
+  if (basis === 'inferred') return '模型的话'
+  if (basis !== 'stated') return '来源未记录'
+  if (wordsBy === 'person') return '你的原话'
+  return wordsBy === 'agent' ? 'Agent 转述' : '来源未记录'
+}
+
+function proposedWords(speaker: string, basis: string | undefined, wordsBy: WordsBy | undefined) {
+  if (speaker !== 'learner') return '从模型的话里提炼，经你确认。'
+  if (wordsBy === 'agent') return 'Agent 转述的话，经你确认。'
+  return wordsBy === 'person' || basis === undefined ? '你提出这一条。' : '来源未记录，经你确认。'
+}
 
 interface PanelProps {
   readonly space: string
@@ -328,7 +340,7 @@ function NodeDetail(props: PanelProps & { node: HeldNode }) {
       <Marks node={node} />
       <p className="hint">
         {node.adoptedFrom === undefined ? (
-          wordsOf(node.origin?.basis)
+          wordsOf(node.origin?.basis, node.wordsBy)
         ) : (
           <>
             {links.nameOf(node.adoptedFrom.author)} 发布的成果，不是你的原话。{' '}
@@ -684,7 +696,7 @@ function TrailLine(props: {
     case 'proposed':
       return (
         <p>
-          {entry.speaker === 'learner' ? '你提出这一条。' : '从模型的话里提炼，经你确认。'}
+          {proposedWords(entry.speaker, entry.basis, entry.wordsBy)}
           {entry.thread !== undefined && (
             <>
               {' '}

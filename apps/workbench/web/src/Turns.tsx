@@ -32,6 +32,14 @@ export const Links = createContext<TurnLinks>({
   offer: () => Promise.resolve(undefined),
 })
 
+/** Set beside words that may not have come from the person directly. Their own turns need no note. */
+function sourceNote(turn: Turn): string | undefined {
+  if (turn.by === undefined || turn.writtenWith === 'person') return undefined
+  return turn.writtenWith === 'agent' || turn.by.startsWith('actor_agent_')
+    ? 'Agent 转述'
+    : '来源未记录'
+}
+
 /** What the person said, which they can make their own, or see what it became. */
 export function LearnerTurn({ turn, thread }: { turn: Turn; thread: string | undefined }) {
   const links = useContext(Links)
@@ -40,9 +48,11 @@ export function LearnerTurn({ turn, thread }: { turn: Turn; thread: string | und
   const made = links.nodes.find((node) => node.origin?.turn === turn.id)
   // A turn still being sent has no id to go back to yet.
   const canOffer = thread !== undefined && turn.id !== 'asking'
+  const source = sourceNote(turn)
   return (
     <div id={`turn-${turn.id}`} className="learner-turn" data-focused={links.focused === turn.id}>
       <p className="question">{turn.text}</p>
+      {source !== undefined && <p className="hint turn-source">{source}</p>}
       {made !== undefined ? (
         <button type="button" className="link" onClick={() => links.openNode(made.nodeId)}>
           已记成理解，去看看

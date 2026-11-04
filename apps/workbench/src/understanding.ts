@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import type { HostItem, Proposal, SceneView, SceneWrites, Turn } from '@episteme/application'
+import {
+  writtenWithOf,
+  type HostItem,
+  type Proposal,
+  type SceneView,
+  type SceneWrites,
+  type Turn,
+} from '@episteme/application'
 import type { SceneRoute, SceneRouteContext } from '@episteme/service'
 import { relevant, type Answer, type RecalledUnderstanding } from './answer.js'
 import type { MaterialStore, SearchHit } from './materials.js'
@@ -58,6 +65,12 @@ export interface Origin {
 }
 
 /**
+ * How words said to be the person's reached the record (ADR 0021): typed by them, relayed by an agent, or nobody knows.
+ * It is about the words' way in, not about whether they are true.
+ */
+export type WordsBy = 'person' | 'agent' | 'unrecorded'
+
+/**
  * That someone else's published item is held in this space. The adoption itself is a state event in the graph; this
  * only says where the person put it, because a node belongs to its author's space, and it is the author's words.
  */
@@ -105,6 +118,8 @@ export interface HeldNode {
   /** The words it was drawn from. */
   readonly excerpt?: string
   readonly origin?: Origin
+  /** Only for words kept as the person's own. */
+  readonly wordsBy?: WordsBy
   readonly relations: readonly {
     readonly type: string
     readonly direction: 'in' | 'out'
@@ -133,6 +148,7 @@ export type TrailEntry =
       readonly at: number
       readonly speaker: Origin['speaker']
       readonly basis?: string
+      readonly wordsBy?: WordsBy
       readonly excerpt?: string
       readonly thread?: string
       readonly turn?: string
@@ -262,6 +278,22 @@ function originOf(view: SceneView, suggestion: string | undefined): Origin | und
   return view.records.get(`${ORIGIN_PREFIX}${suggestion}`)?.value as Origin | undefined
 }
 
+/** How the words of one turn arrived. A turn that is gone can no longer say. */
+export function wordsByTurn(view: SceneView, thread: string, turn: string): WordsBy {
+  const found = view.threadView(thread)?.turns.find((each) => each.id === turn)
+  return (found === undefined ? undefined : writtenWithOf(found)) ?? 'unrecorded'
+}
+
+/**
+ * For a kept origin in the person's own words. With no turn behind it, the words were typed into a route only the
+ * person can use: a revision or a response.
+ */
+function wordsByOrigin(view: SceneView, origin: Origin): WordsBy | undefined {
+  if (origin.basis !== 'stated') return undefined
+  if (origin.turn === undefined) return 'person'
+  return origin.thread === undefined ? 'unrecorded' : wordsByTurn(view, origin.thread, origin.turn)
+}
+
 function challengesOf(view: SceneView, node?: string): readonly Challenge[] {
   const all = view.records.list(CHALLENGE_PREFIX).map((record) => record.value as Challenge)
   return node === undefined ? all : all.filter((challenge) => challenge.node === node)
@@ -282,6 +314,7 @@ export function heldNodes(view: SceneView, space: string): readonly HeldNode[] {
     const origin = originOf(view, node.fromSuggestion)
     const provenance = expanded.origin as { readonly excerpt?: string } | undefined
     const adoption = adoptions.get(node.nodeId)
+    const wordsBy = origin === undefined ? undefined : wordsByOrigin(view, origin)
     // The author moving on does not move the person who cited them: that takes the person's own version, below.
     const revisedTo =
       adoption === undefined
@@ -306,6 +339,7 @@ export function heldNodes(view: SceneView, space: string): readonly HeldNode[] {
         ...(node.fromSuggestion === undefined ? {} : { fromSuggestion: node.fromSuggestion }),
         ...(provenance?.excerpt === undefined ? {} : { excerpt: provenance.excerpt }),
         ...(origin === undefined ? {} : { origin }),
+        ...(wordsBy === undefined ? {} : { wordsBy }),
         relations: relations.filter((relation) => here.has(relation.nodeId)),
         elsewhere: relations.filter((relation) => !here.has(relation.nodeId)),
         ...(adoption === undefined
@@ -412,6 +446,7 @@ function trailOf(
           at: first,
           speaker: origin?.speaker ?? 'learner',
           ...(origin === undefined ? {} : { basis: origin.basis }),
+          ...(node.wordsBy === undefined ? {} : { wordsBy: node.wordsBy }),
           ...(node.excerpt === undefined ? {} : { excerpt: node.excerpt }),
           ...(origin?.thread === undefined ? {} : { thread: origin.thread }),
           ...(origin?.turn === undefined ? {} : { turn: origin.turn }),
@@ -990,9 +1025,19 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
                   (other) => other !== proposal.label && sameThought(proposal.label, other),
                 )
               : undefined
+          // A host's own `stated` has no kept origin: the agent is who says those words are the person's.
+          const wordsBy =
+            origin !== undefined
+              ? wordsByOrigin(view, origin)
+              : suggestion.basis !== 'stated'
+                ? undefined
+                : suggestion.proposedBy.startsWith('actor_agent_')
+                  ? 'agent'
+                  : 'unrecorded'
           return {
             ...suggestion,
             ...(origin === undefined ? {} : { speaker: origin.speaker }),
+            ...(wordsBy === undefined ? {} : { wordsBy }),
             ...(similar === undefined ? {} : { similar }),
             ...(suggestion.proposal.kind === 'link'
               ? { link: linkEnds(suggestion.proposal, nodes, pending) }

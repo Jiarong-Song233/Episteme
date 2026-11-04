@@ -67,6 +67,7 @@ export function PlanShelf(props: {
               onClick={() => props.onSelect(plan.id)}
             >
               {plan.topic}
+              {plan.origin === 'host' && '（Agent 带领）'}
               {plan.status === 'paused' && '（已暂停）'}
               {plan.status === 'done' && '（已结束）'}
             </button>

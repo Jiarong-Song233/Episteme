@@ -3,8 +3,10 @@ import type {
   Challenge,
   HeldNode,
   MaterialSummary,
+  ObjectiveReading,
   Plan,
   PublicQuestion,
+  SessionOutcome,
   Space,
   TrailEntry,
 } from '@episteme/workbench'
@@ -18,8 +20,11 @@ export type {
   Evidence,
   HeldNode,
   MaterialSummary,
+  ObjectiveReading,
   Plan,
   PublicQuestion,
+  SessionEvent,
+  SessionOutcome,
   Space,
   Step,
   TrailEntry,
@@ -456,6 +461,12 @@ export const api = {
       ...(retry ? { retry } : {}),
     }) as Promise<PlanMove>,
   status: (space: string) => scene(`/status?space=${encoded(space)}`) as Promise<Status>,
+  outcomes: (space: string) =>
+    scene(`/outcomes?space=${encoded(space)}`) as Promise<{
+      objectives: readonly ObjectiveReading[]
+      unlinked: number
+      sessions: readonly SessionOutcome[]
+    }>,
   understanding: (space: string) =>
     scene(`/understanding?space=${encoded(space)}`) as Promise<Understanding>,
   // The person's decision, through the API's own decision route. The workbench has no other way to make one.

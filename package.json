@@ -20,6 +20,8 @@
     "format:check": "biome format .",
     "prepare": "simple-git-hooks",
     "serve": "pnpm --filter @episteme/service build && node apps/service/dist/serve.js",
+    "workbench:build": "pnpm --filter @episteme/workbench build && pnpm --filter @episteme/workbench-web build",
+    "workbench": "pnpm workbench:build && node apps/workbench/dist/serve.js",
     "check": "pnpm typecheck && pnpm lint && pnpm build && pnpm test"
   },
   "simple-git-hooks": {

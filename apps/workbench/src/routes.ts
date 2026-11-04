@@ -55,7 +55,7 @@ export function scopeOf(space: string): string {
 
 function spaceOf(view: SceneView, id: string): Space {
   const record = view.records.get(`${SPACE_PREFIX}${id}`)
-  if (record === undefined) refuse('unknown_space', 'there is no such space of yours')
+  if (record === undefined) refuse('unknown_space', '这个空间不存在。')
   return record.value as Space
 }
 
@@ -133,7 +133,7 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
         : (await writes.openThread({ title: titleFrom(question), scope })).id
     const thread = view.threadView(threadId)
     if (thread === undefined || thread.thread.scope !== scope) {
-      refuse('unknown_thread', 'there is no such conversation in this space')
+      refuse('unknown_thread', '这个空间里没有这段对话。')
     }
     // Retrying after a failed call answers the same turn, instead of asking the question twice.
     const last = thread.turns.at(-1)
@@ -180,7 +180,7 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     const reply = thread?.turns.find((candidate) => candidate.id === replyId)
     const record = view.records.get(`${ANSWER_PREFIX}${replyId}`)
     if (reply === undefined || record === undefined || thread?.thread.scope !== scopeOf(space.id)) {
-      refuse('unknown_answer', 'there is no such answer in this space')
+      refuse('unknown_answer', '这个空间里没有这条回答。')
     }
     const answer = record.value as Answer
     const titles = new Map(answer.citations.map((citation) => [citation.n, citation.title]))
@@ -320,7 +320,7 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     }),
     route('GET', '/session', ({ view, query }) => {
       const thread = view.threadView(required(query, 'thread'))
-      if (thread === undefined) refuse('unknown_thread', 'there is no such conversation of yours')
+      if (thread === undefined) refuse('unknown_thread', '这段对话不存在。')
       return {
         thread: thread.thread,
         turns: thread.turns.map((turn) => {

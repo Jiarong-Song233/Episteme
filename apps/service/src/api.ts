@@ -6,6 +6,7 @@ import {
   type CognitiveSession,
   type Decision,
 } from '@episteme/application'
+import { agentActorFor } from '@episteme/mcp'
 import type { Caller, Directory, Operation } from './identity.js'
 import type { SceneProfile } from './profile.js'
 
@@ -687,6 +688,12 @@ export async function handleApi(
         session.appendTurn(segment(turnsPath[1]), {
           speaker,
           text: asString(body['text'], 'text'),
+          // From the credential, never the body (ADR 0021). With none, nobody knows who wrote it, so nothing is said.
+          ...(caller === undefined
+            ? {}
+            : caller.kind === 'agent'
+              ? { by: agentActorFor(caller.label), writtenWith: 'agent' as const }
+              : { writtenWith: 'person' as const }),
         }),
       )
       if (turn !== undefined) sendJson(response, 200, { ...at(session), turn })

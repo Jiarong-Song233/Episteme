@@ -427,7 +427,11 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
     }
     // Only now, after the model has answered, so a failure leaves the question open to try again.
     await say(writes, plan, question.prompt)
-    await writes.appendTurn(plan.thread, { speaker: 'learner', text: shown })
+    await writes.appendTurn(plan.thread, {
+      speaker: 'learner',
+      text: shown,
+      writtenWith: 'person', // `/plans/act` takes only the person's credential (ADR 0020)
+    })
     if (verdict !== '') await say(writes, plan, verdict)
     await keepAnswer(view, writes, plan, answer, by)
     const answered: Attempt = {
@@ -494,7 +498,11 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
           // A retry answers the turn already kept, instead of saying it twice.
           const last = view.threadView(plan.thread)?.turns.at(-1)
           if (body['retry'] !== true || last?.speaker !== 'learner' || last.text !== said) {
-            await writes.appendTurn(plan.thread, { speaker: 'learner', text: said })
+            await writes.appendTurn(plan.thread, {
+              speaker: 'learner',
+              text: said,
+              writtenWith: 'person', // `/plans/act` takes only the person's credential (ADR 0020)
+            })
           }
           return { plan: await reply(view, writes, plan, step, said) }
         }

@@ -118,7 +118,11 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     const earlier = retrying ? thread.turns.slice(0, -1) : thread.turns
     const turn = retrying
       ? last
-      : await writes.appendTurn(threadId, { speaker: 'learner', text: question })
+      : await writes.appendTurn(threadId, {
+          speaker: 'learner',
+          text: question,
+          writtenWith: 'person', // this route takes only the person's credential (ADR 0020)
+        })
 
     const store = await materialsOf(writes)
     let hits = store.search(writes.actor, space.id, question)

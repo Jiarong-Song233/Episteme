@@ -24,7 +24,10 @@ export interface GraphExport {
   /** What wrote it. The file's name only: where it sat on someone's disk does not travel. */
   readonly source: { readonly file: string; readonly build: string }
   readonly storedAs: { readonly sqliteFormat: number; readonly recordSchema: number }
-  /** Over `records` and `companions` as they are serialized here, so a damaged or edited file is refused. */
+  /**
+   * Over `records` and `companions` as they are serialized here, so a damaged file is refused. Anyone editing the file
+   * can recompute it, so it says nothing about who wrote the contents.
+   */
   readonly sha256: string
   readonly counts: {
     readonly records: number
@@ -113,8 +116,9 @@ export async function exportGraph(
   } finally {
     db.close()
   }
-  // `wx`: a file that appeared in the meantime is still not replaced.
-  await writeFile(target, JSON.stringify(exported), { encoding: 'utf8', flag: 'wx' })
+  // `wx`: a file that appeared in the meantime is still not replaced. `0o600`: the file holds everyone's private
+  // material, so only its owner reads it. Windows ignores the mode and the file takes its folder's permissions.
+  await writeFile(target, JSON.stringify(exported), { encoding: 'utf8', flag: 'wx', mode: 0o600 })
   return exported
 }
 

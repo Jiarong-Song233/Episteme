@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -250,6 +251,48 @@ describe('exporting and importing a graph', () => {
     expect(again.sha256).toBe(first.sha256)
   }, 60_000)
 
+  // Windows ignores the mode, and CI's Linux runners are what check it.
+  it.skipIf(process.platform === 'win32')(
+    'writes a file only its owner can read, whatever the umask allows',
+    async () => {
+      await session()
+      const before = process.umask(0)
+      try {
+        await exportGraph(graph, archive, OPTIONS)
+      } finally {
+        process.umask(before)
+      }
+      expect((await stat(archive)).mode & 0o777).toBe(0o600)
+    },
+    60_000,
+  )
+
+  it('takes an edited file whose checksum was recomputed, so the checksum proves no authorship', async () => {
+    await session()
+    await exportGraph(graph, archive, OPTIONS)
+    const original = await readGraphExport(archive)
+    const { records } = original
+    const companions = original.companions.map((each) => ({
+      ...each,
+      body: each.body.replaceAll('位置编码', '换过的词'),
+    }))
+    expect(JSON.stringify(companions)).toContain('换过的词')
+    const edited = join(directory, 'edited.episteme.json')
+    await writeFile(
+      edited,
+      JSON.stringify({
+        ...original,
+        companions,
+        sha256: createHash('sha256').update(JSON.stringify({ records, companions })).digest('hex'),
+      }),
+    )
+    const restored = join(directory, 'restored.db')
+    await importGraph(edited, restored)
+    const again = join(directory, 'again.episteme.json')
+    await exportGraph(restored, again, OPTIONS)
+    expect(JSON.stringify((await readGraphExport(again)).companions)).toContain('换过的词')
+  }, 60_000)
+
   it('refuses a graph someone is using', async () => {
     const storage = await openSqliteStorage(graph)
     try {
@@ -319,10 +362,12 @@ describe('exporting and importing a graph', () => {
     const run = promisify(execFile)
     const out = await run(process.execPath, [serve, 'export', archive, '--graph', graph])
     expect(out.stdout).toContain('私人材料')
+    expect(out.stdout).toContain('其他人的内容')
 
     const restored = join(directory, 'restored.db')
     const back = await run(process.execPath, [serve, 'import', archive, '--graph', restored])
     expect(back.stdout).toContain('graph.db')
+    expect(back.stdout).toContain('无法证明内容是谁写的')
     expect(existsSync(restored)).toBe(true)
 
     await expect(

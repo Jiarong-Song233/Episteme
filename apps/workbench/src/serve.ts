@@ -89,12 +89,12 @@ if (positionals[0] === 'export' || positionals[0] === 'import') {
     if (positionals[0] === 'export') {
       const { counts } = await exportGraph(graph, file, { build: BUILD })
       process.stdout.write(
-        `已导出 ${counts.records} 条记录到 ${file}。\n这个文件含全部内容，包括私人材料和对话，请自己保管。登录令牌不在里面。\n`,
+        `已导出 ${counts.records} 条记录到 ${file}。\n这个文件含整个图谱的全部内容，包括私人材料和对话；多人使用时也包括其他人的内容。文件没有加密，请自己保管。登录令牌不在里面。\n`,
       )
     } else {
       const { counts, source, exportedAt } = await importGraph(file, graph)
       process.stdout.write(
-        `已恢复到 ${graph}：${counts.records} 条记录，来自 ${source.file}（${source.build}），导出于 ${exportedAt}。\n`,
+        `已恢复到 ${graph}：${counts.records} 条记录，来自 ${source.file}（${source.build}），导出于 ${exportedAt}。\n来源和导出时间都写在文件里，校验值只能发现损坏，无法证明内容是谁写的，也无法发现有人改过。请只导入你信任的文件。\n`,
       )
     }
     process.exit(0)

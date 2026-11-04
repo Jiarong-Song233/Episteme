@@ -206,6 +206,12 @@ export class Directory {
     return undefined
   }
 
+  /** What a person is called, for showing who wrote something. `undefined` for anyone not in this directory. */
+  nameOf(actorId: string): string | undefined {
+    this.#reloadIfChanged()
+    return this.#people.find((person) => person.actorId === actorId)?.displayName
+  }
+
   /** Whether people manage their own tokens here: only with a user file, that is, in shared mode. */
   get selfService(): boolean {
     return this.#path !== undefined

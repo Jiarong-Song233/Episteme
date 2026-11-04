@@ -7,6 +7,7 @@ import { learningRoutes } from './learning.js'
 import { MaterialStore } from './materials.js'
 import { ModelFailure, type ModelClient, type ModelMessage } from './model.js'
 import { MAX_MATERIAL_BYTES, MaterialRefusal, parseMaterial } from './parse.js'
+import { sharingRoutes } from './sharing.js'
 import { recalledFor, understandingRoutes } from './understanding.js'
 import {
   ANSWER_PREFIX,
@@ -151,6 +152,7 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
   return [
     ...learningRoutes({ model, library, now, materialsOf }),
     ...understandingRoutes({ model, now, materialsOf }),
+    ...sharingRoutes({ now }),
     route('GET', '/model', () => ({ name: model.name, simulated: model.simulated })),
 
     route('GET', '/spaces', ({ view }) => ({

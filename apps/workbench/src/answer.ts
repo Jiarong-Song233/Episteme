@@ -61,6 +61,8 @@ export interface Answer {
 }
 
 export interface RecalledUnderstanding {
+  /** Set when this is someone else's published item the person cited. */
+  readonly from?: { readonly author: string; readonly publication: string }
   readonly nodeId: string
   readonly label: string
   /** The person has an unresolved contradiction on it. */
@@ -104,7 +106,8 @@ export function citationsOf(hits: readonly SearchHit[]): readonly Citation[] {
 function priorBlock(recalled: readonly RecalledUnderstanding[]): string {
   if (recalled.length === 0) return ''
   const lines = recalled.map(
-    ({ label, conflict }) => `- ${label}${conflict ? '（学习者认为这一条还有未解决的矛盾）' : ''}`,
+    ({ label, conflict, from }) =>
+      `- ${label}${conflict ? '（学习者认为这一条还有未解决的矛盾）' : ''}${from === undefined ? '' : '（这是学习者引用的他人成果，不是学习者自己的话）'}`,
   )
   return `<prior>\n${lines.join('\n')}\n</prior>\n上面 prior 里是学习者之前确认过的理解，不是材料：不能当依据，不能标编号。它和摘录不一致时，要明确指出不一致的地方。\n\n`
 }

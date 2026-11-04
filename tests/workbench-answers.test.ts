@@ -13,6 +13,7 @@ import {
   remoteModel,
   SimulatedModel,
   type ModelClient,
+  type ModelMessage,
 } from '@episteme/workbench'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -90,6 +91,47 @@ describe('answers', () => {
     })
     expect(answer.status).toBe('insufficient_evidence')
     expect(model.calls).toBe(0)
+  })
+
+  it('opens the conversation with the person, even when the thread opened with the workbench', async () => {
+    const store = await storeWith(['编码', '位置编码把顺序告诉模型。'])
+    const seen: (readonly ModelMessage[])[] = []
+    const answerWith = (history: readonly ModelMessage[]) =>
+      answerFrom({
+        question: '位置编码做什么',
+        hits: store.search('a', 's', '位置编码做什么'),
+        history,
+        model: {
+          name: 'recording',
+          simulated: true,
+          complete: (messages) => {
+            seen.push(messages)
+            return Promise.resolve({ text: '告诉模型顺序。[1]' })
+          },
+        },
+      })
+    await answerWith([{ role: 'assistant', content: '先看概览。' }])
+    await answerWith([
+      { role: 'user', content: '什么是编码' },
+      { role: 'assistant', content: '一种表示。' },
+    ])
+    expect(seen[0]?.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'user'])
+    expect(seen[1]?.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'user'])
+    expect(seen[1]?.[1]?.content).toBe('什么是编码')
+  })
+
+  it('cites all of what the model read, so the sentence an answer rests on is never cut off', async () => {
+    const late = '要找的那句话在很后面。'
+    const store = await storeWith(['长文', `${'前面的铺垫内容。'.repeat(90)}${late}`])
+    const hits = store.search('a', 's', '要找的那句话')
+    const answer = await answerFrom({
+      question: '要找的那句话',
+      hits,
+      history: [],
+      model: scripted('在很后面。[1]'),
+    })
+    expect(hits[0]?.chunk.text.length).toBeGreaterThan(600)
+    expect(answer.citations[0]?.quote).toContain(late)
   })
 
   it('reports what the model itself says it cannot answer', async () => {

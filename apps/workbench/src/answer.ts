@@ -70,15 +70,13 @@ export interface RecalledUnderstanding {
 }
 
 /** Below this share of a question's words, no passage is treated as being about it. */
-const MIN_COVERAGE = 0.34
-/** What a further passage needs once the best one has cleared `MIN_COVERAGE`. */
-const MIN_COMPANION_COVERAGE = 0.2
+const MIN_COVERAGE = 0.2
 /** A cited sentence sharing less than this of its words with the excerpt is flagged. */
 const MIN_SUPPORT = 0.2
-const MAX_QUOTE = 600
 const MAX_HISTORY = 6
 export const INSUFFICIENT_MARK = '[证据不足]'
 const INFERENCE_MARK = '[推断]'
+const RESUMING = '（继续之前的学习）'
 
 const SYSTEM = `你是学习助手，只根据给出的材料摘录回答问题。
 规则：
@@ -99,7 +97,8 @@ export function citationsOf(hits: readonly SearchHit[]): readonly Citation[] {
     line: chunk.line,
     ...(chunk.page === undefined ? {} : { page: chunk.page }),
     ...(chunk.section === undefined ? {} : { section: chunk.section }),
-    quote: chunk.text.slice(0, MAX_QUOTE),
+    // All of what the model read: a cut quote can leave out the very sentence the answer rests on.
+    quote: chunk.text,
   }))
 }
 
@@ -126,12 +125,16 @@ function promptFor(
       return `<excerpt n="${index + 1}" title="${title}" at="${where}">\n${chunk.text}\n</excerpt>`
     })
     .join('\n')
+  const earlier = history.slice(-MAX_HISTORY)
   return [
     {
       role: 'system',
       content: instruction === undefined ? SYSTEM : `${SYSTEM}\n\n这一步的要求：${instruction}`,
     },
-    ...history.slice(-MAX_HISTORY),
+    // A plan's thread opens with the workbench speaking. Real services answer most such prompts with nothing at all, so
+    // the conversation has to open with the person (docs/research/evaluation/round-2.md).
+    ...(earlier[0]?.role === 'assistant' ? [{ role: 'user' as const, content: RESUMING }] : []),
+    ...earlier,
     {
       role: 'user',
       content: `${excerpts}\n\n${priorBlock(recalled)}<question>${question}</question>`,
@@ -263,12 +266,13 @@ export function checkReply(
 /**
  * Whether a passage is about the question at all. Nothing is sent to a model otherwise: a model handed unrelated
  * passages tends to answer anyway, and the person would be told the material says something it does not.
+ *
+ * Deliberately low. This only has to stop questions about something else; a question in other words than the material's
+ * shares few of them, and telling those apart from a real gap is the model's job, which it does through
+ * `INSUFFICIENT_MARK` (docs/research/evaluation/round-2.md).
  */
 export function relevant(hits: readonly SearchHit[]): readonly SearchHit[] {
-  const best = Math.max(0, ...hits.map((hit) => hit.coverage))
-  if (best < MIN_COVERAGE) return []
-  // A question about two things is half covered by each document, so only the best passage has to clear the bar.
-  return hits.filter((hit) => hit.coverage >= MIN_COMPANION_COVERAGE)
+  return hits.filter((hit) => hit.coverage >= MIN_COVERAGE)
 }
 
 export interface AskInput {

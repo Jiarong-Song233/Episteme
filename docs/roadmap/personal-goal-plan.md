@@ -53,6 +53,7 @@ flowchart TD
 | G5 边界审计与导出恢复 | Review | G4 | 非教学场景不改 Core；导出、导入、恢复有测试；SAIR 贡献候选清单 | `feat/boundary-and-recovery` |
 | G5 真实主机 e2e | Review | G5 审计 | 真实 Claude Code 连接 MCP（SAIR #32）。无头模式已跑通；交互模式和 Codex 未验证 | `feat/boundary-and-recovery` |
 | G6 可复现评估：同模型基线 | Review | G5 | 固定材料和任务，方法、结果、局限和下一轮依据见[第一轮报告](../research/evaluation/round-1.md) | `feat/evaluation` |
+| G6 第一轮发现的修复 | Review | G6 基线 | 同义改写题从 6/18 到 15/18，引用不再截断，对话步骤的空回复查明根因。见[第二轮报告](../research/evaluation/round-2.md) | `fix/evaluation-findings` |
 | G6 与成熟产品对比 | Blocked | G6 基线 | 运行第三方项目需要用户点名授权；未运行前这一项不算达成 | |
 
 ## 能力差距（2026-11-02 盘点）

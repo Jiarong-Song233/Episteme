@@ -5,7 +5,12 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { GraphLockedError, exportGraph, importGraph } from '@episteme/application'
+import {
+  GraphLockedError,
+  UnreadableGraphError,
+  exportGraph,
+  importGraph,
+} from '@episteme/application'
 import { addPerson, addToken, startService } from '@episteme/service'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { modelFromEnvironment } from './model.js'
@@ -162,6 +167,12 @@ try {
   process.on('SIGINT', stop)
   process.on('SIGTERM', stop)
 } catch (error) {
+  if (error instanceof UnreadableGraphError) {
+    process.stderr.write(
+      `这个版本打不开这个文件，文件没有被改动：\n  ${error.message}\n如果它是旧版图谱，可以转换成一个新文件：\n  pnpm serve graph convert <旧图谱> <新图谱>\n`,
+    )
+    process.exit(1)
+  }
   if (!(error instanceof GraphLockedError)) throw error
   process.stderr.write(`这个图谱已经被另一个进程打开了：\n  ${error.graphPath}\n`)
   process.exit(1)

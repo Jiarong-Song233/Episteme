@@ -273,6 +273,15 @@ opt-in.
   ([#25](https://github.com/SAIR-club/Episteme/issues/25)).
 - **Unencrypted local storage.** A graph, with its drafts and sources, is a SQLite file on disk, with no
   encryption and no authentication. Do not expose the service to a network.
+- **Anything on your machine can add to a local graph.** In local mode, reading, proposing, and creating spaces
+  and materials need no credential, and the total has no limit, so a stray script can pile up data. Web
+  pages from elsewhere are refused, and deleting, archiving, renaming and replacing need your token. A token would
+  add little here, since a process running as you can open the graph file anyway
+  ([ADR 0020](docs/decisions/0020-scene-route-capabilities.md)).
+- **An export is the whole graph, in plain JSON.** `pnpm workbench export` works on the file and asks for no
+  credential; in a shared deployment it holds everyone's data. It is written readable only by its owner, except on
+  Windows, where it takes its folder's permissions. Its checksum catches damage, not editing, so import only files you
+  trust.
 
 Scope creep is the main risk to this project, so the following are explicitly out of scope for
 now: multi-agent systems, recommendation engines, automatic curriculum generation, reputation,

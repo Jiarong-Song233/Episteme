@@ -45,12 +45,24 @@ const DECISION_PATTERNS: readonly RegExp[] = [
   /^POST \/api\/v1\/tokens\/[^/]+\/revoke$/,
 ]
 
-/** What a request to the API asks to do. */
-export function operationOf(method: string, path: string): Operation {
+/**
+ * What a request to the API asks to do.
+ *
+ * A scene's route that changes anything is the person's unless its profile names it as only proposing (ADR 0020), so
+ * a route nobody thought about is closed, and so is a path that matches no route.
+ */
+export function operationOf(
+  method: string,
+  path: string,
+  profile: Pick<SceneProfile, 'name' | 'proposingRoutes'>,
+): Operation {
   const route = `${method} ${path}`
-  return DECISION_ROUTES.includes(route) || DECISION_PATTERNS.some((pattern) => pattern.test(route))
-    ? 'decide'
-    : 'read'
+  if (DECISION_ROUTES.includes(route) || DECISION_PATTERNS.some((pattern) => pattern.test(route))) {
+    return 'decide'
+  }
+  const scene = `${API_PREFIX}/scene/${profile.name}`
+  if (method === 'GET' || !path.startsWith(`${scene}/`)) return 'read'
+  return profile.proposingRoutes?.includes(path.slice(scene.length)) === true ? 'read' : 'decide'
 }
 
 export interface ApiContext {

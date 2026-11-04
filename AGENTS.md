@@ -8,13 +8,13 @@ Keep this file limited to durable, cross-session guidance. Current progress, tem
 
 - Purpose: Episteme turns inquiry into persistent, evolving understanding. It is open cognitive infrastructure for carrying, organising and evolving human understanding: a shared cognitive graph that applications built on Episteme project views over. The persistent cognitive graph is the core asset. See `README.md`.
 - Layer: Infrastructure. Episteme is domain-agnostic cognitive infrastructure without application business logic. See [Project Invariants](#project-invariants).
-- Stack: TypeScript (strict, ESM, NodeNext), pnpm workspace monorepo, Vitest, ESLint (flat config), Prettier. No framework or model provider is wired in yet, and the only database is SQLite, the one durable storage backend (`@episteme/storage-sqlite`, ADR 0018) — Core must run and be tested with no frontend, no LLM and no database.
+- Stack: TypeScript (strict, ESM, NodeNext), pnpm workspace monorepo, Vitest, ESLint (flat config), Biome (formatting only). No framework or model provider is wired in yet, and the only database is SQLite, the one durable storage backend (`@episteme/storage-sqlite`, ADR 0018) — Core must run and be tested with no frontend, no LLM and no database.
 - Package manager: pnpm, pinned by `packageManager` in `package.json` (see `pnpm-workspace.yaml`). The project supports Node >= 22 (`engines`). pnpm 11 itself needs Node >= 22.13 to run, so develop on Node 22.13 or later, or use a standalone pnpm. The two floors differ on purpose; see [Continuous Integration](#continuous-integration).
 
 ## Commands
 
 - Install: `pnpm install`
-- Dev: `pnpm demo` (runs the v0 closed loop from `examples/learn-session`)
+- Run: `pnpm serve` (the service; `pnpm serve --help` lists its options)
 - Test: `pnpm test` (or `pnpm test:watch`)
 - Check: `pnpm check` (typecheck + lint + test). Individually: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`. `pnpm build` emits `dist/` via project references.
 
@@ -78,13 +78,13 @@ Note: Vitest resolves `@episteme/*` through each package's `dist/`, so **run `pn
 
 ### Per-change workflow
 
-Every change follows one cycle: **Issue → branch from the latest `main` → develop and test → PR → review → merge.** The next task that depends on it starts only after it has merged.
+Every change follows one cycle: **branch from the latest `main` → develop and test → Draft PR → review → merge.** This is a personal repository (`Jiarong-Song233/Episteme`), so no issue is required first: the plan lives in `docs/roadmap/personal-goal-plan.md`. Work that depends on an unmerged PR stacks on its branch.
 
-- Start from an issue that states the background, scope, acceptance criteria, dependencies and what is out of scope. The PR links it.
+- Under Goal Mode the agent may push personal feature branches and open Draft PRs, and nothing beyond that: no direct push to `main`, no merge, no force push, and no write to `SAIR-club/*` or MindLink, whose remotes are read-only here.
 - Fetch first and cut the branch from the latest `origin/main` (`git fetch origin && git checkout -b <type>/<short-topic> origin/main`), never from a stale local `main` or another checkout's working tree. Nothing is committed directly to `main` (see [Branch discipline](#branch-discipline)).
 - Split the work into one commit per coherent unit (feature / refactor / docs / chore), never one big mixed commit, and never commit unrelated changes together.
 - Group related units that belong to the same module or feature area into one branch, and open one PR per branch when the user asks. A PR's title is a Conventional Commit and becomes the squash subject on merge.
-- Do not stack branches by default. A branch is based on another unmerged branch only when it genuinely depends on code that has not merged yet; otherwise wait for the dependency to merge and branch from `main` again. Independent work is never stacked to save time.
+- A branch is based on another unmerged branch only when it genuinely depends on code that has not merged yet. Independent work is never stacked to save time.
 
 ## Conventional Commits
 

@@ -77,37 +77,27 @@ Everything is written to one SQLite file per graph and survives closing the proc
 
 ![The Learn surface](docs/images/learn-surface.png)
 
-Behind it, three earlier phases of work that each proved one thing:
-
-| phase | claim                                                             | how to see it          |
-| ----- | ----------------------------------------------------------------- | ---------------------- |
-| 0     | understanding changes and the change affects the next interaction | `pnpm demo`            |
-| 1     | understanding survives a process restart                          | `pnpm demo:persistent` |
-| 2     | a paraphrased question reaches stored cognition                   | `pnpm demo:semantic`   |
-
-All of it runs with **no database, no model server, no language model and no frontend toolchain**. That is
-not an accident of the current state: it is the project's own claim being demonstrated.
+Core and the layers above it run and are tested with **no model server, no language model and no frontend
+toolchain**; only the one SQLite file per graph is needed once a graph has to survive a restart. The proofs of the
+loop are the suites in `tests/`, such as `tests/northstar.test.ts`.
 
 ## Quick start
 
+Requires Node >= 22.13 and pnpm 11 (`corepack enable`, or a standalone pnpm). Windows, macOS and Linux all work;
+Windows is tested in CI.
+
 ```bash
 pnpm install
-pnpm check              # typecheck + lint + tests
-pnpm serve              # use it, in a browser at http://127.0.0.1:4321
-# or
-pnpm learn              # the same loop in a terminal
-# and the phase demos:
-pnpm demo && pnpm demo:persistent && pnpm demo:semantic && pnpm demo:distill
-```
-
-`pnpm learn --help` and `pnpm serve --help` list the options, including `--file` and `--graph` to choose the
-graph.
-The default is `~/.episteme/learn.db`, seeded with a demonstration topic. For your own learning, keep a graph
-of its own outside the repository and start it empty:
-
-```bash
+pnpm check              # typecheck + lint + build + tests
+pnpm serve --help       # every option of the service
 pnpm serve --graph "$HOME/.episteme/my-topic.db" --blank
 ```
+
+`pnpm serve` serves MCP and the REST API. It serves a browser page only when given a built Workspace with
+`--workspace <dir>`. Keep your own graph outside the repository. The default is `~/.episteme/learn.db`.
+
+The personal route's plan and honest state are in
+[personal-goal-plan](docs/roadmap/personal-goal-plan.md) and [personal-progress](docs/roadmap/personal-progress.md).
 
 ## Connecting an agent
 
@@ -149,11 +139,11 @@ Before you record anything the answer has to establish the ground. After, it sta
 understood. The interface shows the change as a comparison rather than asserting it, and shows the scoring
 weights so the ranking is checkable rather than authoritative.
 
-You can ask in **Chinese or English**; the seeded topic is bilingual and one graph serves both.
+You can ask in **Chinese or English**; one graph serves both.
 
-The interface also answers _"what have I understood so far?"_ — grouping everything you have recorded into
-what needs attention next (an unresolved conflict, a missing foundation, something you believe but cannot
-explain yet) and what is already buildable. See [apps/learn](apps/learn/README.md).
+`reflect` answers _"what have I understood so far?"_ — grouping everything you have recorded into what needs
+attention next (an unresolved conflict, a missing foundation, something you believe but cannot explain yet) and
+what is already buildable.
 
 ## Layout
 
@@ -161,7 +151,6 @@ explain yet) and what is already buildable. See [apps/learn](apps/learn/README.m
 episteme/
 ├── packages/
 │   ├── core/               Episteme Core — ontology, graph, state, events, guards, projection, embedding port
-│   ├── domain-learn/       Learn domain pack: vocabulary, rules and the retrievers
 │   ├── storage-memory/     In-memory GraphStorageAdapter
 │   ├── storage-sqlite/     Durable storage: one SQLite file per graph, held by an OS lock (ADR 0018)
 │   ├── embeddings-http/    Embedding adapters over HTTP (Ollama, OpenAI-compatible, TEI)
@@ -169,23 +158,12 @@ episteme/
 │   ├── application/        The use-case layer every surface drives (LearnSession)
 │   ├── distillation/       Learning material → episodes → candidate understanding, as suggestions only
 │   ├── mcp/                The MCP surface: recall, propose, reflect and distill; no confirm tool
-│   ├── agent/              CognitiveAgent interface + a scripted mock used as the test double
-│   ├── domain-forum/       [placeholder] Forum domain pack
-│   └── logic-bridge/       [placeholder] optional formalisation (Lean, Datalog, SMT)
+│   └── agent/              CognitiveAgent interface + a scripted mock used as the test double
 ├── apps/
-│   ├── service/            The Episteme service: owns the graph, serves MCP, REST and the Workspace
-│   └── learn/              The Learn surface: the terminal client and the page served as the Workspace
-├── examples/
-│   ├── learn-session/      Phase 0: the cognitive loop
-│   ├── persistent-session/ Phase 1: the loop across a process restart
-│   ├── semantic-session/   Phase 2: a paraphrase reaching stored cognition
-│   └── distill-session/    Distillation: a learning dialogue in, only what the learner accepts kept
+│   └── service/            The Episteme service: owns the graph, serves MCP, REST and a built Workspace
 ├── tests/                  Cross-package tests, including the North Star, restart and paraphrase suites
 └── docs/                   architecture, concepts, decisions (ADRs), roadmap
 ```
-
-Only packages that do something exist as code. The rest are documented placeholders rather
-than empty shells, so that the intended shape is visible without pretending it is built.
 
 ## Architecture in one screen
 
@@ -308,14 +286,14 @@ mock as the deterministic test double the loop's proofs depend on ([ADR 0008](do
 ## What comes next
 
 Episteme's side of the shared service is in place: identity, visibility, publications, threads and scene records,
-delegated confirmation and layered recall. Development now centres on MindLink, the learning application built on
-it; what it will be and the issues that build it are in the
-[MindLink product spec](docs/planning/mindlink-spec.md).
+delegated confirmation and layered recall. This personal repository now builds an independently runnable AI
+learning workbench on it, with its plan and state in [personal-goal-plan](docs/roadmap/personal-goal-plan.md) and
+[personal-progress](docs/roadmap/personal-progress.md).
 
 ## Technical principles
 
 Simple, typed, modular, testable and replaceable — rather than clever, complex or prematurely
-distributed. TypeScript, a pnpm workspace monorepo, Vitest, ESLint and Prettier.
+distributed. TypeScript, a pnpm workspace monorepo, Vitest, ESLint and Biome (formatting only).
 
 The domain model runs and is tested **without a frontend, without an LLM and without a
 database**. That is a design constraint, not an accident: it is what allows the ontology to

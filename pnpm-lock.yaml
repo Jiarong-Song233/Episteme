@@ -48,6 +48,27 @@ importers:
         specifier: workspace:*
         version: link:../../packages/mcp
 
+  apps/workbench:
+    dependencies:
+      '@episteme/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@episteme/distillation':
+        specifier: workspace:*
+        version: link:../../packages/distillation
+      '@episteme/service':
+        specifier: workspace:*
+        version: link:../service
+      minisearch:
+        specifier: 7.2.0
+        version: 7.2.0
+      openai:
+        specifier: 7.47.0
+        version: 7.47.0(zod@4.6.5)
+      unpdf:
+        specifier: 2.1.0
+        version: 2.1.0
+
   packages/agent:
     dependencies:
       '@episteme/core':
@@ -158,6 +179,9 @@ importers:
       '@episteme/storage-sqlite':
         specifier: workspace:*
         version: link:../packages/storage-sqlite
+      '@episteme/workbench':
+        specifier: workspace:*
+        version: link:../apps/workbench
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
@@ -1014,6 +1038,9 @@ packages:
     resolution: {integrity: sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==}
     engines: {node: '>=16 || 14 >=14.17'}
 
+  minisearch@7.2.0:
+    resolution: {integrity: sha512-dqT2XBYUOZOiC5t2HRnwADjhNS2cecp9u+TJRiJ1Qp/f5qjkeT5APcGPjHw+bz89Ms8Jp+cG4AlE+QZ/QnDglg==}
+
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
@@ -1028,6 +1055,33 @@ packages:
   node-addon-api@8.9.2:
     resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
     engines: {node: ^18 || ^20 || >= 21}
+
+  openai@7.47.0:
+    resolution: {integrity: sha512-BYa2RYgocAv9WjPUJmNu8fICuA1fFhkTBEpiR3sC5L1K6v8Hnhc8pcnQEhu8l/+W1XKA+JUaBa7HpT+AK1s77w==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      google-auth-library: '>=9.15.1 <12'
+      undici: '>=5 <9'
+      ws: ^8.21.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      google-auth-library:
+        optional: true
+      undici:
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
 
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
@@ -1219,6 +1273,15 @@ packages:
 
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+
+  unpdf@2.1.0:
+    resolution: {integrity: sha512-G/Hsrm++g0EoubUhV8TDFItq6oQ+FUu9EMvIRtHUwseKXB0iJoCvaLvBGOpYUBqyvggv/XfxhYYtohL2QpE3xQ==}
+    engines: {node: '>=24'}
+    peerDependencies:
+      '@napi-rs/canvas': ^0.1.69 || ^1.0.0
+    peerDependenciesMeta:
+      '@napi-rs/canvas':
+        optional: true
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
@@ -2051,6 +2114,8 @@ snapshots:
 
   minipass@7.1.3: {}
 
+  minisearch@7.2.0: {}
+
   ms@2.1.3: {}
 
   nanoid@3.3.19: {}
@@ -2058,6 +2123,10 @@ snapshots:
   natural-compare@1.4.0: {}
 
   node-addon-api@8.9.2: {}
+
+  openai@7.47.0(zod@4.6.5):
+    optionalDependencies:
+      zod: 4.6.5
 
   optionator@0.9.4:
     dependencies:
@@ -2236,6 +2305,8 @@ snapshots:
   typescript@5.7.2: {}
 
   undici-types@6.21.0: {}
+
+  unpdf@2.1.0: {}
 
   uri-js@4.4.1:
     dependencies:

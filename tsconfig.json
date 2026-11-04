@@ -3,6 +3,7 @@
   "files": [],
   "references": [
     { "path": "apps/service" },
+    { "path": "apps/workbench" },
     { "path": "packages/core" },
     { "path": "packages/storage-memory" },
     { "path": "packages/storage-sqlite" },

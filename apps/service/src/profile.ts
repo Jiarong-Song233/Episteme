@@ -1,4 +1,9 @@
-import { learnScene, type SceneView, type SessionScene } from '@episteme/application'
+import {
+  learnScene,
+  type SceneView,
+  type SceneWrites,
+  type SessionScene,
+} from '@episteme/application'
 import type { SceneTool } from '@episteme/mcp'
 
 /**
@@ -87,6 +92,8 @@ export interface SceneProfile {
 /** What a scene's route receives: a view of the session that cannot decide or write, and the request. */
 export interface SceneRouteContext {
   readonly view: SceneView
+  /** The caller's conversation and the scene's own logs. Never the graph. */
+  readonly writes: SceneWrites
   /** The JSON body of a `POST`, or an empty object. */
   readonly body: Readonly<Record<string, unknown>>
   readonly query: URLSearchParams
@@ -103,6 +110,8 @@ export interface SceneRoute {
   readonly method: 'GET' | 'POST'
   /** Starts with `/`, for example `/projects`. */
   readonly path: string
+  /** The largest JSON body it accepts, when the default 1 MB is not enough, as for an upload. */
+  readonly maxBodyBytes?: number
   readonly handle: (
     context: SceneRouteContext,
   ) => Readonly<Record<string, unknown>> | Promise<Readonly<Record<string, unknown>>>

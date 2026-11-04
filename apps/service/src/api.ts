@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { isRefusal, sceneViewOf, type CognitiveSession, type Decision } from '@episteme/application'
+import {
+  isRefusal,
+  sceneViewOf,
+  sceneWritesOf,
+  type CognitiveSession,
+  type Decision,
+} from '@episteme/application'
 import type { Caller, Directory, Operation } from './identity.js'
 import type { SceneProfile } from './profile.js'
 
@@ -108,13 +114,16 @@ function sendRefusal(
 }
 
 /** Reads a JSON body, bounded so a malformed or hostile request cannot exhaust memory. */
-async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJson(
+  request: IncomingMessage,
+  limit = 1_000_000,
+): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of request) {
     const buffer = chunk as Buffer
     size += buffer.length
-    if (size > 1_000_000) throw new RequestError('request body too large')
+    if (size > limit) throw new RequestError('request body too large')
     chunks.push(buffer)
   }
   if (chunks.length === 0) return {}
@@ -815,10 +824,15 @@ export async function handleApi(
         (candidate) => candidate.method === method && candidate.path === subpath,
       )
       if (sceneRoute !== undefined) {
-        const body = method === 'POST' ? await readJson(request) : {}
+        const body = method === 'POST' ? await readJson(request, sceneRoute.maxBodyBytes) : {}
         const query = new URL(request.url ?? '/', 'http://localhost').searchParams
         const answer = await refusing(response, async () =>
-          sceneRoute.handle({ view: sceneViewOf(session), body, query }),
+          sceneRoute.handle({
+            view: sceneViewOf(session),
+            writes: sceneWritesOf(session),
+            body,
+            query,
+          }),
         )
         if (answer === undefined) return
         sendJson(response, 200, { ...at(session), ...answer })

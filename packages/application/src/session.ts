@@ -531,6 +531,8 @@ export interface SessionOptions {
  */
 /** What every person's session over one graph shares: one mutation queue, one revision, one lifetime. */
 interface SharedState {
+  /** A scene's logs, for a session with no file to keep them in. */
+  readonly memoryLogs: Map<string, SceneLog>
   /** The tail of the mutation queue. See `#exclusive`. */
   mutations: Promise<unknown>
   /** See `revision`. Advanced only by `#exclusive`. */
@@ -705,6 +707,7 @@ export class CognitiveSession {
       epoch: randomUUID(),
       recovered: [],
       people: new Map(),
+      memoryLogs: new Map(),
     }
     const session = new CognitiveSession(parts, HUMAN, shared)
     shared.people.set(HUMAN, session)
@@ -1852,6 +1855,21 @@ export class CognitiveSession {
   /** This person's latest records in a scene's namespace. */
   sceneRecords(namespace: string, prefix = ''): readonly SceneRecord[] {
     return this.#parts.records.list(namespace, this.#actor, prefix)
+  }
+
+  /**
+   * A named log of this session's scene, beside the graph and in its file (ADR 0018). In memory when the session is.
+   * Names take the same form as a companion log's, and are kept apart from the graph's own stores and other scenes'.
+   */
+  sceneLog(name: string): SceneLog {
+    const scoped = `scene-${this.#scene.name}-${name}`
+    if (this.#parts.store !== undefined) return this.#parts.store.companion(scoped)
+    let log = this.#shared.memoryLogs.get(scoped)
+    if (log === undefined) {
+      log = memoryLog()
+      this.#shared.memoryLogs.set(scoped, log)
+    }
+    return log
   }
 
   /** Writes the next version of one of this person's records. `null` removes it, keeping its history. */
@@ -3301,10 +3319,33 @@ function normalized(proposal: Proposal): Proposal {
 
 /** The part of the durable store a session uses: writing, and releasing the graph when it is done. */
 interface Store {
+  companion(name: string): SceneLog
   save(state?: unknown): Promise<void>
   close(): Promise<void>
   /** Copies the graph as last saved, in its own format. */
   backUp(target: string): Promise<void>
+}
+
+/** A named log kept beside the graph. Each line is one record; `replace` swaps all of them at once. */
+export interface SceneLog {
+  read(): Promise<readonly string[]>
+  append(body: string): Promise<void>
+  replace(bodies: readonly string[]): Promise<void>
+}
+
+function memoryLog(): SceneLog {
+  let lines: readonly string[] = []
+  return {
+    read: () => Promise.resolve(lines),
+    append: (body) => {
+      lines = [...lines, body]
+      return Promise.resolve()
+    },
+    replace: (bodies) => {
+      lines = [...bodies]
+      return Promise.resolve()
+    },
+  }
 }
 
 /** Turns the retrieval's recorded contributions into something a view can render. */

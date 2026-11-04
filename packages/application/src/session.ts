@@ -1706,7 +1706,12 @@ export class CognitiveSession {
   /** Records one turn of a thread of this person's, raw. */
   appendTurn(
     threadId: string,
-    input: { readonly speaker: 'learner' | 'agent'; readonly text: string; readonly by?: string },
+    input: {
+      readonly speaker: 'learner' | 'agent'
+      readonly text: string
+      readonly by?: string
+      readonly writtenWith?: 'person' | 'agent'
+    },
   ): Promise<Turn> {
     return this.#exclusive(async () => {
       this.#ownThread(threadId)
@@ -1719,6 +1724,7 @@ export class CognitiveSession {
         speaker: input.speaker,
         text,
         by: input.by ?? this.#actor,
+        ...(input.writtenWith === undefined ? {} : { writtenWith: input.writtenWith }),
         at: systemClock.now(),
       }
       await this.#parts.threads.addTurn(turn)

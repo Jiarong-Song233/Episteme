@@ -39,7 +39,10 @@ The person judges them.**
 3. Absent means unknown, not the person. Turns from before this ADR have no field, and neither do requests with no
    credential. Nothing back-fills them, because a guess here would be the same mistake this decision removes. Older
    turns whose `by` is an agent are already known to be relayed.
-4. The review surfaces show the difference: "Agent 转述" for a relay and "来源未记录" for unknown.
+4. The review surfaces show the difference: "Agent 转述" for a relay and "来源未记录" for unknown. The conversation,
+   the candidate, the held item and its trail, and what came of a session all read it from the turn the words lie in. A
+   host's own `basis: stated` has no such turn on record, so it reads as a relay: the host is who says the words are the
+   person's.
 5. Relayed turns can still be evidence. Refusing them would leave the host-driven loop with none.
 
 ## Consequences

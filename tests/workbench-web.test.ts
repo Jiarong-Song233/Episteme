@@ -12,6 +12,7 @@ import {
 } from '@episteme/workbench'
 import { chromium, type Browser, type Locator, type Page } from 'playwright-core'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { mcpWire } from './mcp-wire.js'
 
 /**
  * The whole first experience, in a real browser, through the page a person uses.
@@ -356,6 +357,50 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.locator('.node-row', { hasText: words }).click()
     await page.locator('.node-label', { hasText: words }).waitFor()
   }
+
+  it('marks the words an agent relayed, from the conversation to what the person holds', async () => {
+    const said = '位置编码可有可无'
+    const relayed = '位置编码告诉模型词的顺序'
+    const unknown = '注意力让词元彼此关联'
+    await open()
+    await newSpace('机器学习')
+    await upload('a.md', NOTES)
+    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await ask(said)
+    await page.locator('.learner-turn', { hasText: said }).waitFor()
+
+    const running = service as EpistemeService
+    const listed = await fetch(`${running.apiUrl}/threads`, {
+      headers: { authorization: `Bearer ${running.humanToken ?? ''}` },
+    })
+    const { threads } = (await listed.json()) as { threads: readonly { id: string }[] }
+    const thread = threads[0]?.id ?? ''
+    const host = mcpWire(() => running.mcpUrl, { name: 'Claude Code', version: '1' })
+    await host.call('thread_append', { thread, speaker: 'learner', text: relayed })
+    const sent = await fetch(`${running.apiUrl}/threads/${thread}/turns`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ speaker: 'learner', text: unknown }),
+    })
+    expect(sent.status).toBe(200)
+
+    await page.reload()
+    const relayedTurn = page.locator('.learner-turn', { hasText: relayed })
+    await relayedTurn.getByText('Agent 转述').waitFor()
+    await page.locator('.learner-turn', { hasText: unknown }).getByText('来源未记录').waitFor()
+    const ownTurn = page.locator('.learner-turn', { hasText: said })
+    expect(await ownTurn.locator('.turn-source').count()).toBe(0)
+
+    await relayedTurn.getByRole('button', { name: '这是我的理解' }).click()
+    await page.getByRole('tab', { name: /待确认（1）/, selected: true }).waitFor()
+    await page.locator('.pending').getByText('Agent 转述').first().waitFor()
+    expect(await page.locator('.pending').getByText('你的原话').count()).toBe(0)
+    await page.getByRole('button', { name: '确认为我的理解' }).click()
+    await page.getByRole('tab', { name: /我的理解（/ }).click()
+    await page.locator('.node-row', { hasText: relayed }).click()
+    await page.locator('.node-detail .hint', { hasText: 'Agent 转述' }).first().waitFor()
+    await page.locator('.trail').getByText('Agent 转述的话，经你确认').waitFor()
+  }, 60_000)
 
   it('walks one understanding from proposed to challenged, revised and used again', async () => {
     const said = '位置编码可有可无'

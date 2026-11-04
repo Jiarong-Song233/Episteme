@@ -1239,7 +1239,7 @@ function PendingItem(props: {
         <p className="candidate">{candidate.proposal.label}</p>
       )}
       <p className="hint">
-        {wordsOf(candidate.basis)}。{candidate.rationale}
+        {wordsOf(candidate.basis, candidate.wordsBy)}。{candidate.rationale}
       </p>
       {candidate.similar !== undefined && <p className="hint">和这一条相近：{candidate.similar}</p>}
       <p className="decisions">

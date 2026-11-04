@@ -3,7 +3,7 @@ import type { SceneView } from '@episteme/application'
 import type { Plan } from './plans.js'
 import type { Attempt } from './practice.js'
 import { scopeOf } from './requests.js'
-import { heldNodes } from './understanding.js'
+import { heldNodes, wordsByTurn, type WordsBy } from './understanding.js'
 
 /**
  * What a learner did, and how it reads across sessions (ADR 0019).
@@ -284,6 +284,8 @@ export interface SessionEvent {
   readonly assessment?: LearningEvidence['assessment']
   readonly move?: LearningEvidence['move']
   readonly candidate?: ObjectiveReading['candidates'][number]
+  /** How the learner's words it rests on arrived, when it rests on a turn. */
+  readonly wordsBy?: WordsBy
 }
 
 /** One plan as the person reads it afterwards. It holds no words of a turn. */
@@ -348,6 +350,9 @@ export function sessionsOf(view: SceneView, space: string): readonly SessionOutc
                   ...(each.assessment === undefined ? {} : { assessment: each.assessment }),
                   ...(each.move === undefined ? {} : { move: each.move }),
                   ...(made === undefined ? {} : { candidate: made }),
+                  ...(each.source === undefined
+                    ? {}
+                    : { wordsBy: wordsByTurn(view, each.source.thread, each.source.turn) }),
                 }
               })
             return [{ id, label, events }]

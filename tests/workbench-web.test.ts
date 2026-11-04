@@ -340,6 +340,133 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await expect.poll(() => page.getByText('进度已保留').count()).toBe(0)
   }, 60_000)
 
+  /** Says a thing in the conversation, makes it the person's own, and opens what it became. */
+  const holdOwnWords = async (words: string): Promise<void> => {
+    await ask(words)
+    const turn = page.locator('.learner-turn', { hasText: words })
+    await turn.getByRole('button', { name: '这是我的理解' }).click()
+    await page.getByRole('tab', { name: /待确认（1）/, selected: true }).waitFor()
+    await page.locator('.pending').getByText('你的原话').first().waitFor()
+    await page.getByRole('button', { name: '确认为我的理解' }).click()
+    await page.getByRole('tab', { name: /我的理解（/ }).click()
+    await page.locator('.node-row', { hasText: words }).click()
+    await page.locator('.node-label', { hasText: words }).waitFor()
+  }
+
+  it('walks one understanding from proposed to challenged, revised and used again', async () => {
+    const said = '位置编码可有可无'
+    const better = '位置编码告诉模型词的顺序，不可缺少'
+    await open()
+    await newSpace('机器学习')
+    await upload('a.md', NOTES)
+    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+
+    await holdOwnWords(said)
+    await page.locator('.node-detail').getByText('你的原话').waitFor()
+    await page.locator('.trail').getByText('你提出这一条').waitFor()
+
+    // Confirming it says nothing about mastering it, and what the person records is theirs.
+    await page.getByText('确认一条理解，不等于你已经掌握它').waitFor()
+    await page.getByLabel('确信程度').selectOption({ index: 1 })
+    await page.locator('.trail').getByText('确信程度：').waitFor()
+
+    // A challenge changes nothing held until the person answers it.
+    await page.getByRole('button', { name: '提出质疑' }).click()
+    await page.getByLabel('你的质疑').fill('没有它，模型怎么知道先后？')
+    await page.getByRole('button', { name: '记下这条质疑' }).click()
+    await page.locator('.challenge', { hasText: '怎么知道先后' }).waitFor()
+    await page.getByRole('tab', { name: '我的理解（1）' }).waitFor()
+
+    await page.getByRole('button', { name: '它说得对，修正' }).click()
+    await page.getByLabel('现在你怎么想').fill(better)
+    await page.getByLabel('为什么改').fill('材料说它传递顺序')
+    await page.getByRole('button', { name: '保存修正' }).click()
+
+    // The new wording opens, knowing where it came from; the old one stays, marked, with its whole trail.
+    await page.locator('.node-label', { hasText: better }).waitFor()
+    await page
+      .locator('.trail', { hasText: '修正而来' })
+      .getByRole('button', { name: said })
+      .click()
+    await page.locator('.node-label', { hasText: said }).waitFor()
+    await page.locator('.marks').getByText('已修正').waitFor()
+    await page.locator('.trail').getByText('你据此修正了这一条').waitFor()
+    await page.getByRole('tab', { name: '我的理解（1）' }).waitFor()
+
+    // Back to the words it came from.
+    await page.getByRole('button', { name: '回到当时的对话' }).click()
+    await page.locator('.learner-turn[data-focused="true"]', { hasText: said }).waitFor()
+    await page
+      .locator('.learner-turn', { hasText: said })
+      .getByRole('button', { name: '已记成理解，去看看' })
+      .waitFor()
+
+    // A new conversation brings up the revised wording only, and not as evidence.
+    await page.getByRole('button', { name: '开始新对话' }).click()
+    await ask('位置编码有什么用')
+    const recalled = page.locator('.recalled')
+    await recalled.getByRole('button', { name: better }).waitFor()
+    expect(await recalled.textContent()).not.toContain(said)
+    await recalled.getByText('不是材料').waitFor()
+
+    // All of it is still there after a restart.
+    await close()
+    await open()
+    await page.getByRole('tab', { name: '我的理解（1）' }).click()
+    await page.locator('.node-row', { hasText: better }).click()
+    await page
+      .locator('.trail', { hasText: '修正而来' })
+      .getByRole('button', { name: said })
+      .waitFor()
+    await page.locator('.trail').getByText('材料说它传递顺序').waitFor()
+  }, 120_000)
+
+  it('keeps a contradiction open, takes a model challenge, and withdraws', async () => {
+    const model: ModelClient = {
+      name: 'stub',
+      simulated: false,
+      complete: (messages) =>
+        Promise.resolve({
+          text: messages[0]?.content.includes('提出一个质疑')
+            ? '{"challenge":"没有它，模型真的看不出先后吗？","quote":"位置编码把序列的顺序告诉模型。"}'
+            : '位置编码把序列的顺序告诉模型。[1]',
+        }),
+    }
+    await open(model)
+    await newSpace('机器学习')
+    await upload('a.md', NOTES)
+    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+
+    await holdOwnWords('位置编码是必需的')
+    await page.getByRole('button', { name: '让模型质疑' }).click()
+    const challenge = page.locator('.challenge', { hasText: '真的看不出先后' })
+    await challenge.getByText('位置编码把序列的顺序告诉模型').waitFor()
+    await challenge.getByRole('button', { name: '不成立，放下' }).click()
+    await page.locator('.trail').getByText('你放下了它').waitFor()
+    await page.getByRole('button', { name: '全部理解' }).click()
+
+    await holdOwnWords('位置编码不是必需的')
+    await page.getByRole('button', { name: '和另一条矛盾' }).click()
+    await page.getByRole('button', { name: '记下这个矛盾' }).click()
+    await page.locator('.marks').getByText('未解决的矛盾').waitFor()
+    await page.locator('.relations').getByRole('button', { name: '位置编码是必需的' }).click()
+    await page.locator('.marks').getByText('未解决的矛盾').waitFor()
+
+    // Neither is forced out, and the conversation says so when it brings one up.
+    await page.getByRole('tab', { name: '我的理解（2）' }).waitFor()
+    await page.getByRole('button', { name: '全部理解' }).click()
+    await page.locator('.map circle').first().waitFor()
+    await page.getByRole('button', { name: '开始新对话' }).click()
+    await ask('位置编码是必需的吗')
+    await page.locator('.recalled').getByText('未解决的矛盾').first().waitFor()
+
+    await page.locator('.recalled button').first().click()
+    await page.getByRole('button', { name: '撤回', exact: true }).click()
+    await page.getByRole('tab', { name: '我的理解（1）' }).waitFor()
+    await page.getByRole('button', { name: '恢复', exact: true }).click()
+    await page.getByRole('tab', { name: '我的理解（2）' }).waitFor()
+  }, 120_000)
+
   it('fits a phone', async () => {
     await open()
     await page.setViewportSize({ width: 375, height: 812 })

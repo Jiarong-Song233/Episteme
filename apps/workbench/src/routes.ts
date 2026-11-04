@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { HostItem, SceneWrites, Turn } from '@episteme/application'
+import type { SceneWrites, Turn } from '@episteme/application'
 import type { SceneRoute, SceneRouteContext } from '@episteme/service'
 import { answerFrom, answerText, relevant, type Answer } from './answer.js'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
@@ -7,6 +7,7 @@ import { learningRoutes } from './learning.js'
 import { MaterialStore } from './materials.js'
 import { ModelFailure, type ModelClient, type ModelMessage } from './model.js'
 import { MAX_MATERIAL_BYTES, MaterialRefusal, parseMaterial } from './parse.js'
+import { recalledFor, understandingRoutes } from './understanding.js'
 import {
   ANSWER_PREFIX,
   openSpaceOf,
@@ -126,9 +127,10 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
         hits = store.search(writes.actor, space.id, `${previous.text}\n${question}`)
       }
     }
+    const recalled = await recalledFor(view, space.id, question)
     let answer: Answer
     try {
-      answer = await answerFrom({ question, hits, history: historyOf(earlier), model })
+      answer = await answerFrom({ question, hits, history: historyOf(earlier), model, recalled })
     } catch (error) {
       if (!(error instanceof ModelFailure)) throw error
       return {
@@ -146,64 +148,9 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     return { thread: threadId, turn: turn.id, reply: reply.id, answer }
   }
 
-  async function candidates({ view, body }: SceneRouteContext) {
-    const space = openSpaceOf(view, text(body, 'space'))
-    const threadId = text(body, 'thread')
-    const replyId = text(body, 'reply')
-    const thread = view.threadView(threadId)
-    const reply = thread?.turns.find((candidate) => candidate.id === replyId)
-    const record = view.records.get(`${ANSWER_PREFIX}${replyId}`)
-    if (reply === undefined || record === undefined || thread?.thread.scope !== scopeOf(space.id)) {
-      refuse('unknown_answer', '这个空间里没有这条回答。')
-    }
-    const answer = record.value as Answer
-    const titles = new Map(answer.citations.map((citation) => [citation.n, citation.title]))
-    const items: HostItem[] = answer.segments.flatMap((segment, index): HostItem[] => {
-      if (segment.basis !== 'material' || segment.weak === true) return []
-      const from = segment.citations.map((n) => `《${titles.get(n) ?? ''}》`).join('、')
-      return [
-        {
-          kind: 'node',
-          ref: `s${index}`,
-          role: 'claim',
-          label: segment.text,
-          quote: segment.text,
-          basis: 'inferred',
-          rationale: `模型回答中的这句话引用了${from}。确认前它不算你的理解。`,
-        },
-      ]
-    })
-    if (items.length === 0) {
-      return {
-        suggestions: [],
-        refused: [],
-        message: '这条回答里没有可以提炼的、有引用依据的句子。',
-      }
-    }
-    const outcome = await view.distill(
-      { title: thread?.thread.title ?? '', text: reply.text },
-      {
-        scope: scopeOf(space.id),
-        requestedBy: 'workbench',
-        host: {
-          candidates: items,
-          hostSession: threadId,
-          submissionId: replyId,
-        },
-      },
-    )
-    if (!outcome.ok) refuse(outcome.refusal.code, outcome.refusal.message)
-    return {
-      suggestions: outcome.suggestions.map((suggestion) => ({
-        id: suggestion.id,
-        proposal: suggestion.proposal,
-      })),
-      refused: outcome.refused.map(({ ref, code, message }) => ({ ref, code, message })),
-    }
-  }
-
   return [
     ...learningRoutes({ model, library, now, materialsOf }),
+    ...understandingRoutes({ model, now, materialsOf }),
     route('GET', '/model', () => ({ name: model.name, simulated: model.simulated })),
 
     route('GET', '/spaces', ({ view }) => ({
@@ -306,24 +253,5 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     }),
 
     route('POST', '/ask', ask),
-    route('POST', '/candidates', candidates),
-
-    // What this space holds that is the person's own: what they have accepted, and what still waits for them.
-    route('GET', '/understanding', ({ view, query }) => {
-      const space = spaceOf(view, required(query, 'space'))
-      const scope = scopeOf(space.id)
-      const tag = `scope:${scope}`
-      return {
-        nodes: view
-          .listNodes()
-          .filter((node) => node.tags.includes(tag))
-          .map((node) => ({
-            ...node,
-            understanding: view.understandingOf(node.nodeId),
-          })),
-        pending: view.pendingSuggestions().filter((suggestion) => suggestion.scope === scope),
-        dimensions: view.recordableDimensions,
-      }
-    }),
   ]
 }

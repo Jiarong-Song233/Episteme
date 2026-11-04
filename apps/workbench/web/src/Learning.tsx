@@ -14,7 +14,7 @@ import {
   type Turn,
   type WorkflowInfo,
 } from './api.js'
-import { AgentTurn, messageOf } from './Turns.js'
+import { AgentTurn, messageOf, LearnerTurn } from './Turns.js'
 
 /** Plans in the shelf, a plan on the page, and what the record says so far. */
 
@@ -262,9 +262,7 @@ export function PlanView(props: {
         )}
         {turns.map((turn: Turn) =>
           turn.speaker === 'learner' ? (
-            <p key={turn.id} className="question">
-              {turn.text}
-            </p>
+            <LearnerTurn key={turn.id} turn={turn} thread={plan.thread} />
           ) : (
             <AgentTurn
               key={turn.id}

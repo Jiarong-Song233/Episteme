@@ -1,10 +1,87 @@
-import { useState } from 'react'
-import type { Answer, Citation, Evidence, Turn } from './api.js'
+import { createContext, useContext, useState } from 'react'
+import type { Answer, Citation, Evidence, HeldNode, Turn } from './api.js'
 
 /** What the agent said, shared by a conversation and a plan. */
 
 export const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : '出了点问题。请重试。'
+
+/** What a turn needs to reach the understanding drawn from it, and to go the other way. */
+export interface TurnLinks {
+  readonly nodes: readonly HeldNode[]
+  /** The turn a node's page sent the person back to. */
+  readonly focused: string | undefined
+  readonly openNode: (node: string) => void
+  readonly offer: (thread: string, turn: string) => Promise<string | undefined>
+}
+
+export const Links = createContext<TurnLinks>({
+  nodes: [],
+  focused: undefined,
+  openNode: () => undefined,
+  offer: () => Promise.resolve(undefined),
+})
+
+/** What the person said, which they can make their own, or see what it became. */
+export function LearnerTurn({ turn, thread }: { turn: Turn; thread: string | undefined }) {
+  const links = useContext(Links)
+  const [note, setNote] = useState<string>()
+  const [working, setWorking] = useState(false)
+  const made = links.nodes.find((node) => node.origin?.turn === turn.id)
+  // A turn still being sent has no id to go back to yet.
+  const canOffer = thread !== undefined && turn.id !== 'asking'
+  return (
+    <div id={`turn-${turn.id}`} className="learner-turn" data-focused={links.focused === turn.id}>
+      <p className="question">{turn.text}</p>
+      {made !== undefined ? (
+        <button type="button" className="link" onClick={() => links.openNode(made.nodeId)}>
+          已记成理解，去看看
+        </button>
+      ) : (
+        canOffer && (
+          <button
+            type="button"
+            className="link own-words"
+            disabled={working}
+            onClick={() => {
+              setWorking(true)
+              setNote(undefined)
+              links
+                .offer(thread, turn.id)
+                .then(setNote)
+                .catch((error: unknown) => setNote(messageOf(error)))
+                .finally(() => setWorking(false))
+            }}
+          >
+            {working ? '正在记下…' : '这是我的理解'}
+          </button>
+        )
+      )}
+      {note !== undefined && made === undefined && <p className="hint">{note}</p>}
+    </div>
+  )
+}
+
+/** What the person had confirmed on this, set apart from the answer, because it is not evidence. */
+function Recalled({ answer }: { answer: Answer }) {
+  const links = useContext(Links)
+  if (answer.recalled === undefined) return null
+  return (
+    <aside className="recalled">
+      <p className="hint">你之前确认过（不是材料，只是提醒）：</p>
+      <ul>
+        {answer.recalled.map((item) => (
+          <li key={item.nodeId}>
+            <button type="button" className="link" onClick={() => links.openNode(item.nodeId)}>
+              {item.label}
+            </button>
+            {item.conflict && <span className="hint">（你还有未解决的矛盾）</span>}
+          </li>
+        ))}
+      </ul>
+    </aside>
+  )
+}
 
 export function AgentTurn(props: {
   turn: Turn
@@ -12,14 +89,26 @@ export function AgentTurn(props: {
   onCandidates: (reply: string) => Promise<string | undefined>
 }) {
   const { turn } = props
+  const links = useContext(Links)
   const [state, setState] = useState<'idle' | 'working' | 'done'>('idle')
   const [note, setNote] = useState<string>()
-  if (turn.answer === undefined) return <p className="answer">{turn.text}</p>
+  if (turn.answer === undefined) {
+    return (
+      <p id={`turn-${turn.id}`} className="answer" data-focused={links.focused === turn.id}>
+        {turn.text}
+      </p>
+    )
+  }
   const usable = turn.answer.segments.some(
     (segment) => segment.basis === 'material' && segment.weak !== true,
   )
   return (
-    <article className="answer-block">
+    <article
+      id={`turn-${turn.id}`}
+      className="answer-block"
+      data-focused={links.focused === turn.id}
+    >
+      <Recalled answer={turn.answer} />
       <AnswerBody answer={turn.answer} onCite={props.onCite} />
       {note !== undefined && <p className="hint">{note}</p>}
       {usable && (

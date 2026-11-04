@@ -46,9 +46,9 @@ flowchart TD
 | G2.2 声明式工作流 | Review | G2.1 | 声明式、可恢复；先审计 MindLink #20/#29/#11/#28/#6 的约定 | |
 | G2.3 速通/深度模式 | Review | G2.2 | 同一材料走两种模式，深度可切直接讲解 | |
 | G2.4 练习、反馈、复习 | Review | G2.3 | 分开记录正确率、模型估计、用户确认 | |
-| G3.1 候选审查与状态界面 | Ready | S5 | 修改、驳回、冲突保留 | |
-| G3.2 图谱与时间线 | Backlog | G3.1 | 单一图谱多视图 | |
-| G3.3 新会话复用理解 | Backlog | G3.2 | 新对话能引用已确认理解，并标明来源 | |
+| G3.1 候选审查与状态界面 | Review | S5 | 修改、驳回、冲突保留 | `feat/workbench-understanding` |
+| G3.2 图谱与时间线 | Review | G3.1 | 单一图谱多视图 | `feat/workbench-understanding` |
+| G3.3 新会话复用理解 | Review | G3.2 | 新对话能引用已确认理解，并标明来源 | `feat/workbench-understanding` |
 | G4 发布、引用、分叉 | Backlog | G3 | A 发布，B 引用并分叉，可追溯，A 不被覆盖 | |
 | G5 边界审计与导出恢复 | Backlog | G4 | 非教学场景不改 Core；导出、导入、恢复有测试；SAIR 贡献候选清单 | |
 | G5 真实主机 e2e | Backlog | G5 审计 | 真实 Claude Code 连接 MCP（SAIR #32） | |

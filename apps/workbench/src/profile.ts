@@ -1,6 +1,7 @@
 import { learnScene } from '@episteme/application'
 import { BLANK_TOPIC, type SceneProfile } from '@episteme/service'
 import type { ModelClient } from './model.js'
+import { WORKBENCH_PROPOSING_ROUTES } from './route-access.js'
 import { workbenchRoutes } from './routes.js'
 
 export const WORKBENCH_SCENE = 'workbench'
@@ -16,6 +17,7 @@ export function workbenchProfile(options: {
 }): SceneProfile {
   return {
     name: WORKBENCH_SCENE,
+    proposingRoutes: WORKBENCH_PROPOSING_ROUTES,
     seed: BLANK_TOPIC,
     scene: learnScene,
     routes: workbenchRoutes(options),

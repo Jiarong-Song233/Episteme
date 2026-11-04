@@ -201,7 +201,7 @@ async function serve(
         : path === MCP_PATH
           ? authorized(response, caller, 'read', () => mcp.handle(request, response, caller))
           : path === API_PREFIX || path.startsWith(`${API_PREFIX}/`)
-            ? authorized(response, caller, operationOf(method, path), () =>
+            ? authorized(response, caller, operationOf(method, path, profile), () =>
                 handleApi(request, response, path, {
                   // Each person reads and writes through their own session over the one graph (ADR 0014).
                   session: caller === undefined ? session : session.forActor(caller.actorId),

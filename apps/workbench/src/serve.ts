@@ -5,13 +5,15 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { GraphLockedError } from '@episteme/application'
+import { GraphLockedError, exportGraph, importGraph } from '@episteme/application'
 import { addPerson, addToken, startService } from '@episteme/service'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { modelFromEnvironment } from './model.js'
 import { workbenchProfile } from './profile.js'
 
 /** Starts the workbench: the service, its routes, and the page, on one graph file. */
+
+const BUILD = '@episteme/workbench 0.1.0'
 
 const { values, positionals } = parseArgs({
   options: {
@@ -35,6 +37,9 @@ if (values.help === true) {
       `    --shared --users <文件>     多人使用同一图谱，每人用自己的令牌登录\n` +
       `    --public-origin <地址>      别人访问这个服务用的地址，默认 http://127.0.0.1:<端口>\n` +
       `    pnpm workbench add-person <名字> --users <文件>   添加一个人并生成登录令牌（只显示一次）\n\n` +
+      `  备份和恢复（先停止服务）：\n` +
+      `    pnpm workbench export <文件> [--graph <文件>]   导出全部内容，含私人材料\n` +
+      `    pnpm workbench import <文件> --graph <新文件>    恢复成一个新图谱，不会覆盖已有文件\n\n` +
       `  模型（都不设置时用模拟模型，它只摘录材料，不是真正的回答）：\n` +
       `    EPISTEME_MODEL_BASE_URL    OpenAI 兼容地址，例如 http://127.0.0.1:11434/v1\n` +
       `    EPISTEME_MODEL_NAME        模型名\n` +
@@ -66,6 +71,38 @@ if (positionals[0] === 'add-person') {
 
 const graph =
   values.graph ?? process.env['EPISTEME_FILE'] ?? join(homedir(), '.episteme', 'workbench.db')
+
+if (positionals[0] === 'export' || positionals[0] === 'import') {
+  const file = positionals[1]
+  if (file === undefined || (positionals[0] === 'import' && values.graph === undefined)) {
+    process.stderr.write(
+      '用法：pnpm workbench export <文件> [--graph <文件>]\n      pnpm workbench import <文件> --graph <新文件>\n',
+    )
+    process.exit(1)
+  }
+  try {
+    if (positionals[0] === 'export') {
+      const { counts } = await exportGraph(graph, file, { build: BUILD })
+      process.stdout.write(
+        `已导出 ${counts.records} 条记录到 ${file}。\n这个文件含全部内容，包括私人材料和对话，请自己保管。登录令牌不在里面。\n`,
+      )
+    } else {
+      const { counts, source, exportedAt } = await importGraph(file, graph)
+      process.stdout.write(
+        `已恢复到 ${graph}：${counts.records} 条记录，来自 ${source.file}（${source.build}），导出于 ${exportedAt}。\n`,
+      )
+    }
+    process.exit(0)
+  } catch (error) {
+    if (error instanceof GraphLockedError) {
+      process.stderr.write(`这个图谱正在被使用，请先停止服务：${error.graphPath}\n`)
+    } else {
+      process.stderr.write(`${(error as Error).message}\n`)
+    }
+    process.exit(1)
+  }
+}
+
 const port = Number.parseInt(values.port ?? process.env['PORT'] ?? '4322', 10)
 const page = join(dirname(fileURLToPath(import.meta.url)), '..', 'web', 'dist')
 if (values.shared === true && usersFile === undefined) {

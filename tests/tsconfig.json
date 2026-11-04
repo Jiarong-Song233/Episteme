@@ -11,6 +11,7 @@
   "references": [
     { "path": "../apps/service" },
     { "path": "../apps/workbench" },
+    { "path": "../apps/hypothesis" },
     { "path": "../packages/core" },
     { "path": "../packages/storage-memory" },
     { "path": "../packages/storage-sqlite" },

@@ -1,0 +1,139 @@
+{
+  "release": "0.12.5",
+  "model": "auto/deepseek-v4.1-flash",
+  "spent": {
+    "calls": 3,
+    "tokens": 1175,
+    "failures": 0
+  },
+  "steps": [
+    {
+      "name": "记忆：保存一条理解",
+      "ok": true,
+      "observed": {
+        "id": "676c2e3b-9fa4-46e8-aaca-ea50081e01b2",
+        "user_id": "e0e4d458-584c-4b1b-a445-ed105a921466",
+        "type": "context",
+        "path": null,
+        "content": "我的理解：潮汐协议的降级阈值是 72%。",
+        "meta": {
+          "created_by": "manual"
+        },
+        "updated_at": 1793680126,
+        "created_at": 1793680126
+      }
+    },
+    {
+      "name": "记忆：修正后旧说法还在不在",
+      "ok": true,
+      "observed": {
+        "count": 1,
+        "fields": ["id", "user_id", "type", "path", "content", "meta", "updated_at", "created_at"],
+        "keepsOldText": false
+      }
+    },
+    {
+      "name": "记忆：新会话能否用上修正后的说法",
+      "ok": true,
+      "observed": {
+        "answer": "80",
+        "usedRevision": true,
+        "sources": 0
+      }
+    },
+    {
+      "name": "记忆：另一个人能否看到",
+      "ok": true,
+      "observed": {
+        "count": 0
+      }
+    },
+    {
+      "name": "笔记：保存一条理解",
+      "ok": true,
+      "observed": {
+        "id": "48a13c33-ddb6-4c68-b240-b30fd56a2d32",
+        "user_id": "e0e4d458-584c-4b1b-a445-ed105a921466",
+        "title": "潮汐协议",
+        "data": {
+          "content": {
+            "md": "阈值是 72%，依据是规范第二节。"
+          },
+          "pages": [
+            {
+              "id": "main",
+              "title": "潮汐协议",
+              "content": {
+                "md": "阈值是 72%，依据是规范第二节。"
+              },
+              "versions": [],
+              "revision": 0,
+              "generation": 0,
+              "parent_id": null
+            }
+          ],
+          "pages_revision": 0,
+          "search_text": "潮汐协议\n阈值是 72%，依据是规范第二节。"
+        },
+        "meta": null,
+        "is_pinned": false,
+        "access_grants": [],
+        "created_at": 1793680131979692000,
+        "updated_at": 1793680131979692000
+      }
+    },
+    {
+      "name": "笔记：共享前另一个人能否读",
+      "ok": false,
+      "observed": "/api/v1/notes/48a13c33-ddb6-4c68-b240-b30fd56a2d32: 403 {\"detail\":\"Something went wrong :/\"}"
+    },
+    {
+      "name": "笔记：只读共享给另一个人",
+      "ok": true,
+      "observed": {
+        "grants": 1
+      }
+    },
+    {
+      "name": "笔记：另一个人读到",
+      "ok": true,
+      "observed": {
+        "text": "阈值是 72%，依据是规范第二节。",
+        "fields": [
+          "id",
+          "user_id",
+          "title",
+          "data",
+          "meta",
+          "is_pinned",
+          "access_grants",
+          "created_at",
+          "updated_at",
+          "write_access"
+        ]
+      }
+    },
+    {
+      "name": "笔记：只读的人能否改",
+      "ok": false,
+      "observed": "/api/v1/notes/48a13c33-ddb6-4c68-b240-b30fd56a2d32/update: 403 {\"detail\":\"Something went wrong :/\"}"
+    },
+    {
+      "name": "笔记：作者修正后，读者看到什么，旧版本还在不在",
+      "ok": true,
+      "observed": {
+        "text": "阈值是 80%，上一版读错了。",
+        "keepsOldText": false,
+        "dataFields": ["content", "pages", "pages_revision", "search_text"]
+      }
+    },
+    {
+      "name": "笔记：另一个人提问时引用它，来源能否认出作者",
+      "ok": true,
+      "observed": {
+        "answer": "笔记说阈值是 **80%**，并提到上一版读错了 [1]。",
+        "sources": "[{\"source\":{\"type\":\"note\",\"id\":\"48a13c33-ddb6-4c68-b240-b30fd56a2d32\"},\"document\":[\"阈值是 80%，上一版读错了。\"],\"metadata\":[{\"file_id\":\"48a13c33-ddb6-4c68-b240-b30fd56a2d32\",\"note_id\":\"48a13c33-ddb6-4c68-b240-b30fd56a2d32\",\"page_id\":\"main\",\"parent_id\":null,\"name\":\"潮汐协议 / 潮汐协议\",\"source\":\"/notes/48a13c33-ddb6-4c68-b240-b30fd56a2d32?page=main\"}]}]"
+      }
+    }
+  ]
+}

@@ -193,6 +193,8 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
 
   it('says so when an address names a space that is not there', async () => {
     await newSpace('机器学习')
+    // An empty space settles on its own address first, which would replace the one this test is about to write.
+    await page.waitForURL(/\/new/)
     await page.goto(`${service.workspaceUrl ?? ''}#/spaces/space_gone/threads/thread_gone`)
     await page.reload()
     await page.getByText('找不到这个地址里的空间').waitFor()

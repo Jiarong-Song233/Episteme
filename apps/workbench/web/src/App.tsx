@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
+import { useLocation, useSearch } from 'wouter'
+import { useHistoryState } from 'wouter/use-browser-location'
 import {
   api,
   ApiError,
@@ -20,10 +30,18 @@ import {
 import { Commons, SignIn } from './Commons.js'
 import { PlanShelf, PlanView, StatusView } from './Learning.js'
 import { Outcomes } from './Outcomes.js'
+import {
+  hrefOf,
+  opensSide,
+  panelOf,
+  usePlace,
+  type Panel,
+  type Place,
+  type SideTab,
+} from './routes.js'
 import { AgentTurn, LearnerTurn, Links, messageOf } from './Turns.js'
 import { UnderstandingPanel, wordsOf } from './Understanding.js'
 
-type SideTab = 'source' | 'pending' | 'understood' | 'status'
 type Pane = 'shelf' | 'talk' | 'side'
 
 const LAST_SPACE = 'workbench.space'
@@ -55,6 +73,13 @@ interface SourceRequest {
   readonly title: string
   readonly citation?: Citation
   /** The closest sentence inside the cited passage, when the answer found one. */
+  readonly evidence?: Evidence
+}
+
+/** The passage a citation points at, kept in its history entry so a refresh or going back marks it again. */
+interface Cited {
+  readonly materialId: string
+  readonly citation: Citation
   readonly evidence?: Evidence
 }
 
@@ -110,21 +135,67 @@ function Desk({
   onNames: (me: Me) => void
   onSignIn: () => void
 }) {
-  const [commons, setCommons] = useState(false)
-  const [publication, setPublication] = useState<string>()
-  /** A node to open once the space it lies in has loaded, because changing space clears the selection. */
-  const nodeAfterSwitch = useRef<string | undefined>(undefined)
+  const place = usePlace()
+  const [, navigate] = useLocation()
+  // Read for the re-render when only the query changes; the router's copy has already decoded the values.
+  useSearch()
+  const panel = panelOf(window.location.search)
+  const cited = useHistoryState<Cited | null>()
+  /** The latest address, for work that finishes after the person may have moved on. */
+  const here = useRef({ place, panel, cited })
+  here.current = { place, panel, cited }
+
+  const go = useCallback(
+    (
+      to: Place,
+      next: Panel = {},
+      options: { readonly replace?: boolean; readonly cited?: Cited } = {},
+    ): void => {
+      const href = hrefOf(to, next)
+      const from = here.current
+      navigate(href, {
+        // The same address twice would make the back button seem to do nothing.
+        replace: options.replace === true || href === hrefOf(from.place, from.panel),
+        state:
+          options.cited ?? (next.material === from.panel.material ? (from.cited ?? null) : null),
+      })
+    },
+    [navigate],
+  )
+
+  /** Changes what the side column shows and leaves the place open as it is. */
+  const showPanel = useCallback(
+    (next: Panel, options: { readonly cited?: Cited } = {}): void => {
+      go(here.current.place, next, options)
+    },
+    [go],
+  )
+
+  /** The space on show. Public results have no space of their own, so the last one stays beside them. */
+  const [heldSpace, setHeldSpace] = useState<string | undefined>(remembered() ?? undefined)
+  const spaceId = 'space' in place ? place.space : heldSpace
+  const threadId = place.kind === 'thread' ? place.thread : undefined
+  const planId = place.kind === 'plan' ? place.plan : undefined
+  const commons = place.kind === 'commons'
+  const publication = place.kind === 'commons' ? place.publication : undefined
+  const tab: SideTab = panel.side ?? 'source'
+  const selectedNode = panel.node
+  const focusedTurn = panel.turn
+
   const [model, setModel] = useState<{ name: string; simulated: boolean }>()
   const [spaces, setSpaces] = useState<readonly Space[]>([])
-  const [spaceId, setSpaceId] = useState<string>()
+  const [listed, setListed] = useState(false)
+  /** The space whose materials, conversations and plans are in hand. */
+  const [loadedFor, setLoadedFor] = useState<string>()
   const [materials, setMaterials] = useState<readonly MaterialSummary[]>([])
   const [sessions, setSessions] = useState<readonly Session[]>([])
-  const [threadId, setThreadId] = useState<string>()
   const [turns, setTurns] = useState<readonly Turn[]>([])
+  /** A conversation whose turns are already in hand because asking just started it. */
+  const threadInHand = useRef<string | undefined>(undefined)
   const [understanding, setUnderstanding] = useState<Understanding>(NO_UNDERSTANDING)
-  const [source, setSource] = useState<SourceRequest>()
-  const [tab, setTab] = useState<SideTab>('source')
-  const [pane, setPane] = useState<Pane>('shelf')
+  const [pane, setPane] = useState<Pane>(() =>
+    opensSide(panel) ? 'side' : place.kind === 'home' || place.kind === 'space' ? 'shelf' : 'talk',
+  )
   const [notice, setNotice] = useState<string>()
   const [asking, setAsking] = useState(false)
   const [failed, setFailed] = useState<{ question: string; failure: Failure }>()
@@ -133,15 +204,42 @@ function Desk({
     blocks: readonly BlockInfo[]
   }>({ workflows: [], blocks: [] })
   const [plans, setPlans] = useState<readonly Plan[]>([])
-  const [planId, setPlanId] = useState<string>()
   const [planNotice, setPlanNotice] = useState<string>()
   const [learned, setLearned] = useState(0)
-  const [selectedNode, setSelectedNode] = useState<string>()
-  const [focusedTurn, setFocusedTurn] = useState<string>()
 
   const space = spaces.find((candidate) => candidate.id === spaceId)
+  const spaceKnown = space !== undefined
   const planInView = plans.find((plan) => plan.id === planId)
   const threadInView = planId === undefined ? threadId : planInView?.thread
+  const planLoaded = loadedFor === spaceId
+  /** An address can name a space that is gone, or one this person cannot see. */
+  const lostSpace = listed && 'space' in place && !spaceKnown
+
+  const source = useMemo<SourceRequest | undefined>(() => {
+    const { material } = panel
+    if (material === undefined) return undefined
+    const passage = cited?.materialId === material ? cited : undefined
+    return {
+      materialId: material,
+      title:
+        passage?.citation.title ??
+        materials.find((candidate) => candidate.id === material)?.title ??
+        '',
+      ...(passage === undefined ? {} : { citation: passage.citation }),
+      ...(passage?.evidence === undefined ? {} : { evidence: passage.evidence }),
+    }
+  }, [panel.material, cited, materials])
+
+  // Going back or forward lands a phone on the column that changed.
+  useEffect(() => {
+    const opened = window.location.search
+    const moved = (): void => {
+      const now = window.location.search
+      setPane(now !== opened && opensSide(panelOf(now)) ? 'side' : 'talk')
+    }
+    window.addEventListener('popstate', moved)
+    return () => window.removeEventListener('popstate', moved)
+  }, [panel.side, panel.node, panel.material, panel.turn])
 
   useEffect(() => {
     if (focusedTurn === undefined) return undefined
@@ -170,75 +268,115 @@ function Desk({
     [me.mode, onSignIn],
   )
 
-  const openThread = useCallback(async (thread: string | undefined) => {
-    setThreadId(thread)
-    setFailed(undefined)
-    setTurns(thread === undefined ? [] : (await api.session(thread)).turns)
-  }, [])
-
   useEffect(() => {
     guard(async () => {
       setModel(await api.model())
       setLibrary(await api.workflows())
-      const listed = (await api.spaces()).spaces
-      setSpaces(listed)
-      const open = listed.filter((candidate) => !candidate.archived)
-      const last = remembered()
-      setSpaceId((open.find((candidate) => candidate.id === last) ?? open[0])?.id)
+      setSpaces((await api.spaces()).spaces)
+      setListed(true)
     })
   }, [guard])
 
+  // An address without a space falls back on the last one still open, or the first.
+  const addressedSpace = 'space' in place ? place.space : undefined
+  const needsSpace = place.kind === 'home' || place.kind === 'commons'
   useEffect(() => {
-    setSource(undefined)
-    setSelectedNode(nodeAfterSwitch.current)
-    nodeAfterSwitch.current = undefined
-    setFocusedTurn(undefined)
-    if (spaceId === undefined) {
+    if (addressedSpace !== undefined) {
+      setHeldSpace(addressedSpace)
+      return
+    }
+    if (!listed || !needsSpace) return
+    const open = spaces.filter((candidate) => !candidate.archived)
+    const last = remembered()
+    const fallback = (open.find((candidate) => candidate.id === last) ?? open[0])?.id
+    setHeldSpace(fallback)
+    if (place.kind === 'home' && fallback !== undefined) {
+      go({ kind: 'space', space: fallback }, here.current.panel, { replace: true })
+    }
+  }, [addressedSpace, listed, needsSpace, spaces, place.kind, go])
+
+  // Public results may be switched off on this service, whatever an old link says.
+  useEffect(() => {
+    if (place.kind === 'commons' && !me.sharing) go({ kind: 'home' }, {}, { replace: true })
+  }, [place.kind, me.sharing, go])
+
+  const readable = spaceId !== undefined && spaceKnown
+  useEffect(() => {
+    setLoadedFor(undefined)
+    if (!readable) {
       setMaterials([])
       setSessions([])
       setUnderstanding(NO_UNDERSTANDING)
       setPlans([])
-      setPlanId(undefined)
-      void openThread(undefined)
-      return
+      return undefined
     }
     remember(spaceId)
+    let current = true
     guard(async () => {
-      const [listed, threads, held, planned] = await Promise.all([
+      const [found, threads, held, planned] = await Promise.all([
         api.materials(spaceId),
         api.sessions(spaceId),
         api.understanding(spaceId),
         api.plans(spaceId),
       ])
-      setMaterials(listed.materials)
+      if (!current) return
+      setMaterials(found.materials)
       setSessions(threads.sessions)
       setUnderstanding(held)
       setPlans(planned.plans)
       setPlanNotice(undefined)
-      // Coming back to a space picks up where the person left off, in a plan or a conversation.
-      const ownThreads = new Set(planned.plans.map((plan) => plan.thread))
-      const latest = threads.sessions
-        .filter((session) => !ownThreads.has(session.id))
-        .sort((a, b) => b.createdAt - a.createdAt)[0]
-      const unfinished = planned.plans
-        .filter((plan) => plan.status !== 'done')
-        .sort((a, b) => b.updatedAt - a.updatedAt)[0]
-      const resume =
-        unfinished !== undefined && unfinished.updatedAt >= (latest?.createdAt ?? 0)
-          ? unfinished
-          : undefined
-      setPlanId(resume?.id)
-      await openThread(resume === undefined ? latest?.id : undefined)
+      setLoadedFor(spaceId)
     })
-  }, [spaceId, guard, openThread])
+    return () => {
+      current = false
+    }
+  }, [spaceId, readable, guard])
+
+  // Coming back to a space picks up where the person left off, in a plan or a conversation.
+  const resumeIn = place.kind === 'space' && loadedFor === place.space ? place.space : undefined
+  useEffect(() => {
+    if (resumeIn === undefined) return
+    const ownThreads = new Set(plans.map((plan) => plan.thread))
+    const latest = sessions
+      .filter((session) => !ownThreads.has(session.id))
+      .sort((a, b) => b.createdAt - a.createdAt)[0]
+    const unfinished = plans
+      .filter((plan) => plan.status !== 'done')
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0]
+    const to: Place =
+      unfinished !== undefined && unfinished.updatedAt >= (latest?.createdAt ?? 0)
+        ? { kind: 'plan', space: resumeIn, plan: unfinished.id }
+        : latest !== undefined
+          ? { kind: 'thread', space: resumeIn, thread: latest.id }
+          : { kind: 'new', space: resumeIn }
+    go(to, here.current.panel, { replace: true })
+  }, [resumeIn, plans, sessions, go])
+
+  useEffect(() => {
+    if (threadId !== undefined && threadInHand.current === threadId) {
+      threadInHand.current = undefined
+      return undefined
+    }
+    setFailed(undefined)
+    if (threadId === undefined) {
+      setTurns([])
+      return undefined
+    }
+    let current = true
+    guard(async () => {
+      const found = await api.session(threadId)
+      if (current) setTurns(found.turns)
+    })
+    return () => {
+      current = false
+    }
+  }, [threadId, guard])
 
   // A host agent writes while this page sits in the background, so coming back to it reads again.
   useEffect(() => {
     const reread = (): void => {
       void (async () => {
-        const listed = (await api.spaces()).spaces
-        setSpaces(listed)
-        setSpaceId((held) => held ?? listed.find((candidate) => !candidate.archived)?.id)
+        setSpaces((await api.spaces()).spaces)
         if (spaceId === undefined) return
         const [planned, held] = await Promise.all([api.plans(spaceId), api.understanding(spaceId)])
         setPlans(planned.plans)
@@ -262,16 +400,25 @@ function Desk({
     if (spaceId === undefined) return
     setAsking(true)
     setFailed(undefined)
-    setFocusedTurn(undefined)
+    if (panel.turn !== undefined) {
+      const { turn: _dropped, ...rest } = panel
+      go(place, rest, { replace: true })
+    }
     if (!retry) {
       setTurns((held) => [...held, { id: 'asking', speaker: 'learner', text: question }])
     }
     guard(async () => {
       try {
         const asked = await api.ask(spaceId, question, threadId, retry)
-        setThreadId(asked.thread)
         setTurns((await api.session(asked.thread)).turns)
         setSessions((await api.sessions(spaceId)).sessions)
+        if (asked.thread !== threadId) {
+          threadInHand.current = asked.thread
+          // A new conversation takes the empty one's place, so going back skips it.
+          go({ kind: 'thread', space: spaceId, thread: asked.thread }, here.current.panel, {
+            replace: true,
+          })
+        }
         if (asked.failure !== undefined) setFailed({ question, failure: asked.failure })
       } finally {
         setAsking(false)
@@ -279,19 +426,27 @@ function Desk({
     })
   }
 
-  const showSource = (request: SourceRequest): void => {
-    setSource(request)
-    setTab('source')
-    setPane('side')
-  }
+  /** Opens a side tab over whatever the side column was showing. */
+  const showTab = useCallback(
+    (side: SideTab): void => {
+      showPanel({ ...here.current.panel, side })
+      setPane('side')
+    },
+    [showPanel],
+  )
 
   const cite = (citation: Citation, evidence?: Evidence): void => {
-    showSource({
-      materialId: citation.materialId,
-      title: citation.title,
-      citation,
-      ...(evidence === undefined ? {} : { evidence }),
-    })
+    showPanel(
+      { ...panel, side: 'source', material: citation.materialId },
+      {
+        cited: {
+          materialId: citation.materialId,
+          citation,
+          ...(evidence === undefined ? {} : { evidence }),
+        },
+      },
+    )
+    setPane('side')
   }
 
   const makeCandidates = async (
@@ -301,10 +456,7 @@ function Desk({
     if (spaceId === undefined || thread === undefined) return undefined
     const made = await api.candidates(spaceId, thread, reply)
     await refreshUnderstanding()
-    if (made.suggestions.length > 0) {
-      setTab('pending')
-      setPane('side')
-    }
+    if (made.suggestions.length > 0) showTab('pending')
     return made.message
   }
 
@@ -312,22 +464,24 @@ function Desk({
     if (spaceId === undefined) return undefined
     const made = await api.candidatesFromTurn(spaceId, thread, turn)
     await refreshUnderstanding()
-    if (made.suggestions.length > 0) {
-      setTab('pending')
-      setPane('side')
-    }
+    if (made.suggestions.length > 0) showTab('pending')
     return made.message
   }
 
   const openNode = (node: string): void => {
-    setSelectedNode(node)
-    setTab('understood')
+    showPanel({ ...panel, side: 'understood', node })
     setPane('side')
   }
 
   const openPublication = (id: string): void => {
-    setCommons(true)
-    setPublication(id)
+    go({ kind: 'commons', publication: id }, panel)
+    setPane('talk')
+  }
+
+  /** Moves to another place in a space, leaving the side column as it is. */
+  const moveTo = (to: Place): void => {
+    const { turn: _dropped, ...rest } = panel
+    go(to, rest)
     setPane('talk')
   }
 
@@ -340,20 +494,26 @@ function Desk({
 
   /** From an understanding back to the words it came from, in a conversation or a plan. */
   const jumpTo = (thread: string, turn: string | undefined): void => {
+    if (spaceId === undefined) return
     const plan = plans.find((candidate) => candidate.thread === thread)
-    setFocusedTurn(turn)
+    const { turn: _dropped, ...rest } = panel
+    go(
+      plan !== undefined && plan.origin !== 'host'
+        ? { kind: 'plan', space: spaceId, plan: plan.id }
+        : { kind: 'thread', space: spaceId, thread },
+      turn === undefined ? rest : { ...rest, turn },
+    )
     setPane('talk')
-    if (plan !== undefined && plan.origin !== 'host') {
-      setPlanId(plan.id)
-      return
-    }
-    setPlanId(undefined)
-    guard(() => openThread(thread))
   }
 
   const decided = async (): Promise<void> => {
     await refreshUnderstanding()
     setLearned((held) => held + 1)
+  }
+
+  /** Enters a space where the person left off, on the side tab they were reading. */
+  const enterSpace = (id: string): void => {
+    go({ kind: 'space', space: id }, panel.side === undefined ? {} : { side: panel.side })
   }
 
   return (
@@ -390,14 +550,11 @@ function Desk({
               onCreated={(plan, created) => {
                 setPlans((held) => [plan, ...held])
                 setPlanNotice(created)
-                setPlanId(plan.id)
-                setPane('talk')
+                if (spaceId !== undefined) moveTo({ kind: 'plan', space: spaceId, plan: plan.id })
               }}
               onSelect={(id) => {
-                setCommons(false)
                 setPlanNotice(undefined)
-                setPlanId(id)
-                setPane('talk')
+                if (spaceId !== undefined) moveTo({ kind: 'plan', space: spaceId, plan: id })
               }}
             />
           }
@@ -406,41 +563,36 @@ function Desk({
             <Identity
               me={me}
               commons={commons}
-              onCommons={() => {
-                setCommons(true)
-                setPublication(undefined)
-                setPane('talk')
-              }}
+              onCommons={() => moveTo({ kind: 'commons' })}
               onSignIn={onSignIn}
             />
           }
           onSpaces={(next, selected) => {
             setSpaces(next)
-            if (selected !== undefined) setSpaceId(selected)
+            if (selected !== undefined) enterSpace(selected)
           }}
           onSelectSpace={(id) => {
-            setSpaceId(id)
-            setCommons(false)
+            enterSpace(id)
             setPane('talk')
           }}
           onMaterialsChanged={refreshMaterials}
-          onOpenMaterial={(material) =>
-            showSource({ materialId: material.id, title: material.title })
-          }
+          onOpenMaterial={(material) => {
+            showPanel({ ...panel, side: 'source', material: material.id })
+            setPane('side')
+          }}
           onSelectThread={(id) => {
-            setCommons(false)
-            setPlanId(undefined)
-            guard(() => openThread(id))
-            setPane('talk')
+            if (spaceId !== undefined) moveTo({ kind: 'thread', space: spaceId, thread: id })
           }}
           onNewThread={() => {
-            setCommons(false)
-            setPlanId(undefined)
-            guard(() => openThread(undefined))
-            setPane('talk')
+            if (spaceId !== undefined) moveTo({ kind: 'new', space: spaceId })
           }}
         />
         <main className="talk">
+          {lostSpace && (
+            <p className="banner banner-error" role="alert">
+              找不到这个地址里的空间，它可能已被删除，或者你没有权限查看。可以从左边选一个空间。
+            </p>
+          )}
           {model?.simulated === true && (
             <p className="banner">
               现在用的是模拟模型：它只摘录材料原句，不会真正回答。配置 EPISTEME_MODEL_BASE_URL
@@ -459,20 +611,23 @@ function Desk({
               current={spaceId}
               dimensions={understanding.dimensions}
               opened={publication}
-              onOpen={setPublication}
+              onOpen={(id) =>
+                go(
+                  id === undefined ? { kind: 'commons' } : { kind: 'commons', publication: id },
+                  panel,
+                )
+              }
               onChanged={decided}
               onOpenNode={(space, node) => {
                 if (space === spaceId) {
                   openNode(node)
                   return
                 }
-                nodeAfterSwitch.current = node
-                setSpaceId(space)
-                setTab('understood')
+                go({ kind: 'space', space }, { side: 'understood', node })
                 setPane('side')
               }}
             />
-          ) : planId === undefined ? (
+          ) : lostSpace ? null : planId === undefined ? (
             <Conversation
               space={space}
               hasMaterial={materials.length > 0}
@@ -491,12 +646,18 @@ function Desk({
               focus={planId}
               version={learned}
               blocks={library.blocks}
-              onReview={() => {
-                setTab('pending')
-                setPane('side')
-              }}
+              onReview={() => showTab('pending')}
               onOpenThread={(thread) => jumpTo(thread, undefined)}
             />
+          ) : !planLoaded ? (
+            // Which view a plan gets depends on who made it, and that is not known until the plans arrive.
+            <p className="working" role="status">
+              正在打开…
+            </p>
+          ) : planInView === undefined ? (
+            <p className="banner banner-error" role="alert">
+              这个空间里没有这份学习计划。可以从左边选一份。
+            </p>
           ) : (
             <PlanView
               plan={planId}
@@ -512,16 +673,13 @@ function Desk({
               }}
               onCite={cite}
               onCandidates={makeCandidates}
-              onShowStatus={() => {
-                setTab('status')
-                setPane('side')
-              }}
+              onShowStatus={() => showTab('status')}
             />
           )}
         </main>
         <Side
           tab={tab}
-          onTab={setTab}
+          onTab={(side) => showPanel({ ...panel, side })}
           source={source}
           understanding={understanding}
           guard={guard}
@@ -541,7 +699,10 @@ function Desk({
                 selected={selectedNode}
                 simulated={model?.simulated === true}
                 guard={guard}
-                onSelect={setSelectedNode}
+                onSelect={(node) => {
+                  const { node: _dropped, ...rest } = panel
+                  showPanel(node === undefined ? rest : { ...rest, node })
+                }}
                 onChanged={decided}
                 onJump={jumpTo}
               />

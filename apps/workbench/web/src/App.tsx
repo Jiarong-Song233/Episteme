@@ -28,7 +28,7 @@ import {
   type WorkflowInfo,
 } from './api.js'
 import { Commons, SignIn } from './Commons.js'
-import { PlanShelf, PlanView, StatusView } from './Learning.js'
+import { PlanShelf, PlanView } from './Learning.js'
 import { Outcomes } from './Outcomes.js'
 import {
   hrefOf,
@@ -194,7 +194,7 @@ function Desk({
   const threadInHand = useRef<string | undefined>(undefined)
   const [understanding, setUnderstanding] = useState<Understanding>(NO_UNDERSTANDING)
   const [pane, setPane] = useState<Pane>(() =>
-    opensSide(panel) ? 'side' : place.kind === 'home' || place.kind === 'space' ? 'shelf' : 'talk',
+    opensSide(panel) ? 'side' : place.kind === 'home' ? 'shelf' : 'talk',
   )
   const [notice, setNotice] = useState<string>()
   const [asking, setAsking] = useState(false)
@@ -292,6 +292,7 @@ function Desk({
     setHeldSpace(fallback)
     if (place.kind === 'home' && fallback !== undefined) {
       go({ kind: 'space', space: fallback }, here.current.panel, { replace: true })
+      if (!opensSide(here.current.panel)) setPane('talk')
     }
   }, [addressedSpace, listed, needsSpace, spaces, place.kind, go])
 
@@ -332,25 +333,41 @@ function Desk({
     }
   }, [spaceId, readable, guard])
 
-  // Coming back to a space picks up where the person left off, in a plan or a conversation.
-  const resumeIn = place.kind === 'space' && loadedFor === place.space ? place.space : undefined
-  useEffect(() => {
-    if (resumeIn === undefined) return
+  /** Where the person left off in this space, in a plan or a conversation. */
+  const resume = useMemo<{ readonly label: string; readonly to: Place } | undefined>(() => {
+    if (spaceId === undefined) return undefined
     const ownThreads = new Set(plans.map((plan) => plan.thread))
-    const latest = sessions
+    const latest = [...sessions]
       .filter((session) => !ownThreads.has(session.id))
       .sort((a, b) => b.createdAt - a.createdAt)[0]
-    const unfinished = plans
+    const unfinished = [...plans]
       .filter((plan) => plan.status !== 'done')
       .sort((a, b) => b.updatedAt - a.updatedAt)[0]
-    const to: Place =
-      unfinished !== undefined && unfinished.updatedAt >= (latest?.createdAt ?? 0)
-        ? { kind: 'plan', space: resumeIn, plan: unfinished.id }
-        : latest !== undefined
-          ? { kind: 'thread', space: resumeIn, thread: latest.id }
-          : { kind: 'new', space: resumeIn }
-    go(to, here.current.panel, { replace: true })
-  }, [resumeIn, plans, sessions, go])
+    if (unfinished !== undefined && unfinished.updatedAt >= (latest?.createdAt ?? 0)) {
+      return {
+        label: unfinished.topic,
+        to: { kind: 'plan', space: spaceId, plan: unfinished.id },
+      }
+    }
+    return latest === undefined
+      ? undefined
+      : { label: latest.title, to: { kind: 'thread', space: spaceId, thread: latest.id } }
+  }, [spaceId, plans, sessions])
+
+  // A space with nothing in it has nothing to look back on, so it opens ready for the first question.
+  const emptySpace =
+    place.kind === 'space' &&
+    loadedFor === place.space &&
+    sessions.length === 0 &&
+    plans.length === 0 &&
+    understanding.pending.length === 0 &&
+    understanding.nodes.length === 0
+  const emptyId = emptySpace ? place.space : undefined
+  useEffect(() => {
+    if (emptyId !== undefined) {
+      go({ kind: 'new', space: emptyId }, here.current.panel, { replace: true })
+    }
+  }, [emptyId, go])
 
   useEffect(() => {
     if (threadId !== undefined && threadInHand.current === threadId) {
@@ -627,7 +644,30 @@ function Desk({
                 setPane('side')
               }}
             />
-          ) : lostSpace ? null : planId === undefined ? (
+          ) : lostSpace ? null : place.kind === 'space' ? (
+            planLoaded ? (
+              <Outcomes
+                space={place.space}
+                name={space?.name ?? ''}
+                focus={undefined}
+                version={learned}
+                blocks={library.blocks}
+                pending={understanding.pending}
+                resume={
+                  resume === undefined
+                    ? undefined
+                    : { label: resume.label, open: () => moveTo(resume.to) }
+                }
+                onNewThread={() => moveTo({ kind: 'new', space: place.space })}
+                onReview={() => showTab('pending')}
+                onOpenThread={(thread) => jumpTo(thread, undefined)}
+              />
+            ) : (
+              <p className="working" role="status">
+                正在打开…
+              </p>
+            )
+          ) : planId === undefined ? (
             <Conversation
               space={space}
               hasMaterial={materials.length > 0}
@@ -646,6 +686,9 @@ function Desk({
               focus={planId}
               version={learned}
               blocks={library.blocks}
+              pending={understanding.pending}
+              resume={undefined}
+              onNewThread={() => moveTo({ kind: 'new', space: spaceId })}
               onReview={() => showTab('pending')}
               onOpenThread={(thread) => jumpTo(thread, undefined)}
             />
@@ -673,7 +716,9 @@ function Desk({
               }}
               onCite={cite}
               onCandidates={makeCandidates}
-              onShowStatus={() => showTab('status')}
+              onShowOverview={() => {
+                if (spaceId !== undefined) moveTo({ kind: 'space', space: spaceId })
+              }}
             />
           )}
         </main>
@@ -708,7 +753,6 @@ function Desk({
               />
             )
           }
-          status={<StatusView space={spaceId} version={learned} />}
         />
         <nav className="switcher" aria-label="切换页面">
           <button type="button" aria-current={pane === 'shelf'} onClick={() => setPane('shelf')}>
@@ -1170,7 +1214,6 @@ function Side(props: {
   onDecided: () => Promise<void>
   pending: ReactNode
   understood: ReactNode
-  status: ReactNode
 }) {
   const { tab, understanding } = props
   const tabs: readonly (readonly [SideTab, string])[] = [
@@ -1180,7 +1223,6 @@ function Side(props: {
       'understood',
       `我的理解（${understanding.nodes.filter((node) => node.revisedTo === undefined && !node.withdrawn).length}）`,
     ],
-    ['status', '学习状态'],
   ]
   return (
     <aside className="side" aria-label="原文与理解">
@@ -1199,7 +1241,6 @@ function Side(props: {
       </div>
       <div className="side-body">
         {tab === 'source' && <SourceView request={props.source} />}
-        {tab === 'status' && props.status}
         {tab === 'pending' && (
           <>
             {props.pending}

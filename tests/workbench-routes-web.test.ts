@@ -191,6 +191,40 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     await fresh.close()
   }, 60_000)
 
+  it('opens a space that has something in it on the overview, not on a question box', async () => {
+    await newSpace('机器学习')
+    await upload('编码笔记.md')
+    await ask('位置编码有什么用')
+    const conversation = page.url()
+    await page.getByRole('button', { name: '提炼成待确认的理解' }).first().click()
+    await page.getByRole('tab', { name: /待确认（[1-9]/ }).waitFor()
+
+    await page.getByRole('button', { name: '机器学习', exact: true }).click()
+    await page.waitForURL(/#\/spaces\/[^/]+$/)
+    await main()
+      .getByRole('heading', { name: /等你确认（[1-9]/ })
+      .waitFor()
+    await main().getByText('练习正确率').waitFor()
+    expect(await page.getByLabel('你的问题').count()).toBe(0)
+    expect(await page.getByRole('tab', { name: '学习状态' }).count()).toBe(0)
+
+    // The overview survives a refresh rather than sliding on to the last conversation.
+    const overview = page.url()
+    await page.reload()
+    await main()
+      .getByRole('heading', { name: /等你确认（[1-9]/ })
+      .waitFor()
+    expect(page.url()).toBe(overview)
+
+    await main().getByRole('button', { name: '去确认' }).click()
+    await page.waitForURL(/side=pending/)
+
+    await main().getByRole('button', { name: '回到“位置编码有什么用”' }).click()
+    await main().getByText('位置编码有什么用').first().waitFor()
+    expect(page.url().split('#')[1]).toBe(conversation.split('#')[1])
+    await page.getByLabel('你的问题').waitFor()
+  }, 120_000)
+
   it('says so when an address names a space that is not there', async () => {
     await newSpace('机器学习')
     await page.goto(`${service.workspaceUrl ?? ''}#/spaces/space_gone/threads/thread_gone`)

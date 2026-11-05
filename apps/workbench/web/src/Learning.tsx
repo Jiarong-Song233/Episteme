@@ -133,7 +133,7 @@ export function PlanView(props: {
   onChanged: () => void
   onCite: (citation: Citation, evidence?: Evidence) => void
   onCandidates: (thread: string, reply: string) => Promise<string | undefined>
-  onShowStatus: () => void
+  onShowOverview: () => void
 }) {
   const { guard, onChanged } = props
   const [detail, setDetail] = useState<PlanDetail>()
@@ -294,8 +294,8 @@ export function PlanView(props: {
         {plan.status === 'done' ? (
           <p>
             这个计划结束了。
-            <button type="button" className="link" onClick={props.onShowStatus}>
-              看学习状态
+            <button type="button" className="link" onClick={props.onShowOverview}>
+              看这个空间的概览
             </button>
           </p>
         ) : plan.status === 'paused' ? (

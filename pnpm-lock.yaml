@@ -79,7 +79,7 @@ importers:
         version: 7.2.0
       openai:
         specifier: 7.47.0
-        version: 7.47.0(zod@4.6.5)
+        version: 7.47.0(zod@4.6.7)
       unpdf:
         specifier: 2.1.0
         version: 2.1.0
@@ -1707,8 +1707,8 @@ packages:
     resolution: {integrity: sha512-si7QWI6zUMq56bESFvagtmzMdGOtoxfR+Sez11Mobfc7tm+VkUckk9bW2UeffTGVUbOksxmSw0AA2gs8g71NCQ==}
     engines: {node: '>=12'}
 
-  zod@4.6.5:
-    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -1888,12 +1888,12 @@ snapshots:
 
   '@modelcontextprotocol/core@2.3.0':
     dependencies:
-      zod: 4.6.5
+      zod: 4.6.7
 
   '@modelcontextprotocol/server@2.3.0':
     dependencies:
       '@modelcontextprotocol/core': 2.3.0
-      zod: 4.6.5
+      zod: 4.6.7
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
@@ -2583,9 +2583,9 @@ snapshots:
 
   node-addon-api@8.9.2: {}
 
-  openai@7.47.0(zod@4.6.5):
+  openai@7.47.0(zod@4.6.7):
     optionalDependencies:
-      zod: 4.6.5
+      zod: 4.6.7
 
   optionator@0.9.4:
     dependencies:
@@ -2915,4 +2915,4 @@ snapshots:
       string-width: 5.1.2
       strip-ansi: 7.2.0
 
-  zod@4.6.5: {}
+  zod@4.6.7: {}

@@ -150,7 +150,9 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
 
     await page.getByRole('heading', { name: '机器学习' }).waitFor()
     await page.getByRole('button', { name: '编码笔记.md', exact: true }).waitFor()
-    await page.getByRole('button', { name: '位置编码有什么用' }).waitFor()
+    await page.getByRole('button', { name: '位置编码有什么用', exact: true }).waitFor()
+    // Coming back opens on the overview, one step from the conversation.
+    await page.getByRole('button', { name: '回到“位置编码有什么用”' }).click()
     await page.locator('.question', { hasText: '位置编码有什么用' }).waitFor()
     await page.getByRole('button', { name: /查看引用 1/ }).waitFor()
     await page.getByRole('tab', { name: '我的理解（1）' }).click()
@@ -282,7 +284,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.getByRole('button', { name: '继续学习' }).click()
 
     await advanceTo(page.getByText('这个计划结束了'))
-    await page.getByRole('button', { name: '看学习状态' }).click()
+    await page.getByRole('button', { name: '看这个空间的概览' }).click()
     await page.locator('.status').getByText('0 / 1').waitFor()
     await page.getByText('建议回头看').waitFor()
     await page.getByText('不等于你实际理解了多少').waitFor()
@@ -305,6 +307,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
 
     await close()
     await open()
+    await page.getByRole('button', { name: '回到“注意力”' }).click()
     await page.getByRole('heading', { name: '注意力' }).waitFor()
     await page.locator('.answer', { hasText: '举一个例子' }).waitFor()
     await page.getByRole('button', { name: '这一步够了' }).click()

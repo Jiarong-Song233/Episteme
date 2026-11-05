@@ -185,7 +185,8 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
 
     // The first author sees the answer with its author's name, and their own words unchanged.
     await lin.reload()
-    await lin.getByRole('button', { name: '公开成果' }).click()
+    // A refresh stays on the publication that was open, so this is the way back to the whole list.
+    await lin.getByRole('button', { name: '公开成果', exact: true }).click()
     await lin.locator('.publications .row', { hasText: original ?? '' }).click()
     await lin.locator('.responses', { hasText: '魏' }).getByText(WEIS_VERSION).waitFor()
     await lin.getByRole('main').getByRole('button', { name: '看谱系和差异' }).click()
@@ -197,7 +198,7 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
     await lin.getByRole('button', { name: '确认撤回' }).click()
     await lin.getByText(/已撤回/).waitFor()
     await wei.reload()
-    await wei.getByRole('button', { name: '公开成果' }).click()
+    await wei.getByRole('button', { name: '公开成果', exact: true }).click()
     await expect
       .poll(() => wei.locator('.publications .row', { hasText: original ?? '' }).count())
       .toBe(0)

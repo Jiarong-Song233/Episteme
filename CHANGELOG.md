@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **工作台的页面有了地址**：空间、对话、学习计划、公开成果和右栏内容都写进地址，刷新、浏览器后退和粘贴链接都能回到同一处。地址里只有编号，不含引用原文。
+
 ### 不兼容的变化
 
 - **存储只用 SQLite**（[ADR 0018](docs/decisions/0018-sqlite-only.md)）：一个图谱就是一个 SQLite 文件，旁边的建议、材料、对话和场景记录也存在这个文件里，不再有 `.jsonl` 文件和 `.lock` 文件。`@episteme/storage-local`（JSONL）已删除，`graph import` / `graph export` 一并删除；旧的 JSONL 图谱和第 1 版 SQLite 图谱不能再直接打开，服务会拒绝并且不改动文件；用 `pnpm serve graph convert <旧图谱> <新图谱>` 转换成一个新文件，旧文件只读。默认图谱改为 `~/.episteme/learn.db`。

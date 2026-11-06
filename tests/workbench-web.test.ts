@@ -136,13 +136,13 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     expect(await page.locator('mark').textContent()).not.toContain('注意力机制')
 
     // Nothing is understanding until the person says so.
-    await page.getByRole('tab', { name: '我的理解（0）' }).waitFor()
+    await page.getByRole('button', { name: '我的理解（0）' }).waitFor()
     await page.getByRole('button', { name: '提炼成待确认的理解' }).click()
-    await page.getByRole('tab', { name: '待确认（1）', selected: true }).waitFor()
-    await page.getByRole('tab', { name: '我的理解（0）' }).waitFor()
+    await page.getByRole('button', { name: '待确认（1）' }).click()
+    await page.getByRole('button', { name: '我的理解（0）' }).waitFor()
 
     await page.getByRole('button', { name: '确认为我的理解' }).click()
-    await page.getByRole('tab', { name: '我的理解（1）' }).click()
+    await page.getByRole('button', { name: '我的理解（1）' }).click()
     await page.locator('.understood li', { hasText: '位置编码' }).waitFor()
 
     await close()
@@ -155,7 +155,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.getByRole('button', { name: '回到“位置编码有什么用”' }).click()
     await page.locator('.question', { hasText: '位置编码有什么用' }).waitFor()
     await page.getByRole('button', { name: /查看引用 1/ }).waitFor()
-    await page.getByRole('tab', { name: '我的理解（1）' }).click()
+    await page.getByRole('button', { name: '我的理解（1）' }).click()
     await page.locator('.understood li', { hasText: '位置编码' }).waitFor()
   }, 60_000)
 
@@ -274,7 +274,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
 
     // What the plan said can go to review, like any answer.
     await page.getByRole('button', { name: '提炼成待确认的理解' }).first().click()
-    await page.getByRole('tab', { name: /待确认（[1-9]/ }).waitFor()
+    await page.getByRole('button', { name: /待确认（[1-9]/ }).waitFor()
 
     // Pausing survives a reload.
     await page.getByRole('button', { name: '暂停', exact: true }).click()
@@ -353,10 +353,10 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await ask(words)
     const turn = page.locator('.learner-turn', { hasText: words })
     await turn.getByRole('button', { name: '这是我的理解' }).click()
-    await page.getByRole('tab', { name: /待确认（1）/, selected: true }).waitFor()
+    await page.getByRole('button', { name: '待确认（1）' }).click()
     await page.locator('.pending').getByText('你的原话').first().waitFor()
     await page.getByRole('button', { name: '确认为我的理解' }).click()
-    await page.getByRole('tab', { name: /我的理解（/ }).click()
+    await page.getByRole('button', { name: /我的理解（/ }).click()
     await page.locator('.node-row', { hasText: words }).click()
     await page.locator('.node-label', { hasText: words }).waitFor()
   }
@@ -395,11 +395,11 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     expect(await ownTurn.locator('.turn-source').count()).toBe(0)
 
     await relayedTurn.getByRole('button', { name: '这是我的理解' }).click()
-    await page.getByRole('tab', { name: /待确认（1）/, selected: true }).waitFor()
+    await page.getByRole('button', { name: '待确认（1）' }).click()
     await page.locator('.pending').getByText('Agent 转述').first().waitFor()
     expect(await page.locator('.pending').getByText('你的原话').count()).toBe(0)
     await page.getByRole('button', { name: '确认为我的理解' }).click()
-    await page.getByRole('tab', { name: /我的理解（/ }).click()
+    await page.getByRole('button', { name: /我的理解（/ }).click()
     await page.locator('.node-row', { hasText: relayed }).click()
     await page.locator('.node-detail .hint', { hasText: 'Agent 转述' }).first().waitFor()
     await page.locator('.trail').getByText('Agent 转述的话，经你确认').waitFor()
@@ -427,7 +427,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.getByLabel('你的质疑').fill('没有它，模型怎么知道先后？')
     await page.getByRole('button', { name: '记下这条质疑' }).click()
     await page.locator('.challenge', { hasText: '怎么知道先后' }).waitFor()
-    await page.getByRole('tab', { name: '我的理解（1）' }).waitFor()
+    await page.getByRole('button', { name: '我的理解（1）' }).waitFor()
 
     await page.getByRole('button', { name: '它说得对，修正' }).click()
     await page.getByLabel('现在你怎么想').fill(better)
@@ -443,7 +443,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.locator('.node-label', { hasText: said }).waitFor()
     await page.locator('.marks').getByText('已修正').waitFor()
     await page.locator('.trail').getByText('你据此修正了这一条').waitFor()
-    await page.getByRole('tab', { name: '我的理解（1）' }).waitFor()
+    await page.getByRole('button', { name: '我的理解（1）' }).waitFor()
 
     // Back to the words it came from.
     await page.getByRole('button', { name: '回到当时的对话' }).click()
@@ -464,7 +464,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     // All of it is still there after a restart.
     await close()
     await open()
-    await page.getByRole('tab', { name: '我的理解（1）' }).click()
+    await page.getByRole('button', { name: '我的理解（1）' }).click()
     await page.locator('.node-row', { hasText: better }).click()
     await page
       .locator('.trail', { hasText: '修正而来' })
@@ -497,6 +497,8 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.locator('.trail').getByText('你放下了它').waitFor()
     await page.getByRole('button', { name: '全部理解' }).click()
 
+    // Understanding has its own page now: the conversation is one step back in learning.
+    await page.getByRole('button', { name: '学习', exact: true }).click()
     await holdOwnWords('位置编码不是必需的')
     await page.getByRole('button', { name: '和另一条矛盾' }).click()
     await page.getByRole('button', { name: '记下这个矛盾' }).click()
@@ -505,7 +507,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.locator('.marks').getByText('未解决的矛盾').waitFor()
 
     // Neither is forced out, and the conversation says so when it brings one up.
-    await page.getByRole('tab', { name: '我的理解（2）' }).waitFor()
+    await page.getByRole('button', { name: '我的理解（2）' }).waitFor()
     await page.getByRole('button', { name: '全部理解' }).click()
     await page.locator('.map circle').first().waitFor()
     await page.getByRole('button', { name: '开始新对话' }).click()
@@ -514,9 +516,9 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
 
     await page.locator('.recalled button').first().click()
     await page.getByRole('button', { name: '撤回', exact: true }).click()
-    await page.getByRole('tab', { name: '我的理解（1）' }).waitFor()
+    await page.getByRole('button', { name: '我的理解（1）' }).waitFor()
     await page.getByRole('button', { name: '恢复', exact: true }).click()
-    await page.getByRole('tab', { name: '我的理解（2）' }).waitFor()
+    await page.getByRole('button', { name: '我的理解（2）' }).waitFor()
   }, 120_000)
 
   it('fits a phone', async () => {
@@ -527,7 +529,10 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
       'document.documentElement.scrollWidth - document.documentElement.clientWidth',
     )
     expect(overflow).toBeLessThanOrEqual(0)
-    await page.getByRole('button', { name: '原文与理解' }).click()
-    await page.getByRole('tab', { name: '原文', exact: true }).waitFor()
+    await page.getByRole('button', { name: '原文', exact: true }).click()
+    await page.getByText('点回答里的角标').waitFor()
+    await page.getByRole('button', { name: '空间', exact: true }).click()
+    await page.getByRole('button', { name: '我的理解（0）' }).click()
+    await page.getByRole('heading', { name: '我的理解' }).waitFor()
   }, 60_000)
 })

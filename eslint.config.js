@@ -4,7 +4,16 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/*.tsbuildinfo'],
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/*.tsbuildinfo',
+      // The desktop program's Rust build output and the bundle it carries.
+      'apps/desktop/src-tauri/target/**',
+      'apps/desktop/src-tauri/resources/**',
+      'apps/desktop/src-tauri/gen/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

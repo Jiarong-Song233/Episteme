@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Two ruled lines of notes and a tick: only what the person confirmed counts. -->
+  <rect width="512" height="512" rx="112" fill="#2d6a50"/>
+  <g stroke="#cfe5d8" stroke-width="30" stroke-linecap="round">
+    <line x1="132" y1="168" x2="380" y2="168"/>
+    <line x1="132" y1="252" x2="300" y2="252"/>
+  </g>
+  <path d="M138 350 L196 402 L318 292" fill="none" stroke="#ffffff" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

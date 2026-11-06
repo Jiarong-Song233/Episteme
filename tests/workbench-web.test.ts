@@ -79,11 +79,20 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
   }
 
   const upload = async (name: string, content: string): Promise<void> => {
+    await page.getByRole('button', { name: /^材料（/ }).click()
     await page.locator('.upload input').setInputFiles({
       name,
       mimeType: 'text/plain',
       buffer: Buffer.from(content),
     })
+  }
+
+  /** Adds a material on the materials page and goes back to learning, the way a person would. */
+  const addMaterial = async (name: string, content: string): Promise<void> => {
+    await upload(name, content)
+    await page.locator('.material-list').getByRole('button', { name, exact: true }).waitFor()
+    await page.getByRole('button', { name: /^材料（[1-9]/ }).waitFor()
+    await page.getByRole('button', { name: '学习', exact: true }).click()
   }
 
   const ask = async (question: string): Promise<void> => {
@@ -123,8 +132,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await open()
     await page.getByText('现在用的是模拟模型').waitFor()
     await newSpace('机器学习')
-    await upload('编码笔记.md', NOTES)
-    await page.getByRole('button', { name: '编码笔记.md', exact: true }).waitFor()
+    await addMaterial('编码笔记.md', NOTES)
 
     await ask('位置编码有什么用')
     const cite = page.getByRole('button', { name: /查看引用 1：编码笔记\.md/ })
@@ -149,7 +157,12 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await open()
 
     await page.getByRole('heading', { name: '机器学习' }).waitFor()
-    await page.getByRole('button', { name: '编码笔记.md', exact: true }).waitFor()
+    await page.getByRole('button', { name: '材料（1）' }).click()
+    await page
+      .locator('.material-list')
+      .getByRole('button', { name: '编码笔记.md', exact: true })
+      .waitFor()
+    await page.getByRole('button', { name: '概览', exact: true }).click()
     await page.getByRole('button', { name: '位置编码有什么用', exact: true }).waitFor()
     // Coming back opens on the overview, one step from the conversation.
     await page.getByRole('button', { name: '回到“位置编码有什么用”' }).click()
@@ -171,8 +184,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await open(model)
     await expect.poll(() => page.getByText('现在用的是模拟模型').count()).toBe(0)
     await newSpace('机器学习')
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
 
     await ask('位置编码有什么用')
     await page.locator('.inferred', { hasText: '我猜这也影响训练速度' }).waitFor()
@@ -197,8 +209,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await upload('a.docx', 'x')
     await page.getByRole('alert').getByText('.txt').waitFor()
 
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
     await ask('位置编码有什么用')
     await page.getByText('模型超时没有回应').waitFor()
     await page.locator('.question').waitFor()
@@ -212,16 +223,18 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
   it('deletes material, and keeps what an old answer quoted from it', async () => {
     await open()
     await newSpace('机器学习')
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
     await ask('位置编码有什么用')
     const cite = page.getByRole('button', { name: /查看引用 1/ })
     await cite.waitFor()
 
+    await page.getByRole('button', { name: '材料（1）' }).click()
     const remove = page.getByRole('button', { name: '删除 a.md' })
     await remove.click()
     await remove.click()
     await expect.poll(() => page.getByRole('button', { name: 'a.md', exact: true }).count()).toBe(0)
+    await page.getByRole('button', { name: '材料（0）' }).waitFor()
+    await page.getByRole('button', { name: '学习', exact: true }).click()
 
     await cite.click()
     await page.getByText('这份材料已被删除').waitFor()
@@ -250,8 +263,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
   it('learns one material both ways: edits, answers, pauses, restarts and sees the record', async () => {
     await open()
     await newSpace('机器学习')
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
 
     // A speedrun, and the person changes the plan before starting.
     await newPlan('位置编码', 30, '速通')
@@ -333,8 +345,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
       },
     })
     await newSpace('机器学习')
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
     await newPlan('位置编码', 15, '速通')
     fail = true
     await page.getByRole('button', { name: '开始学习' }).click()
@@ -367,8 +378,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     const unknown = '注意力让词元彼此关联'
     await open()
     await newSpace('机器学习')
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
     await ask(said)
     await page.locator('.learner-turn', { hasText: said }).waitFor()
 
@@ -410,8 +420,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     const better = '位置编码告诉模型词的顺序，不可缺少'
     await open()
     await newSpace('机器学习')
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
 
     await holdOwnWords(said)
     await page.locator('.node-detail').getByText('你的原话').waitFor()
@@ -486,8 +495,7 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     }
     await open(model)
     await newSpace('机器学习')
-    await upload('a.md', NOTES)
-    await page.getByRole('button', { name: 'a.md', exact: true }).waitFor()
+    await addMaterial('a.md', NOTES)
 
     await holdOwnWords('位置编码是必需的')
     await page.getByRole('button', { name: '让模型质疑' }).click()

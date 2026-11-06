@@ -29,6 +29,7 @@ import {
 } from './api.js'
 import { Commons, SignIn } from './Commons.js'
 import { PlanShelf, PlanView } from './Learning.js'
+import { MaterialsPage } from './Materials.js'
 import { Outcomes } from './Outcomes.js'
 import {
   hrefOf,
@@ -534,6 +535,7 @@ function Desk({
   const showSection = (to: Section): void => {
     if (spaceId === undefined) return
     if (to === 'overview') moveTo({ kind: 'space', space: spaceId })
+    if (to === 'materials') moveTo({ kind: 'materials', space: spaceId })
     if (to === 'review') moveTo({ kind: 'review', space: spaceId })
     if (to === 'understanding') moveTo({ kind: 'understanding', space: spaceId })
     if (to === 'learning') moveTo(resume?.to ?? { kind: 'new', space: spaceId })
@@ -563,12 +565,12 @@ function Desk({
           nav={
             <SpaceNav
               section={section}
+              materials={materials.length}
               pending={understanding.pending.length}
               held={heldCount}
               onShow={showSection}
             />
           }
-          materials={materials}
           sessions={sessions.filter((session) => !plans.some((plan) => plan.thread === session.id))}
           thread={planId === undefined ? threadId : undefined}
           plans={
@@ -609,11 +611,6 @@ function Desk({
           onSelectSpace={(id) => {
             enterSpace(id)
             setPane('talk')
-          }}
-          onMaterialsChanged={refreshMaterials}
-          onOpenMaterial={(material) => {
-            showPanel({ ...panel, material: material.id })
-            setPane('side')
           }}
           onSelectThread={(id) => {
             if (spaceId !== undefined) moveTo({ kind: 'thread', space: spaceId, thread: id })
@@ -658,11 +655,25 @@ function Desk({
                 setPane('talk')
               }}
             />
-          ) : lostSpace ? null : place.kind === 'review' || place.kind === 'understanding' ? (
-            !planLoaded ? (
+          ) : lostSpace ? null : place.kind === 'materials' ||
+            place.kind === 'review' ||
+            place.kind === 'understanding' ? (
+            !planLoaded || space === undefined ? (
               <p className="working" role="status">
                 正在打开…
               </p>
+            ) : place.kind === 'materials' ? (
+              <MaterialsPage
+                space={space}
+                materials={materials}
+                open={panel.material}
+                guard={guard}
+                onChanged={refreshMaterials}
+                onOpen={(material) => {
+                  showPanel({ ...panel, material: material.id })
+                  setPane('side')
+                }}
+              />
             ) : place.kind === 'review' ? (
               <div className="page review">
                 <h2 className="space-title">待确认</h2>
@@ -726,6 +737,9 @@ function Desk({
               onAsk={ask}
               onCite={cite}
               onCandidates={(reply) => makeCandidates(threadId, reply)}
+              onMaterials={() => {
+                if (spaceId !== undefined) moveTo({ kind: 'materials', space: spaceId })
+              }}
               extract={
                 <ExtractFromThread
                   space={spaceId}
@@ -844,6 +858,7 @@ function Identity(props: {
 /** The pages of the open space. The counts say what waits and what is held, before anyone opens them. */
 function SpaceNav(props: {
   section: Section | undefined
+  materials: number
   pending: number
   held: number
   onShow: (section: Section) => void
@@ -851,6 +866,7 @@ function SpaceNav(props: {
   const entries: readonly (readonly [Section, string])[] = [
     ['overview', '概览'],
     ['learning', '学习'],
+    ['materials', `材料（${props.materials}）`],
     ['review', `待确认（${props.pending}）`],
     ['understanding', `我的理解（${props.held}）`],
   ]
@@ -916,7 +932,6 @@ function Shelf(props: {
   spaces: readonly Space[]
   current: string | undefined
   nav: ReactNode
-  materials: readonly MaterialSummary[]
   sessions: readonly Session[]
   thread: string | undefined
   plans: ReactNode
@@ -924,19 +939,12 @@ function Shelf(props: {
   identity: ReactNode
   onSpaces: (spaces: readonly Space[], selected?: string) => void
   onSelectSpace: (id: string) => void
-  onMaterialsChanged: () => Promise<void>
-  onOpenMaterial: (material: MaterialSummary) => void
   onSelectThread: (id: string) => void
   onNewThread: () => void
 }) {
-  const { spaces, current, materials, sessions, guard } = props
+  const { spaces, current, sessions, guard } = props
   const [name, setName] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [uploadNote, setUploadNote] = useState<string>()
-  const [armedDelete, setArmedDelete] = useState<string>()
   const [renaming, setRenaming] = useState<string>()
-  const replaceTarget = useRef<string | undefined>(undefined)
-  const replaceInput = useRef<HTMLInputElement>(null)
   const open = spaces.filter((space) => !space.archived)
   const archived = spaces.filter((space) => space.archived)
   const currentSpace = spaces.find((space) => space.id === current)
@@ -954,24 +962,6 @@ function Shelf(props: {
       setName('')
       await reload(space.id)
       props.onSelectSpace(space.id)
-    })
-  }
-
-  const upload = (files: FileList | null): void => {
-    if (files === null || files.length === 0 || current === undefined) return
-    const chosen = [...files]
-    setUploading(true)
-    setUploadNote(undefined)
-    guard(async () => {
-      try {
-        for (const file of chosen) {
-          const { duplicate } = await api.upload(current, file)
-          if (duplicate) setUploadNote(`“${file.name}”的内容已经在这个空间里了。`)
-        }
-      } finally {
-        setUploading(false)
-        await props.onMaterialsChanged()
-      }
     })
   }
 
@@ -1078,85 +1068,6 @@ function Shelf(props: {
             <h2>这个空间</h2>
             {props.nav}
           </section>
-          <section>
-            <h2>材料</h2>
-            <ul className="list">
-              {materials.map((material) => (
-                <li key={material.id} className="material">
-                  <button
-                    type="button"
-                    className="row"
-                    onClick={() => props.onOpenMaterial(material)}
-                  >
-                    {material.title}
-                  </button>
-                  <span className="quiet-actions">
-                    <button
-                      type="button"
-                      className="link"
-                      aria-label={`更新 ${material.title}`}
-                      onClick={() => {
-                        replaceTarget.current = material.id
-                        replaceInput.current?.click()
-                      }}
-                    >
-                      更新
-                    </button>
-                    <button
-                      type="button"
-                      className="link link-danger"
-                      aria-label={`删除 ${material.title}`}
-                      onClick={() => {
-                        if (armedDelete !== material.id) {
-                          setArmedDelete(material.id)
-                          return
-                        }
-                        setArmedDelete(undefined)
-                        guard(async () => {
-                          await api.deleteMaterial(material.id)
-                          await props.onMaterialsChanged()
-                        })
-                      }}
-                    >
-                      {armedDelete === material.id ? '再点一次确认删除' : '删除'}
-                    </button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <label className="upload" aria-disabled={uploading}>
-              {uploading ? '正在读取…' : '上传材料'}
-              <input
-                type="file"
-                multiple
-                accept=".txt,.md,.markdown,.pdf"
-                disabled={uploading || currentSpace.archived}
-                onChange={(event) => {
-                  upload(event.target.files)
-                  event.target.value = ''
-                }}
-              />
-            </label>
-            <p className="hint">支持 TXT、Markdown 和有文字层的 PDF，单个不超过 20 MB。</p>
-            {uploadNote !== undefined && <p className="hint">{uploadNote}</p>}
-            <input
-              ref={replaceInput}
-              className="hidden-input"
-              type="file"
-              aria-label="选择新版本文件"
-              accept=".txt,.md,.markdown,.pdf"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                const id = replaceTarget.current
-                event.target.value = ''
-                if (file === undefined || id === undefined) return
-                guard(async () => {
-                  await api.replace(id, file)
-                  await props.onMaterialsChanged()
-                })
-              }}
-            />
-          </section>
           {props.plans}
           <section>
             <h2>对话</h2>
@@ -1194,6 +1105,7 @@ function Conversation(props: {
   onAsk: (question: string, retry: boolean) => void
   onCite: (citation: Citation, evidence?: Evidence) => void
   onCandidates: (reply: string) => Promise<string | undefined>
+  onMaterials: () => void
   extract: ReactNode
 }) {
   const { space, turns, asking, failed } = props
@@ -1226,9 +1138,16 @@ function Conversation(props: {
         <h2 className="space-title">{space.name}</h2>
         {turns.length === 0 && (
           <p className="hint page-hint">
-            {props.hasMaterial
-              ? '就材料提一个问题。回答里的每句话都会标明它从哪来。'
-              : '先上传一份材料，再就它提问。'}
+            {props.hasMaterial ? (
+              '就材料提一个问题。回答里的每句话都会标明它从哪来。'
+            ) : (
+              <>
+                先上传一份材料，再就它提问。{' '}
+                <button type="button" className="link" onClick={props.onMaterials}>
+                  去上传材料
+                </button>
+              </>
+            )}
           </p>
         )}
         {turns.length > 0 && props.extract}

@@ -253,6 +253,9 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
   }
 
   const newPlan = async (topic: string, minutes: number, mode: string): Promise<void> => {
+    // With plans already in the space, the form waits behind a link.
+    const adding = page.getByRole('button', { name: '新建学习计划' })
+    if ((await adding.count()) > 0) await adding.click()
     await page.getByLabel('想学什么').fill(topic)
     await page.getByLabel('可用时间').fill(String(minutes))
     await page.getByRole('radio', { name: mode }).check()

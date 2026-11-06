@@ -21,7 +21,7 @@ function sizeWords(material: MaterialSummary): string {
     characters,
     `${material.chunks} 段`,
     ...(material.version > 1 ? [`第 ${material.version} 版`] : []),
-    `${new Date(material.addedAt).toLocaleDateString('zh-CN')}加入`,
+    `${new Date(material.addedAt).toLocaleDateString('zh-CN', { dateStyle: 'long' })}加入`,
   ].join('，')
 }
 

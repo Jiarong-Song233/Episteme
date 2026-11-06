@@ -113,6 +113,9 @@ describe('model settings', () => {
       person,
     )
     expect(wrong.body).toMatchObject({ failure: { code: 'unauthorized' } })
+    // The page has no environment variables to check: the message says what to fix in the form.
+    expect(JSON.stringify(wrong.body)).toContain('密钥')
+    expect(JSON.stringify(wrong.body)).not.toContain('EPISTEME_MODEL')
     await expect(stat(file)).rejects.toThrow()
     expect(settings.simulated).toBe(true)
 

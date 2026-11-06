@@ -40,6 +40,18 @@ const TIMEOUT_MS = 60_000
 /** A check of the connection: one short question, one short answer. */
 const PROBE = [{ role: 'user' as const, content: '只回答一个字：好' }]
 
+/** The model's own messages point at environment variables; on the page, say what to fix in the form. */
+function onPage(error: unknown): unknown {
+  if (!(error instanceof ModelFailure)) return error
+  if (error.code === 'unauthorized') {
+    return new ModelFailure('unauthorized', '服务拒绝了这个密钥。请检查密钥是否填对、是否还有效。')
+  }
+  if (error.code === 'unavailable') {
+    return new ModelFailure('unavailable', `${error.message}请检查服务地址和模型名。`)
+  }
+  return error
+}
+
 function clientFor(saved: SavedModel): ModelClient {
   return budgeted(
     remoteModel({
@@ -166,7 +178,11 @@ export class ModelSettings implements ModelClient {
         : { reasoningEffort: next.reasoningEffort }),
     }
     const client = clientFor(saved)
-    await client.complete(PROBE)
+    try {
+      await client.complete(PROBE)
+    } catch (error) {
+      throw onPage(error)
+    }
     await this.#write(saved)
     this.#saved = saved
     this.#client = client

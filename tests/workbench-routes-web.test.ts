@@ -176,7 +176,7 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
       await main().getByLabel('密钥').fill('sk-wrong')
       await main().getByRole('button', { name: '测试并保存' }).click()
       await main()
-        .getByText(/没有保存：模型服务拒绝了凭据/)
+        .getByText(/没有保存：服务拒绝了这个密钥/)
         .waitFor()
       expect(settings.simulated).toBe(true)
 

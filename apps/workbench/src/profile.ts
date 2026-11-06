@@ -4,6 +4,7 @@ import { BLANK_TOPIC, type SceneProfile } from '@episteme/service'
 import { BUILT_IN_LIBRARY, type Library } from './blocks.js'
 import { hostLearningTools } from './host-learning.js'
 import type { ModelClient } from './model.js'
+import type { ModelSettings } from './model-settings.js'
 import { WORKBENCH_PROPOSING_ROUTES } from './route-access.js'
 import { workbenchRoutes } from './routes.js'
 import { STANCE } from './understanding.js'
@@ -55,6 +56,7 @@ export function workbenchProfile(options: {
   readonly model: ModelClient
   readonly now?: () => number
   readonly library?: Library
+  readonly modelSettings?: ModelSettings
 }): SceneProfile {
   return {
     name: WORKBENCH_SCENE,

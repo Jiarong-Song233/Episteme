@@ -130,8 +130,10 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
 
   it('takes a new person from nothing to saved understanding, and back after a restart', async () => {
     await open()
-    await page.getByText('现在用的是模拟模型').waitFor()
+    // The first visit says what is missing; once a space exists the banner keeps saying it.
+    await page.getByText('没有它，只能摘录材料原句').waitFor()
     await newSpace('机器学习')
+    await page.getByText('现在用的是模拟模型').waitFor()
     await addMaterial('编码笔记.md', NOTES)
 
     await ask('位置编码有什么用')
@@ -182,8 +184,9 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
         }),
     }
     await open(model)
-    await expect.poll(() => page.getByText('现在用的是模拟模型').count()).toBe(0)
+    await page.getByText('已设置：').waitFor()
     await newSpace('机器学习')
+    await expect.poll(() => page.getByText('现在用的是模拟模型').count()).toBe(0)
     await addMaterial('a.md', NOTES)
 
     await ask('位置编码有什么用')

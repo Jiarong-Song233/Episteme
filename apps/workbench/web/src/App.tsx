@@ -19,6 +19,7 @@ import {
   type MaterialSummary,
   type MaterialText,
   type Me,
+  type ModelInfo,
   type PendingCandidate,
   type Plan,
   type Session,
@@ -29,6 +30,8 @@ import {
 } from './api.js'
 import { Commons, SignIn } from './Commons.js'
 import { ConnectPage } from './Connect.js'
+import { ModelPage } from './Model.js'
+import { Welcome } from './Welcome.js'
 import { PlanShelf, PlanView } from './Learning.js'
 import { MaterialsPage } from './Materials.js'
 import { Outcomes } from './Outcomes.js'
@@ -208,7 +211,7 @@ function Desk({
   const selectedNode = place.kind === 'understanding' ? place.node : undefined
   const focusedTurn = panel.turn
 
-  const [model, setModel] = useState<{ name: string; simulated: boolean }>()
+  const [model, setModel] = useState<ModelInfo>()
   const [spaces, setSpaces] = useState<readonly Space[]>([])
   const [listed, setListed] = useState(false)
   /** The space whose materials, conversations and plans are in hand. */
@@ -240,6 +243,8 @@ function Desk({
   const planLoaded = loadedFor === spaceId
   /** An address can name a space that is gone, or one this person cannot see. */
   const lostSpace = listed && 'space' in place && !spaceKnown
+  /** Nothing here yet: the first visit, on the home address. */
+  const welcoming = listed && spaces.length === 0 && place.kind === 'home'
 
   const source = useMemo<SourceRequest | undefined>(() => {
     const { material } = panel
@@ -305,7 +310,11 @@ function Desk({
 
   // An address without a space falls back on the last one still open, or the first.
   const addressedSpace = 'space' in place ? place.space : undefined
-  const needsSpace = place.kind === 'home' || place.kind === 'commons' || place.kind === 'connect'
+  const needsSpace =
+    place.kind === 'home' ||
+    place.kind === 'commons' ||
+    place.kind === 'connect' ||
+    place.kind === 'model'
   useEffect(() => {
     if (addressedSpace !== undefined) {
       setHeldSpace(addressedSpace)
@@ -621,17 +630,33 @@ function Desk({
             />
           }
           connect={
-            <button
-              type="button"
-              className="row"
-              aria-current={place.kind === 'connect' ? 'page' : undefined}
-              onClick={() => {
-                moveTo({ kind: 'connect' })
-                setPane('talk')
-              }}
-            >
-              接入 Agent
-            </button>
+            <>
+              <button
+                type="button"
+                className="row"
+                aria-current={place.kind === 'model' ? 'page' : undefined}
+                onClick={() => {
+                  moveTo({ kind: 'model' })
+                  setPane('talk')
+                }}
+              >
+                模型
+                <span className="row-note">
+                  {model?.simulated === false ? model.name : '未设置'}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="row"
+                aria-current={place.kind === 'connect' ? 'page' : undefined}
+                onClick={() => {
+                  moveTo({ kind: 'connect' })
+                  setPane('talk')
+                }}
+              >
+                接入 Agent
+              </button>
+            </>
           }
           onSpaces={(next, selected) => {
             setSpaces(next)
@@ -654,9 +679,20 @@ function Desk({
               找不到这个地址里的空间，它可能已被删除，或者你没有权限查看。可以从左边选一个空间。
             </p>
           )}
-          {model?.simulated === true && (
+          {model?.simulated === true && place.kind !== 'model' && !welcoming && (
             <p className="banner">
               现在用的是模拟模型：它只摘录材料原句，不会真正回答。可以{' '}
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  moveTo({ kind: 'model' })
+                  setPane('talk')
+                }}
+              >
+                设置一个模型
+              </button>
+              ，或{' '}
               <button
                 type="button"
                 className="link"
@@ -667,7 +703,7 @@ function Desk({
               >
                 接入 Agent
               </button>{' '}
-              让它来讲解，或用 EPISTEME_MODEL_BASE_URL 配置一个模型。
+              让它来讲解。
             </p>
           )}
           {notice !== undefined && (
@@ -677,6 +713,25 @@ function Desk({
           )}
           {place.kind === 'connect' ? (
             <ConnectPage me={me} />
+          ) : place.kind === 'model' ? (
+            <ModelPage me={me} model={model} onChanged={setModel} />
+          ) : welcoming ? (
+            <Welcome
+              model={model}
+              guard={guard}
+              onModel={() => {
+                moveTo({ kind: 'model' })
+                setPane('talk')
+              }}
+              onConnect={() => {
+                moveTo({ kind: 'connect' })
+                setPane('talk')
+              }}
+              onCreated={(created) => {
+                setSpaces((held) => [...held, created])
+                enterSpace(created.id)
+              }}
+            />
           ) : commons ? (
             <Commons
               me={me.actorId}

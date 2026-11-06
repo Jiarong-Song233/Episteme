@@ -16,6 +16,9 @@
 - **“接入 Agent”页面**：左栏底部的“接入 Agent”列出这台电脑上的 MCP 地址，以及 Claude Code、Codex 和其他 MCP 客户端的接入命令，点“复制”即可。Agent 接入后只能读取和提出候选，确认仍然只能由你在“待确认”里完成。使用模拟模型时，顶部提示也会指向这个页面。
 - **桌面程序**（`apps/desktop`，Tauri）：安装包自带 Node 运行环境和学习工作台，打开即在本机 `127.0.0.1:4322` 启动服务。关掉窗口时留在托盘，Agent 仍然连得上；托盘菜单可以设置开机启动，选“退出 Episteme”才停下服务。程序意外退出时服务也会跟着停下，不会一直占着图谱。只能运行一个实例；端口被别的程序占用时会说明原因。
 - **一行命令安装**：`scripts/install.ps1`（Windows）和 `scripts/install.sh`（macOS、Linux）从最新发布版本下载安装包，校验 `SHA256SUMS` 后只为当前用户安装；设置 `EPISTEME_CONNECT=claude,codex` 时顺便接入 Claude Code 和 Codex。[docs/install.md](docs/install.md) 里有可以直接发给 Agent 的安装说明。
+- **在工作台里设置模型**：左栏底部的“模型”页可以选 DeepSeek、OpenAI、OpenRouter、本机 Ollama 或任何兼容 OpenAI 接口的服务。保存前先让模型回答一个测试问题，答不上来就不保存并说明原因。密钥存在图谱旁边的 `model.json`（Linux 和 macOS 上权限 `0600`），之后不再显示，换地址时不会沿用；只有本人能修改，Agent 不能。环境变量 `EPISTEME_MODEL_*` 仍然优先。
+- **第一次打开有欢迎页**：还没有空间时，首页按顺序列出三步：选模型、建第一个空间（在这里直接建好并进入）、接入 Agent（可选）。
+- **发布流程**（`.github/workflows/release.yml`）：改动桌面程序的 PR 会在 Windows、macOS（Apple 芯片）和 Linux 上各构建一次安装包；推送 `v*` 标签时汇总安装包和 `SHA256SUMS`，建成草稿版本，要有人检查后手动发布。
 
 ### 不兼容的变化
 

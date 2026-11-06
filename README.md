@@ -97,6 +97,8 @@ curl -fsSL https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scrip
 Or tell your agent: _"按照 https://github.com/Jiarong-Song233/Episteme/blob/main/docs/install.md 帮我安装 Episteme"_.
 Both scripts check the package against the release's `SHA256SUMS` and install for the current user only. See
 [docs/install.md](docs/install.md). To build it yourself: `pnpm --filter @episteme/desktop build` (needs Rust).
+On first open the workbench walks you through choosing a model (on its **模型** page, which tries the model before
+saving it and keeps the key beside the graph), creating a space, and connecting an agent.
 
 ## Quick start
 

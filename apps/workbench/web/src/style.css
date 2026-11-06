@@ -1,32 +1,61 @@
 /*
- * A student's exercise book. Eye-care green paper, blue-black ink, and a red pen that is only ever used for one
- * thing: marking what the material does not support. In the dark it is a blackboard and chalk.
+ * A quiet tool. The sidebar sits on the canvas; the page is one raised panel beside it. Green is used for one thing,
+ * where you are and what to do next. Red is kept for what the material does not support, and the marker for the
+ * words someone came back to find.
  */
 :root {
-  --paper: #e4eedf;
-  --paper-raised: #f0f6ec;
-  --ink: #1b2a5c;
-  --ink-soft: #4b5a7f;
-  --rule: #b4c8b0;
-  --red: #b3261a;
-  --marker: #f6e27a;
-  /* Not "Source Han Serif SC": some machines have only its Heavy face, and the whole page turns bold. */
-  --serif: "Noto Serif SC", "Noto Serif CJK SC", "Songti SC", STSong, SimSun, serif;
-  --sans: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --canvas: #f3f4f2;
+  --paper: #ffffff;
+  --paper-raised: #f7f8f6;
+  --ink: #1a1f1c;
+  --ink-soft: #646d67;
+  --rule: #e2e5e1;
+  --accent: #2d6a50;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4efe8;
+  --red: #b8392a;
+  --marker: #fbeeb0;
+  --radius: 12px;
+  --radius-control: 8px;
+  --sans:
+    "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "PingFang SC",
+    "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  /* Reading text shares the face; it is set larger and looser instead of in a second family. */
+  --serif: var(--sans);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #1c322a;
-    --paper-raised: #243c33;
-    --ink: #eef2e6;
-    --ink-soft: #b4c4b6;
-    --rule: #41594e;
-    --red: #ff9a8a;
-    --marker: #6b6420;
+    --canvas: #111413;
+    --paper: #181c1a;
+    --paper-raised: #1f2421;
+    --ink: #e4e8e5;
+    --ink-soft: #949d97;
+    --rule: #2a302d;
+    --accent: #78c29c;
+    --accent-ink: #0f1a14;
+    --accent-soft: #1e3128;
+    --red: #ff8b78;
+    --marker: #5a5021;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #111413;
+  --paper: #181c1a;
+  --paper-raised: #1f2421;
+  --ink: #e4e8e5;
+  --ink-soft: #949d97;
+  --rule: #2a302d;
+  --accent: #78c29c;
+  --accent-ink: #0f1a14;
+  --accent-soft: #1e3128;
+  --red: #ff8b78;
+  --marker: #5a5021;
+  color-scheme: dark;
 }
 
 * {
@@ -41,11 +70,12 @@ body,
 }
 
 body {
-  background: var(--paper);
+  background: var(--canvas);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
@@ -65,13 +95,14 @@ ul {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
   color: inherit;
 }
 
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -84,62 +115,81 @@ textarea {
   white-space: nowrap;
 }
 
+/* The frame: sidebar on the canvas, the page as one panel, and the source beside it when it is open. */
 .desk {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 8px;
   height: 100%;
+  padding: 8px 8px 8px 0;
 }
 
-/* The side column opens only for source text, and the page gives up room for it. */
 .desk[data-side="open"] {
-  grid-template-columns: 250px minmax(0, 1fr) minmax(300px, 34%);
+  grid-template-columns: 240px minmax(0, 1fr) minmax(300px, 34%);
 }
 
 .desk[data-side="closed"] .side {
   display: none;
 }
 
-.space-nav .row[data-waiting="true"] {
-  font-weight: 600;
-}
-
 .switcher {
   display: none;
 }
 
-/* Left: what is on the shelf. */
+/* Left: spaces, then the open space's pages, then its plans and conversations. */
 .shelf {
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
-  padding: 20px 16px 32px;
-  border-right: 1px solid var(--rule);
+  padding: 10px 12px 12px 16px;
 }
 
 .wordmark {
-  margin-bottom: 24px;
-  font-family: var(--serif);
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 20px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.wordmark img {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
 }
 
 .shelf section + section {
-  margin-top: 26px;
+  margin-top: 22px;
 }
 
 .shelf h2 {
-  margin-bottom: 6px;
+  margin: 0 0 4px 8px;
   color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.shelf .link {
+  margin: 4px 0 0 8px;
+}
+
+.shelf-foot {
+  margin-top: auto;
+  padding-top: 16px;
 }
 
 .row {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  padding: 4px 8px;
-  margin-left: -8px;
+  min-height: 32px;
+  padding: 5px 8px;
   overflow: hidden;
   border: 0;
+  border-radius: var(--radius-control);
   background: none;
   cursor: pointer;
   text-align: left;
@@ -148,14 +198,32 @@ textarea {
 }
 
 .row:hover {
-  background: var(--paper-raised);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 .row[aria-current="true"],
 .row[aria-current="page"] {
-  background: var(--paper-raised);
-  box-shadow: inset 3px 0 0 var(--ink);
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--rule);
   font-weight: 600;
+}
+
+.count {
+  margin-left: auto;
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+}
+
+.space-nav .row[data-waiting="true"] .count {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .hint {
@@ -169,25 +237,64 @@ textarea {
   margin-top: 8px;
 }
 
-input:not([type="file"]),
+.shelf .inline-form {
+  margin-left: 0;
+}
+
+input:not([type="file"], [type="radio"], [type="checkbox"]),
 textarea {
   width: 100%;
   min-width: 0;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border: 1px solid var(--rule);
-  border-radius: 2px;
-  background: var(--paper-raised);
+  border-radius: var(--radius-control);
+  background: var(--paper);
+  transition: border-color 0.15s;
 }
 
+input:not([type="file"], [type="radio"], [type="checkbox"]):focus,
+textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* Buttons: filled for the one thing to do, outlined for the rest, and plain links for the quiet ways. */
 button:not(.row, .link, .cite, .node-row, .material-title, [role="tab"]),
 .upload {
   flex: none;
-  padding: 5px 12px;
-  border: 1px solid var(--ink);
-  border-radius: 2px;
-  background: var(--ink);
-  color: var(--paper-raised);
+  min-height: 32px;
+  padding: 5px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--accent-ink);
   cursor: pointer;
+  font-weight: 500;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+button:not(.row, .link, .cite, .node-row, .material-title, [role="tab"]):hover:not(:disabled),
+.upload:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+}
+
+button.secondary,
+.switcher button {
+  border-color: var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--paper-raised);
 }
 
 button:disabled {
@@ -202,28 +309,37 @@ button:disabled {
   color: var(--ink-soft);
   cursor: pointer;
   font-size: 13px;
+}
+
+.link:hover:not(:disabled) {
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.link:hover:not(:disabled) {
-  color: var(--ink);
-}
-
-.link-danger:hover {
+.link-danger:hover:not(:disabled) {
   color: var(--red);
 }
 
 .quiet-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 4px;
+  gap: 14px;
+  margin: 6px 0 0 8px;
+}
+
+.material .quiet-actions,
+.material-list .quiet-actions {
+  margin-left: 0;
 }
 
 .archived {
-  margin-top: 10px;
+  margin: 10px 0 0 8px;
   color: var(--ink-soft);
   font-size: 13px;
+}
+
+.archived summary {
+  cursor: pointer;
 }
 
 .row-with-action {
@@ -237,19 +353,16 @@ button:disabled {
   margin-bottom: 8px;
 }
 
-.material .quiet-actions {
-  margin-top: 0;
-}
-
 .upload {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   margin: 6px 0;
   overflow: hidden;
 }
 
 .upload:focus-within {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -264,21 +377,27 @@ button:disabled {
   display: none;
 }
 
-/* Centre: the exercise-book page, with its red margin rule. */
+/* Centre: the page, one raised panel. */
 .talk {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--paper-raised);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
 }
 
 .banner {
-  padding: 6px 20px;
+  padding: 8px 24px;
   border-bottom: 1px solid var(--rule);
+  background: var(--paper-raised);
+  color: var(--ink-soft);
   font-size: 13px;
 }
 
 .banner-error {
+  background: color-mix(in srgb, var(--red) 8%, var(--paper));
   color: var(--red);
 }
 
@@ -294,26 +413,30 @@ button:disabled {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 32px 32px 64px;
-  background: linear-gradient(var(--red), var(--red)) 44px 0 / 1px 100% no-repeat;
+  padding: 32px 40px 40px;
+}
+
+.page > * {
+  max-width: 760px;
 }
 
 .space-title {
-  margin-bottom: 20px;
-  font-family: var(--serif);
-  font-size: 24px;
-  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
 }
 
 .page-hint {
   max-width: 62ch;
-  margin-bottom: 20px;
-  font-size: 15px;
+  margin-bottom: 24px;
+  font-size: 14px;
 }
 
 .question {
   max-width: 62ch;
-  margin: 24px 0 10px;
+  margin: 28px 0 10px;
   font-weight: 600;
   white-space: pre-wrap;
 }
@@ -325,12 +448,11 @@ button:disabled {
 
 .answer,
 .no-evidence {
-  font-family: var(--serif);
-  font-size: 17px;
-  line-height: 2;
+  font-size: 16px;
+  line-height: 1.85;
 }
 
-/* The one loud thing on the page: what the material does not support gets the teacher's red wavy line. */
+/* The one loud mark on the page: what the material does not support. */
 .inferred {
   text-decoration: underline wavy var(--red) 1px;
   text-underline-offset: 5px;
@@ -343,23 +465,24 @@ button:disabled {
 
 .cite {
   position: relative;
-  top: -0.5em;
-  min-width: 1.5em;
+  top: -0.45em;
+  min-width: 1.6em;
   margin: 0 1px;
-  padding: 0 3px;
+  padding: 1px 4px;
   border: 0;
-  background: none;
-  color: var(--ink);
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
   cursor: pointer;
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1;
-  text-decoration: underline;
+  line-height: 1.2;
 }
 
 .cite:hover {
   background: var(--marker);
+  color: var(--ink);
 }
 
 .legend {
@@ -376,8 +499,12 @@ button:disabled {
 }
 
 .working {
-  margin-top: 12px;
+  margin: 12px 0;
   color: var(--ink-soft);
+}
+
+.talk > .working {
+  padding: 32px 40px;
 }
 
 .failed {
@@ -393,7 +520,7 @@ button:disabled {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 12px 32px 12px 64px;
+  padding: 12px 40px 16px;
   border-top: 1px solid var(--rule);
 }
 
@@ -401,12 +528,15 @@ button:disabled {
   resize: vertical;
 }
 
-/* Right: the source, and what waits for the person's own decision. */
+/* Right: the source, as a panel of its own. */
 .side {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--rule);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
 }
 
 .tabs {
@@ -420,7 +550,7 @@ button:disabled {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 12px 20px 9px;
+  padding: 14px 20px 12px;
   border-bottom: 1px solid var(--rule);
   font-weight: 600;
 }
@@ -434,22 +564,32 @@ button:disabled {
   max-width: 640px;
 }
 
-/* Each material as a line in the exercise book: its title, then what it holds, then the quiet ways to change it. */
-.material-list {
+/* Grouped lists: one bordered panel, rows divided inside it. */
+.material-list,
+.pending {
   max-width: 62ch;
   margin: 0 0 16px;
   padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
   list-style: none;
 }
 
-.material-list li {
-  padding: 10px 0 10px 12px;
-  border-bottom: 1px solid var(--rule);
+.material-list li,
+.pending > li {
+  padding: 14px 16px;
   border-left: 3px solid transparent;
 }
 
+.material-list li + li,
+.pending > li + li {
+  border-top: 1px solid var(--rule);
+}
+
 .material-list li[data-open="true"] {
-  border-left-color: var(--ink);
+  border-left-color: var(--accent);
+  background: var(--paper-raised);
 }
 
 .material-title {
@@ -464,7 +604,7 @@ button:disabled {
 }
 
 .material-title:hover {
-  text-decoration: underline;
+  color: var(--accent);
 }
 
 .material-list .hint {
@@ -474,7 +614,7 @@ button:disabled {
 [role="tab"] {
   padding: 12px 0 9px;
   border: 0;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   background: none;
   color: var(--ink-soft);
   cursor: pointer;
@@ -482,7 +622,7 @@ button:disabled {
 }
 
 [role="tab"][aria-selected="true"] {
-  border-bottom-color: var(--ink);
+  border-bottom-color: var(--accent);
   color: var(--ink);
   font-weight: 600;
 }
@@ -504,14 +644,15 @@ button:disabled {
 }
 
 .source-text {
-  font-family: var(--serif);
+  font-family: var(--sans);
   font-size: 15px;
-  line-height: 1.9;
+  line-height: 1.85;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 mark {
+  border-radius: 3px;
   background: var(--marker);
   color: inherit;
 }
@@ -520,20 +661,13 @@ mark {
   margin: 8px 0 16px;
   padding-left: 12px;
   border-left: 3px solid var(--rule);
-  font-family: var(--serif);
-}
-
-.pending li + li {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
 }
 
 .candidate {
   margin-bottom: 4px;
-  font-family: var(--serif);
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.7;
 }
 
 .decisions {
@@ -541,27 +675,26 @@ mark {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
-/* A teacher's red tick, and the only other red: this one is the person's own. */
+/* A tick in the accent: what the person confirmed, and the only thing that counts. */
 .understood li {
   position: relative;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   padding-left: 26px;
-  font-family: var(--serif);
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .understood li::before {
   position: absolute;
-  top: 0.45em;
-  left: 4px;
-  width: 7px;
-  height: 14px;
-  border-right: 2px solid var(--red);
-  border-bottom: 2px solid var(--red);
+  top: 0.4em;
+  left: 5px;
+  width: 6px;
+  height: 12px;
+  border-right: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
   content: "";
   transform: rotate(40deg);
 }
@@ -571,6 +704,7 @@ mark {
   display: grid;
   gap: 8px;
   margin-top: 8px;
+  padding: 0 0 0 8px;
 }
 
 .minutes {
@@ -611,7 +745,7 @@ mark {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 12px;
-  margin: -14px 0 12px;
+  margin: 0 0 16px;
   color: var(--ink-soft);
   font-size: 13px;
 }
@@ -655,7 +789,7 @@ li[data-status="active"] {
 }
 
 li[data-status="active"]::marker {
-  color: var(--ink);
+  color: var(--accent);
 }
 
 li[data-status="skipped"] > span:first-child {
@@ -677,12 +811,14 @@ li[data-status="skipped"] > span:first-child {
   margin: 0 6px 4px 0;
 }
 
-.plan-editor select {
-  padding: 5px 4px;
+.plan-editor select,
+.states select,
+.acting select {
+  padding: 5px 8px;
   border: 1px solid var(--rule);
-  border-radius: 2px;
-  background: var(--paper-raised);
-  color: inherit;
+  border-radius: var(--radius-control);
+  background: var(--paper);
+  color: var(--ink);
   font: inherit;
 }
 
@@ -722,9 +858,8 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .exercise {
-  font-family: var(--serif);
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 15px;
+  line-height: 1.75;
   white-space: pre-wrap;
 }
 
@@ -748,8 +883,8 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .status dd:not(.hint) {
-  font-family: var(--serif);
-  font-size: 20px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .status section {
@@ -760,7 +895,7 @@ li[data-status="skipped"] > span:first-child {
   margin-bottom: 6px;
   color: var(--ink-soft);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .status li {
@@ -779,6 +914,7 @@ li[data-status="skipped"] > span:first-child {
 
 /* Marker over the words someone came back to find. */
 [data-focused="true"] {
+  border-radius: 4px;
   background: var(--marker);
   box-shadow: 0 0 0 6px var(--marker);
 }
@@ -817,7 +953,7 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .node-row:hover {
-  text-decoration: underline;
+  color: var(--accent);
 }
 
 .understood li[data-held="false"]::before {
@@ -834,15 +970,16 @@ li[data-status="skipped"] > span:first-child {
 .marks {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 4px 8px;
   font-family: var(--sans);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .marks span {
+  padding: 0 6px;
+  border-radius: 999px;
   background: var(--marker);
-  padding: 0 4px;
 }
 
 .past {
@@ -858,7 +995,9 @@ li[data-status="skipped"] > span:first-child {
 
 .map {
   margin-bottom: 16px;
-  border-bottom: 1px solid var(--rule);
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
 .map svg {
@@ -873,8 +1012,8 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .map-contradicts {
-  stroke: var(--ink);
-  stroke-width: 2;
+  stroke: var(--red);
+  stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }
 
@@ -887,8 +1026,8 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .map-node circle {
-  fill: var(--ink);
-  stroke: var(--ink);
+  fill: var(--accent);
+  stroke: var(--accent);
   stroke-width: 1.5;
 }
 
@@ -907,7 +1046,7 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .map figcaption {
-  margin-bottom: 12px;
+  margin: 8px 4px 4px;
   font-size: 12px;
 }
 
@@ -918,17 +1057,18 @@ li[data-status="skipped"] > span:first-child {
 
 .node-label {
   margin: 10px 0 6px;
-  font-family: var(--serif);
   font-size: 18px;
   font-weight: 600;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
 .challenge {
   margin: 14px 0;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-control);
   background: var(--paper-raised);
-  border-left: 3px solid var(--ink);
 }
 
 .acting {
@@ -952,11 +1092,6 @@ li[data-status="skipped"] > span:first-child {
 
 .states select,
 .acting select {
-  padding: 4px 6px;
-  border: 1px solid var(--rule);
-  background: var(--paper-raised);
-  color: var(--ink);
-  font: inherit;
   font-size: 13px;
 }
 
@@ -991,7 +1126,7 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .identity .hint {
-  margin-bottom: 8px;
+  margin: 0 0 8px 8px;
 }
 
 .sign-in {
@@ -1023,8 +1158,10 @@ li[data-status="skipped"] > span:first-child {
 
 .filters .link[aria-current="true"],
 .publication .link[aria-current="true"] {
-  background: var(--marker);
-  color: var(--ink);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .publications,
@@ -1045,8 +1182,7 @@ li[data-status="skipped"] > span:first-child {
 }
 
 .publications .row {
-  font-family: var(--serif);
-  font-size: 1.05rem;
+  font-size: 15px;
   white-space: normal;
   text-align: left;
 }
@@ -1054,7 +1190,7 @@ li[data-status="skipped"] > span:first-child {
 .updates {
   margin-bottom: 22px;
   padding-left: 12px;
-  border-left: 4px solid var(--marker);
+  border-left: 3px solid var(--marker);
 }
 
 .published-node {
@@ -1065,8 +1201,7 @@ li[data-status="skipped"] > span:first-child {
 .published-label,
 .lineage-label {
   margin: 0 0 4px;
-  font-family: var(--serif);
-  font-size: 1.1rem;
+  font-size: 16px;
   line-height: 1.7;
 }
 
@@ -1124,7 +1259,6 @@ li[data-status="skipped"] > span:first-child {
 
 .difference {
   margin: 0 0 2px;
-  font-family: var(--serif);
   line-height: 1.7;
 }
 
@@ -1151,10 +1285,123 @@ li[data-status="skipped"] > span:first-child {
   margin-top: 28px;
 }
 
+/* The overview: what waits, what is still open, what came of learning lately. */
+.outcomes {
+  display: grid;
+  gap: 28px;
+}
+
+.outcomes h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.outcomes h4 {
+  margin: 14px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.outcomes ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.next-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 14px;
+}
+
+.reading {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+  border-radius: var(--radius-control);
+}
+
+.reading + .reading {
+  margin-top: 8px;
+}
+
+.reading[data-gap="open"] {
+  border-left-color: var(--red);
+}
+
+.reading strong {
+  font-weight: 600;
+}
+
+.outcome-session[data-focused="true"] > h3 {
+  width: fit-content;
+  background: linear-gradient(transparent 62%, var(--marker) 62%);
+}
+
+.outcome-session li {
+  padding: 3px 0;
+}
+
+.outcome-session li[data-kind="attempt"][data-verdict="contradicts"] b,
+.outcome-session li[data-kind="attempt"][data-verdict="partial"] b {
+  color: var(--red);
+}
+
+.outcome-session b {
+  font-weight: 600;
+}
+
+/* Connecting an agent: each client in a panel, with what to copy. */
+.panel {
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.panel h3 {
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.panel > .hint + .copyable,
+.panel > .copyable + .hint {
+  margin-top: 8px;
+}
+
+.copyable {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.copyable pre {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  overflow-x: auto;
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 @media (max-width: 900px) {
   .desk {
     display: flex;
     flex-direction: column;
+    gap: 0;
+    padding: 0;
   }
 
   .shelf,
@@ -1164,10 +1411,11 @@ li[data-status="skipped"] > span:first-child {
     flex: 1;
     min-height: 0;
     border: 0;
+    border-radius: 0;
   }
 
   .desk[data-pane="shelf"] .shelf {
-    display: block;
+    display: flex;
   }
 
   .desk[data-pane="talk"] .talk,
@@ -1175,13 +1423,24 @@ li[data-status="skipped"] > span:first-child {
     display: flex;
   }
 
+  .shelf {
+    padding: 14px 16px;
+  }
+
   .page {
-    padding: 16px 16px 24px 36px;
-    background-position: 22px 0;
+    padding: 20px 16px 28px;
+  }
+
+  .talk > .working {
+    padding: 20px 16px;
   }
 
   .composer {
     padding: 10px 16px;
+  }
+
+  .banner {
+    padding: 8px 16px;
   }
 
   .tabs {
@@ -1196,89 +1455,39 @@ li[data-status="skipped"] > span:first-child {
 
   .switcher {
     display: flex;
+    gap: 4px;
+    padding: 6px;
     border-top: 1px solid var(--rule);
+    background: var(--canvas);
   }
 
   .switcher button {
     flex: 1;
-    padding: 10px 0;
+    min-height: 36px;
+    padding: 6px 0;
     border: 0;
     background: none;
     color: var(--ink-soft);
   }
 
+  .switcher button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+
   .switcher button[aria-current="true"] {
-    background: var(--paper-raised);
+    background: var(--paper);
+    box-shadow: 0 0 0 1px var(--rule);
     color: var(--ink);
     font-weight: 600;
   }
+
+  .copyable {
+    flex-direction: column;
+  }
 }
 
-.outcomes {
-  display: grid;
-  gap: 2.25rem;
-}
-
-.outcomes h3 {
-  margin: 0 0 0.75rem;
-  font-family: var(--serif);
-  font-size: 1.15rem;
-  font-weight: 600;
-}
-
-.outcomes h4 {
-  margin: 1rem 0 0.35rem;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.outcomes ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.next-action {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 16px;
-  margin-top: 12px;
-}
-
-.reading {
-  display: grid;
-  gap: 0.15rem;
-  padding: 0.6rem 0 0.6rem 0.8rem;
-  border-left: 3px solid var(--rule);
-}
-
-.reading + .reading {
-  margin-top: 0.5rem;
-}
-
-.reading[data-gap="open"] {
-  border-left-color: var(--red);
-}
-
-.reading strong {
-  font-weight: 600;
-}
-
-.outcome-session[data-focused="true"] > h3 {
-  background: linear-gradient(transparent 62%, var(--marker) 62%);
-  width: fit-content;
-}
-
-.outcome-session li {
-  padding: 0.2rem 0;
-}
-
-.outcome-session li[data-kind="attempt"][data-verdict="contradicts"] b,
-.outcome-session li[data-kind="attempt"][data-verdict="partial"] b {
-  color: var(--red);
-}
-
-.outcome-session b {
-  font-weight: 600;
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }

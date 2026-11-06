@@ -158,7 +158,10 @@ try {
       `  模型：${model.simulated ? '模拟模型（只摘录材料，不会真正回答）' : model.name}\n` +
       `  分享：${values.sharing === true ? '已开启，发布前都会让你确认' : '关闭'}\n\n  按 Ctrl+C 停止。\n\n`,
   )
+  let stopping = false
   const stop = (): void => {
+    if (stopping) return
+    stopping = true
     service
       .close()
       .then(() => process.exit(0))
@@ -166,6 +169,13 @@ try {
   }
   process.on('SIGINT', stop)
   process.on('SIGTERM', stop)
+  // The desktop app holds this process's input open while it runs. When the app goes away, even by crashing, the
+  // input closes and the service stops with it instead of keeping the graph locked.
+  if (process.env['EPISTEME_EXIT_WITH_STDIN'] === '1') {
+    process.stdin.once('end', stop)
+    process.stdin.once('close', stop)
+    process.stdin.resume()
+  }
 } catch (error) {
   if (error instanceof UnreadableGraphError) {
     process.stderr.write(

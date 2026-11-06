@@ -34,6 +34,12 @@ export default tseslint.config(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
+    // The page's service worker is plain JavaScript served as it is, outside every TypeScript project.
+    files: ['apps/workbench/web/public/**/*.js'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     files: ['apps/workbench/web/src/**'],
     languageOptions: { globals: { ...globals.browser } },
   },

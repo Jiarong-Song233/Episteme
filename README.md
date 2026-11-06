@@ -96,6 +96,18 @@ pnpm serve --graph "$HOME/.episteme/my-topic.db" --blank
 `pnpm serve` serves MCP and the REST API. It serves a browser page only when given a built Workspace with
 `--workspace <dir>`. Keep your own graph outside the repository. The default is `~/.episteme/learn.db`.
 
+### The learning workbench, as an app
+
+```bash
+pnpm workbench          # builds the page, then serves it at http://127.0.0.1:4322
+```
+
+Open that address in Edge or Chrome and choose **Install** (the icon at the right of the address bar, or
+_Apps → Install this site as an app_). It then opens in its own window from the Start menu or Dock, like any
+desktop program. The service still has to be running: the window keeps only the page itself, so it can open
+and say it cannot reach the service, but your material and understanding are always read from the service and
+never stored by the browser. Installing needs `localhost`/`127.0.0.1` or HTTPS.
+
 The personal route's plan and honest state are in
 [personal-goal-plan](docs/roadmap/personal-goal-plan.md) and [personal-progress](docs/roadmap/personal-progress.md).
 

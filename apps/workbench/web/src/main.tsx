@@ -15,3 +15,10 @@ if (root !== null) {
     </StrictMode>,
   )
 }
+
+// Installs as an app of its own window. The worker keeps only the page and its built files, never anyone's data.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => undefined)
+  })
+}

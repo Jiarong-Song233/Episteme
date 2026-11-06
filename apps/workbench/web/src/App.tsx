@@ -107,6 +107,18 @@ export function App() {
 
   useEffect(enter, [enter])
 
+  // An installed window can open while the service is away; coming back to it tries again.
+  const away = problem !== undefined
+  useEffect(() => {
+    if (!away) return undefined
+    window.addEventListener('focus', enter)
+    window.addEventListener('online', enter)
+    return () => {
+      window.removeEventListener('focus', enter)
+      window.removeEventListener('online', enter)
+    }
+  }, [away, enter])
+
   if (signingIn) {
     return (
       <SignIn
@@ -118,7 +130,10 @@ export function App() {
   if (problem !== undefined) {
     return (
       <p className="banner banner-error" role="alert">
-        {problem}
+        {problem}{' '}
+        <button type="button" className="link" onClick={enter}>
+          重试
+        </button>
       </p>
     )
   }

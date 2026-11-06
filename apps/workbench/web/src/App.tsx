@@ -28,6 +28,7 @@ import {
   type WorkflowInfo,
 } from './api.js'
 import { Commons, SignIn } from './Commons.js'
+import { ConnectPage } from './Connect.js'
 import { PlanShelf, PlanView } from './Learning.js'
 import { MaterialsPage } from './Materials.js'
 import { Outcomes } from './Outcomes.js'
@@ -304,7 +305,7 @@ function Desk({
 
   // An address without a space falls back on the last one still open, or the first.
   const addressedSpace = 'space' in place ? place.space : undefined
-  const needsSpace = place.kind === 'home' || place.kind === 'commons'
+  const needsSpace = place.kind === 'home' || place.kind === 'commons' || place.kind === 'connect'
   useEffect(() => {
     if (addressedSpace !== undefined) {
       setHeldSpace(addressedSpace)
@@ -619,6 +620,19 @@ function Desk({
               onSignIn={onSignIn}
             />
           }
+          connect={
+            <button
+              type="button"
+              className="row"
+              aria-current={place.kind === 'connect' ? 'page' : undefined}
+              onClick={() => {
+                moveTo({ kind: 'connect' })
+                setPane('talk')
+              }}
+            >
+              接入 Agent
+            </button>
+          }
           onSpaces={(next, selected) => {
             setSpaces(next)
             if (selected !== undefined) enterSpace(selected)
@@ -642,8 +656,18 @@ function Desk({
           )}
           {model?.simulated === true && (
             <p className="banner">
-              现在用的是模拟模型：它只摘录材料原句，不会真正回答。配置 EPISTEME_MODEL_BASE_URL
-              后可接入真实模型。
+              现在用的是模拟模型：它只摘录材料原句，不会真正回答。可以{' '}
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  moveTo({ kind: 'connect' })
+                  setPane('talk')
+                }}
+              >
+                接入 Agent
+              </button>{' '}
+              让它来讲解，或用 EPISTEME_MODEL_BASE_URL 配置一个模型。
             </p>
           )}
           {notice !== undefined && (
@@ -651,7 +675,9 @@ function Desk({
               {notice}
             </p>
           )}
-          {commons ? (
+          {place.kind === 'connect' ? (
+            <ConnectPage me={me} />
+          ) : commons ? (
             <Commons
               me={me.actorId}
               spaces={spaces}
@@ -878,26 +904,33 @@ function SpaceNav(props: {
   held: number
   onShow: (section: Section) => void
 }) {
-  const entries: readonly (readonly [Section, string])[] = [
-    ['overview', '概览'],
-    ['learning', '学习'],
-    ['materials', `材料（${props.materials}）`],
-    ['review', `待确认（${props.pending}）`],
-    ['understanding', `我的理解（${props.held}）`],
+  const entries: readonly (readonly [Section, string, number | undefined])[] = [
+    ['overview', '概览', undefined],
+    ['learning', '学习', undefined],
+    ['materials', '材料', props.materials],
+    ['review', '待确认', props.pending],
+    ['understanding', '我的理解', props.held],
   ]
   return (
     <nav className="space-nav" aria-label="这个空间">
       <ul className="list">
-        {entries.map(([id, label]) => (
+        {entries.map(([id, label, count]) => (
           <li key={id}>
             <button
               type="button"
               className="row"
               aria-current={props.section === id ? 'page' : undefined}
               data-waiting={id === 'review' && props.pending > 0}
+              aria-label={count === undefined ? undefined : `${label}（${count}）`}
               onClick={() => props.onShow(id)}
             >
               {label}
+              {/* Read aloud as “待确认（3）”; seen as a small count at the end of the row. */}
+              {count !== undefined && (
+                <span className="count" aria-hidden="true">
+                  {count}
+                </span>
+              )}
             </button>
           </li>
         ))}
@@ -952,6 +985,7 @@ function Shelf(props: {
   plans: ReactNode
   guard: (work: () => Promise<unknown>) => void
   identity: ReactNode
+  connect: ReactNode
   onSpaces: (spaces: readonly Space[], selected?: string) => void
   onSelectSpace: (id: string) => void
   onSelectThread: (id: string) => void
@@ -982,7 +1016,10 @@ function Shelf(props: {
 
   return (
     <aside className="shelf" aria-label="空间">
-      <h1 className="wordmark">学习工作台</h1>
+      <h1 className="wordmark">
+        <img src="./icon.svg" alt="" />
+        Episteme
+      </h1>
       {props.identity}
       <section>
         <h2>空间</h2>
@@ -1028,7 +1065,9 @@ function Shelf(props: {
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
-          <button type="submit">新建</button>
+          <button type="submit" className="secondary">
+            新建
+          </button>
         </form>
         {currentSpace !== undefined && !currentSpace.archived && (
           <p className="quiet-actions">
@@ -1106,6 +1145,7 @@ function Shelf(props: {
           </section>
         </>
       )}
+      <footer className="shelf-foot">{props.connect}</footer>
     </aside>
   )
 }

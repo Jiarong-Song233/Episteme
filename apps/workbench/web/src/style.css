@@ -432,6 +432,43 @@ button:disabled {
   max-width: 640px;
 }
 
+/* Each material as a line in the exercise book: its title, then what it holds, then the quiet ways to change it. */
+.material-list {
+  max-width: 62ch;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.material-list li {
+  padding: 10px 0 10px 12px;
+  border-bottom: 1px solid var(--rule);
+  border-left: 3px solid transparent;
+}
+
+.material-list li[data-open="true"] {
+  border-left-color: var(--ink);
+}
+
+.material-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.material-title:hover {
+  text-decoration: underline;
+}
+
+.material-list .hint {
+  margin: 2px 0 0;
+}
+
 [role="tab"] {
   padding: 12px 0 9px;
   border: 0;

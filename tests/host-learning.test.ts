@@ -223,6 +223,24 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 
+describe('answers a host can read as text', () => {
+  it('carry the ids a host passes on, not only a summary sentence', async () => {
+    const opened = await host.call('learn_space_open', {
+      submission: submission(),
+      name: '只读文字的宿主',
+    })
+    const { space } = opened.structuredContent as unknown as Spaced
+    const listed = await host.call('learn_context', {})
+    const threaded = await host.call('thread_open', { title: '文字', scope: space.scope })
+    const { thread } = threaded.structuredContent as unknown as Threaded
+    const text = (answer: typeof listed) =>
+      answer.content.map((block) => (block.type === 'text' ? block.text : '')).join('\n')
+    expect(text(opened)).toContain(space.id)
+    expect(text(listed)).toContain(space.id)
+    expect(text(threaded)).toContain(thread.id)
+  })
+})
+
 describe('objectives', () => {
   it('are the same across spelling, and apart across spaces', () => {
     expect(objectiveIdOf('sp_a', '  中潮层   崩溃重放 ')).toBe(

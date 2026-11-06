@@ -29,7 +29,9 @@ import {
   type WorkflowInfo,
 } from './api.js'
 import { Commons, SignIn } from './Commons.js'
+import { AgentSessionsPage } from './AgentSessions.js'
 import { ConnectPage } from './Connect.js'
+import { ConversationsPage } from './Conversations.js'
 import { ModelPage } from './Model.js'
 import { Welcome } from './Welcome.js'
 import { PlanShelf, PlanView } from './Learning.js'
@@ -314,7 +316,9 @@ function Desk({
     place.kind === 'home' ||
     place.kind === 'commons' ||
     place.kind === 'connect' ||
-    place.kind === 'model'
+    place.kind === 'model' ||
+    place.kind === 'conversations' ||
+    place.kind === 'agent-sessions'
   useEffect(() => {
     if (addressedSpace !== undefined) {
       setHeldSpace(addressedSpace)
@@ -656,6 +660,28 @@ function Desk({
               >
                 接入 Agent
               </button>
+              <button
+                type="button"
+                className="row"
+                aria-current={place.kind === 'conversations' ? 'page' : undefined}
+                onClick={() => {
+                  moveTo({ kind: 'conversations' })
+                  setPane('talk')
+                }}
+              >
+                所有对话
+              </button>
+              <button
+                type="button"
+                className="row"
+                aria-current={place.kind === 'agent-sessions' ? 'page' : undefined}
+                onClick={() => {
+                  moveTo({ kind: 'agent-sessions' })
+                  setPane('talk')
+                }}
+              >
+                Agent 会话记录
+              </button>
             </>
           }
           onSpaces={(next, selected) => {
@@ -715,6 +741,25 @@ function Desk({
             <ConnectPage me={me} />
           ) : place.kind === 'model' ? (
             <ModelPage me={me} model={model} onChanged={setModel} />
+          ) : place.kind === 'conversations' ? (
+            <ConversationsPage
+              onOpen={(space, thread) => {
+                moveTo({ kind: 'thread', space, thread })
+                setPane('talk')
+              }}
+            />
+          ) : place.kind === 'agent-sessions' ? (
+            <AgentSessionsPage
+              agent={place.agent}
+              session={place.session}
+              onOpen={(agent, session) =>
+                moveTo({
+                  kind: 'agent-sessions',
+                  ...(agent === undefined ? {} : { agent }),
+                  ...(session === undefined ? {} : { session }),
+                })
+              }
+            />
           ) : welcoming ? (
             <Welcome
               model={model}

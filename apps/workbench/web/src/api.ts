@@ -317,6 +317,75 @@ export type ModelChange =
   | { readonly model: ModelInfo }
   | { readonly failure: { readonly code: string; readonly message: string } }
 
+/** One agent of this computer and its connection to the workbench. */
+export interface AgentInfo {
+  readonly id: string
+  readonly name: string
+  readonly maker?: string
+  readonly kind: 'cli' | 'editor' | 'desktop' | 'extension' | 'custom'
+  readonly installed: boolean
+  /** Absent when its settings could not be read to tell. */
+  readonly connected?: boolean
+  readonly current?: boolean
+  readonly how: 'command' | 'settings' | 'manual'
+  readonly file?: string
+  readonly address: string
+  readonly after?: string
+  readonly use?: AgentUse
+}
+
+export interface AgentUse {
+  readonly key: string
+  readonly agent?: string
+  readonly name: string
+  readonly version?: string
+  readonly firstSeen: number
+  readonly lastSeen: number
+  readonly calls: number
+  readonly lastTool?: string
+}
+
+export interface CustomAgentRequest {
+  readonly name: string
+  readonly file?: string
+  readonly key?: string
+  readonly style?: string
+}
+
+/** A conversation of the workbench, across spaces, as the person named it. */
+export interface ConversationInfo {
+  readonly id: string
+  readonly title: string
+  readonly space?: { readonly id: string; readonly name: string }
+  readonly createdAt: number
+  readonly lastAt: number
+  readonly turns: number
+  readonly agents: readonly string[]
+  readonly byPerson: boolean
+  readonly models: readonly string[]
+  readonly archived: boolean
+}
+
+/** A conversation an agent of this computer keeps for itself. */
+export interface AgentSessionInfo {
+  readonly agent: string
+  readonly id: string
+  readonly title: string
+  readonly project?: string
+  readonly updatedAt: number
+  readonly bytes?: number
+}
+
+export interface AgentSessionDetail {
+  readonly summary: AgentSessionInfo
+  readonly messages: readonly {
+    readonly role: 'user' | 'assistant' | 'tool'
+    readonly text: string
+    readonly at?: number
+  }[]
+  readonly truncated: boolean
+}
+
 const scene = (path: string, body?: unknown): Promise<unknown> =>
   request(`/scene/workbench${path}`, body)
 
@@ -398,6 +467,36 @@ export const api = {
     reasoningEffort?: string
   }) => scene('/model/settings', settings) as Promise<ModelChange>,
   clearModel: () => scene('/model/clear', {}) as Promise<ModelChange>,
+  agents: () =>
+    scene('/agents') as Promise<{ agents: readonly AgentInfo[]; others: readonly AgentUse[] }>,
+  connectAgent: (id: string) =>
+    scene('/agents/connect', { id }) as Promise<{ agent: AgentInfo; said?: string }>,
+  disconnectAgent: (id: string) =>
+    scene('/agents/disconnect', { id }) as Promise<{ agent: AgentInfo }>,
+  addCustomAgent: (agent: CustomAgentRequest) =>
+    scene('/agents/custom', agent) as Promise<{ agent: AgentInfo }>,
+  removeCustomAgent: (id: string) => scene('/agents/custom/remove', { id }),
+  forgetAgentUse: (key: string) => scene('/agents/forget', { key }),
+  conversations: (archived: boolean) =>
+    scene(`/conversations${archived ? '?archived=1' : ''}`) as Promise<{
+      conversations: readonly ConversationInfo[]
+    }>,
+  updateConversation: (thread: string, change: { title?: string; archived?: boolean }) =>
+    scene('/conversations/update', { thread, ...change }),
+  agentSessions: (agent: string | undefined, q: string) => {
+    const query = new URLSearchParams()
+    if (agent !== undefined) query.set('agent', agent)
+    if (q !== '') query.set('q', q)
+    const shown = query.toString()
+    return scene(`/agent-sessions${shown === '' ? '' : `?${shown}`}`) as Promise<{
+      agents: readonly { id: string; name: string; found: boolean }[]
+      sessions: readonly AgentSessionInfo[]
+    }>
+  },
+  agentSession: (agent: string, id: string) =>
+    scene(`/agent-sessions/read?agent=${encoded(agent)}&id=${encoded(id)}`) as Promise<{
+      session: AgentSessionDetail
+    }>,
   spaces: () => scene('/spaces') as Promise<{ spaces: readonly Space[] }>,
   createSpace: (name: string) => scene('/spaces', { name }) as Promise<{ space: Space }>,
   updateSpace: (space: string, change: { name?: string; archived?: boolean }) =>

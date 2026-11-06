@@ -76,6 +76,20 @@ export function agentRoutes(agents: Agents): readonly SceneRoute[] {
     },
     {
       method: 'POST',
+      path: '/agents/plugins',
+      handle: ({ body }) => refusing(() => agents.importPlugin(text(body, 'manifest', 20_000))),
+    },
+    {
+      method: 'POST',
+      path: '/agents/plugins/remove',
+      handle: ({ body }) =>
+        refusing(async () => {
+          await agents.removePlugin(id(body))
+          return { removed: true }
+        }),
+    },
+    {
+      method: 'POST',
       path: '/agents/forget',
       handle: ({ body }) =>
         refusing(async () => {

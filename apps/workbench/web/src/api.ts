@@ -322,13 +322,14 @@ export interface AgentInfo {
   readonly id: string
   readonly name: string
   readonly maker?: string
-  readonly kind: 'cli' | 'editor' | 'desktop' | 'extension' | 'custom'
+  readonly kind: 'cli' | 'editor' | 'desktop' | 'extension' | 'manager' | 'custom'
   readonly installed: boolean
   /** Absent when its settings could not be read to tell. */
   readonly connected?: boolean
   readonly current?: boolean
-  readonly how: 'command' | 'settings' | 'manual'
+  readonly how: 'command' | 'settings' | 'skill' | 'manual'
   readonly file?: string
+  readonly source?: 'plugin'
   readonly address: string
   readonly after?: string
   readonly use?: AgentUse
@@ -468,7 +469,14 @@ export const api = {
   }) => scene('/model/settings', settings) as Promise<ModelChange>,
   clearModel: () => scene('/model/clear', {}) as Promise<ModelChange>,
   agents: () =>
-    scene('/agents') as Promise<{ agents: readonly AgentInfo[]; others: readonly AgentUse[] }>,
+    scene('/agents') as Promise<{
+      agents: readonly AgentInfo[]
+      others: readonly AgentUse[]
+      plugins?: { folder: string; problems: readonly { file: string; reason: string }[] }
+    }>,
+  importAgentPlugin: (manifest: string) =>
+    scene('/agents/plugins', { manifest }) as Promise<{ agent: AgentInfo }>,
+  removeAgentPlugin: (id: string) => scene('/agents/plugins/remove', { id }),
   connectAgent: (id: string) =>
     scene('/agents/connect', { id }) as Promise<{ agent: AgentInfo; said?: string }>,
   disconnectAgent: (id: string) =>

@@ -92,6 +92,11 @@ export interface SceneProfile {
    * at, in nobody's voice (ADR 0020). Every other `POST` needs the person's own credential.
    */
   readonly proposingRoutes?: readonly string[]
+  /**
+   * The paths of the `GET` routes only the person may read, because they show what is on their computer outside the
+   * graph, such as their agents' settings and conversation records. Every other `GET` reads like the rest of the API.
+   */
+  readonly privateRoutes?: readonly string[]
 }
 
 /** What a scene's route receives: a view of the session that cannot decide or write, and the request. */

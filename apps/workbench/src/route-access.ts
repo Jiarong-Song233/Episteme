@@ -11,3 +11,13 @@ export const WORKBENCH_PROPOSING_ROUTES = [
   '/candidates/turn',
   '/candidates/thread',
 ] as const
+
+/**
+ * What only the person may read: what is on their computer outside the graph, such as which agents it has, their
+ * settings files, and the conversations those agents keep. An agent reads none of it, and none of it reaches a model.
+ */
+export const WORKBENCH_PRIVATE_ROUTES = [
+  '/agents',
+  '/agent-sessions',
+  '/agent-sessions/read',
+] as const

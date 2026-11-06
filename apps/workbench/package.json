@@ -19,6 +19,7 @@
     "@episteme/core": "workspace:*",
     "@episteme/distillation": "workspace:*",
     "@episteme/service": "workspace:*",
+    "jsonc-parser": "3.3.1",
     "minisearch": "7.2.0",
     "openai": "7.47.0",
     "unpdf": "2.1.0"

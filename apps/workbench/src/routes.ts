@@ -3,6 +3,7 @@ import type { SceneWrites, Turn } from '@episteme/application'
 import type { SceneRoute, SceneRouteContext } from '@episteme/service'
 import { answerFrom, answerText, relevant, type Answer } from './answer.js'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
+import { conversationRoutes, shownThread } from './conversations.js'
 import { objectivesOf, sessionsOf, unlinkedIn } from './evidence.js'
 import { learningRoutes } from './learning.js'
 import { MaterialStore } from './materials.js'
@@ -304,13 +305,19 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
 
     route('GET', '/sessions', ({ view, query }) => {
       const space = spaceOf(view, required(query, 'space'))
-      return { sessions: view.threads(scopeOf(space.id)) }
+      // As the person named them, without the ones they archived (conversations.ts).
+      return {
+        sessions: view
+          .threads(scopeOf(space.id))
+          .map((thread) => shownThread(view, thread))
+          .filter((thread) => !thread.archived),
+      }
     }),
     route('GET', '/session', ({ view, query }) => {
       const thread = view.threadView(required(query, 'thread'))
       if (thread === undefined) refuse('unknown_thread', '这段对话不存在。')
       return {
-        thread: thread.thread,
+        thread: shownThread(view, thread.thread),
         turns: thread.turns.map((turn) => {
           const answer = view.records.get(`${ANSWER_PREFIX}${turn.id}`)
           return answer === undefined ? turn : { ...turn, answer: answer.value as Answer }
@@ -319,5 +326,6 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     }),
 
     route('POST', '/ask', ask),
+    ...conversationRoutes(),
   ]
 }

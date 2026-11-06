@@ -36,6 +36,8 @@ export function PlanShelf(props: {
   const [minutes, setMinutes] = useState('60')
   const [workflow, setWorkflow] = useState('speedrun')
   const [creating, setCreating] = useState(false)
+  // Once there are plans, the form waits behind a link so the shelf stays a list.
+  const [adding, setAdding] = useState(false)
   const chosen = workflows.find((candidate) => candidate.id === workflow)
 
   const create = (event: FormEvent): void => {
@@ -47,6 +49,7 @@ export function PlanShelf(props: {
       try {
         const { plan, notice } = await props.onCreate(wanted, Number(minutes), workflow)
         setTopic('')
+        setAdding(false)
         props.onCreated(plan, notice)
       } finally {
         setCreating(false)
@@ -74,7 +77,13 @@ export function PlanShelf(props: {
           </li>
         ))}
       </ul>
-      {props.hasMaterial && !props.archived ? (
+      {!props.hasMaterial || props.archived ? (
+        <p className="hint">上传材料后，可以生成学习计划。</p>
+      ) : props.plans.length > 0 && !adding ? (
+        <button type="button" className="link" onClick={() => setAdding(true)}>
+          新建学习计划
+        </button>
+      ) : (
         <form className="plan-form" onSubmit={create}>
           <input
             aria-label="想学什么"
@@ -112,8 +121,6 @@ export function PlanShelf(props: {
             {creating ? '正在拟计划…' : '生成计划'}
           </button>
         </form>
-      ) : (
-        <p className="hint">上传材料后，可以生成学习计划。</p>
       )}
     </section>
   )

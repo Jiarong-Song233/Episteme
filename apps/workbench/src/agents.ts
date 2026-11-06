@@ -1,11 +1,19 @@
 import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
-import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { McpActivity } from '@episteme/service'
 import { applyEdits, modify, parse, type ParseError } from 'jsonc-parser'
+import {
+  checkManifest,
+  loadPlugins,
+  pluginDefinition,
+  PluginRefused,
+  type AgentPluginManifest,
+  type PluginProblem,
+} from './agent-plugins.js'
 
 /**
  * The agents on this computer and their connection to the workbench.
@@ -66,11 +74,20 @@ interface SettingsFile {
   readonly style: EntryStyle
 }
 
+export type AgentKind = 'cli' | 'editor' | 'desktop' | 'extension' | 'manager' | 'custom'
+export const AGENT_KINDS: readonly AgentKind[] = [
+  'cli',
+  'editor',
+  'desktop',
+  'extension',
+  'manager',
+]
+
 export interface AgentDefinition {
   readonly id: string
   readonly name: string
   readonly maker?: string
-  readonly kind: 'cli' | 'editor' | 'desktop' | 'extension' | 'custom'
+  readonly kind: AgentKind
   /** Commands on PATH that show it is installed; the first is the one that connects it. */
   readonly commands?: readonly string[]
   /** Files or folders whose presence shows it is installed. */
@@ -82,13 +99,57 @@ export interface AgentDefinition {
     readonly add: (url: string) => readonly string[]
     readonly remove: readonly string[]
   }
-  /** For an agent whose settings we can read but not safely write (TOML): whether it lists the server. */
+  /**
+   * Whether it lists the server, for an agent whose settings we cannot safely write (TOML) or that keeps them where
+   * only its own command reads them. Asked only when it is installed.
+   */
   readonly listed?: (env: AgentEnvironment) => Promise<boolean | undefined>
+  /**
+   * For an agent without MCP settings but with skills: the folder of its skills. Connecting puts an `episteme`
+   * skill there that tells it how to call the workbench with the command-line client.
+   */
+  readonly skill?: (env: AgentEnvironment) => string
+  /**
+   * A manager that writes the server into several agents: the plain address is given, so each agent is known by the
+   * name it gives itself rather than by the manager's.
+   */
+  readonly untagged?: boolean
+  /** Where the definition came from, when not from this file. */
+  readonly source?: 'plugin'
   /** Said after connecting, such as that the program has to be restarted. */
   readonly after?: string
 }
 
 const restart = (name: string): string => `重启 ${name} 或开一个新会话后生效。`
+
+/** `%LOCALAPPDATA%` on Windows, where some desktop programs keep their settings instead of `%APPDATA%`. */
+export function localAppData(env: AgentEnvironment): string {
+  return env.env['LOCALAPPDATA'] ?? join(env.home, 'AppData', 'Local')
+}
+
+/** The agents magpie writes into that Episteme cannot write itself (YAML, TOML or settings of its own). */
+const MAGPIE_AGENTS = ['pi', 'hermes', 'openclaw', 'zcode', 'dsh'] as const
+
+/** Whether a command's listing of MCP servers has the workbench's: a line that starts with its name. */
+async function listedBy(
+  env: AgentEnvironment,
+  command: string,
+  args: readonly string[],
+  section?: RegExp,
+): Promise<boolean | undefined> {
+  const { ok, output } = await env.run(command, args)
+  if (!ok) return undefined
+  let text = output
+  if (section !== undefined) {
+    const start = text.search(section)
+    if (start < 0) return false
+    text = text.slice(start).split(/\r?\n/).slice(1).join('\n')
+    // The section ends at the next line that is not indented.
+    const end = text.search(/^\S/m)
+    if (end >= 0) text = text.slice(0, end)
+  }
+  return new RegExp(`^\\s*${SERVER_NAME}(\\s|$)`, 'm').test(text)
+}
 
 const vscodeStorage = (env: AgentEnvironment, extension: string, file: string): string =>
   join(env.appData, 'Code', 'User', 'globalStorage', extension, 'settings', file)
@@ -334,16 +395,140 @@ export const KNOWN_AGENTS: readonly AgentDefinition[] = [
     name: 'Claude Desktop',
     maker: 'Anthropic',
     kind: 'desktop',
-    detect: (env) => [join(env.appData, 'Claude')],
+    detect: (env) => [join(env.appData, 'Claude'), ...claudeDesktopLocal(env)],
     settings: (env) => ({
-      file: join(env.appData, 'Claude', 'claude_desktop_config.json'),
+      // The Store version on Windows keeps its settings under %LOCALAPPDATA%; the installer version under %APPDATA%.
+      file: join(
+        claudeDesktopLocal(env).find((folder) =>
+          existsSync(join(folder, 'claude_desktop_config.json')),
+        ) ?? join(env.appData, 'Claude'),
+        'claude_desktop_config.json',
+      ),
       key: 'mcpServers',
       // Its settings file only starts local servers, so it runs a small relay to the workbench.
       style: 'stdio',
     }),
     after: '完全退出 Claude Desktop（托盘里也退出）再打开后生效。',
   },
+  {
+    id: 'antigravity-cli',
+    name: 'Antigravity CLI',
+    maker: 'Google',
+    kind: 'cli',
+    commands: ['agy'],
+    detect: (env) => [join(env.home, '.gemini', 'antigravity-cli')],
+    cli: {
+      add: (url) => ['mcp', 'add', '--type', 'http', SERVER_NAME, url],
+      remove: ['mcp', 'remove', SERVER_NAME],
+    },
+    // It keeps its servers where only its own command reads them.
+    listed: (env) => listedBy(env, 'agy', ['mcp', 'list']),
+    after: '新开一个 agy 会话后生效。',
+  },
+  {
+    id: 'antigravity',
+    name: 'Antigravity',
+    maker: 'Google',
+    kind: 'editor',
+    commands: ['antigravity'],
+    detect: (env) => [join(env.appData, 'Antigravity'), join(env.home, '.gemini', 'antigravity')],
+    settings: (env) => ({
+      file: join(env.home, '.gemini', 'antigravity', 'mcp_config.json'),
+      key: 'mcpServers',
+      style: 'serverUrl',
+    }),
+    after: '在 Antigravity 的 MCP 服务器页里点“刷新”，或重启后生效。',
+  },
+  {
+    id: 'workbuddy',
+    name: 'WorkBuddy',
+    maker: '腾讯',
+    kind: 'desktop',
+    detect: (env) => [join(env.home, '.workbuddy')],
+    settings: (env) => ({
+      file: join(env.home, '.workbuddy', 'mcp.json'),
+      key: 'mcpServers',
+      style: 'type-http',
+    }),
+    after: restart('WorkBuddy'),
+  },
+  {
+    id: 'qoder',
+    name: 'Qoder',
+    maker: '阿里巴巴',
+    kind: 'editor',
+    commands: ['qoder'],
+    detect: (env) => [join(env.home, '.qoder')],
+    settings: (env) => ({
+      file: join(env.home, '.qoder', 'settings.json'),
+      key: 'mcpServers',
+      style: 'type-http',
+    }),
+    after: restart('Qoder'),
+  },
+  {
+    id: 'qoder-cn',
+    name: 'Qoder CN',
+    maker: '阿里巴巴',
+    kind: 'editor',
+    detect: (env) => [join(env.home, '.qoder-cn')],
+    settings: (env) => ({
+      file: join(env.home, '.qoder-cn', 'settings.json'),
+      key: 'mcpServers',
+      style: 'type-http',
+    }),
+    after: restart('Qoder CN'),
+  },
+  {
+    id: 'doubao-work',
+    name: '豆包工作',
+    maker: '字节跳动',
+    kind: 'desktop',
+    detect: (env) => [doubaoWorkFolder(env)],
+    // It has no MCP settings it reads from a file; it reads skills, and its agent can run commands.
+    skill: (env) =>
+      join(
+        doubaoWorkFolder(env),
+        'User Data',
+        'Default',
+        '.doubaowork',
+        'agent_mode',
+        'workspace',
+        '.skills',
+      ),
+    after: '在豆包工作的“技能”里能看到 episteme；新开一个任务后生效。',
+  },
+  {
+    id: 'magpie',
+    name: 'magpie（Pi、Hermes、OpenClaw、ZCode、DeepSeek Harness）',
+    kind: 'manager',
+    commands: ['magpie'],
+    untagged: true,
+    cli: {
+      add: (url) => [
+        'library',
+        'mcp',
+        'add',
+        SERVER_NAME,
+        url,
+        `agents=${MAGPIE_AGENTS.join(',')}`,
+      ],
+      remove: ['library', 'mcp', 'rm', SERVER_NAME],
+    },
+    listed: (env) => listedBy(env, 'magpie', ['library'], /^MCP servers/m),
+    after: 'magpie 会把它写进这几个 Agent；在 magpie 的“库”页可以改给哪些 Agent。',
+  },
 ]
+
+function claudeDesktopLocal(env: AgentEnvironment): string[] {
+  return env.platform === 'win32' ? [join(localAppData(env), 'Claude')] : []
+}
+
+function doubaoWorkFolder(env: AgentEnvironment): string {
+  return env.platform === 'win32'
+    ? join(localAppData(env), 'DoubaoWork')
+    : join(env.appData, 'DoubaoWork')
+}
 
 function codexHome(env: AgentEnvironment): string {
   return env.env['CODEX_HOME'] ?? join(env.home, '.codex')
@@ -523,6 +708,11 @@ interface AgentsFile {
 
 /** Names agents give themselves at `initialize`, for a client connected without the tagged address. */
 const SELF_NAMES: readonly (readonly [RegExp, string])[] = [
+  [/antigravity[-_ ]?cli|\bagy\b/i, 'antigravity-cli'],
+  [/antigravity/i, 'antigravity'],
+  [/workbuddy/i, 'workbuddy'],
+  [/qoder/i, 'qoder-cn'],
+  [/doubao|豆包/i, 'doubao-work'],
   [/claude[-_ ]?code/i, 'claude-code'],
   [/codex/i, 'codex'],
   [/gemini/i, 'gemini-cli'],
@@ -551,9 +741,10 @@ export interface AgentView {
   readonly connected: boolean | undefined
   /** Whether the entry points at this workbench's current address. */
   readonly current?: boolean
-  /** How connecting works: its own command, its settings file, or copying the address by hand. */
-  readonly how: 'command' | 'settings' | 'manual'
+  /** How connecting works: its own command, its settings file, a skill, or copying the address by hand. */
+  readonly how: 'command' | 'settings' | 'skill' | 'manual'
   readonly file?: string
+  readonly source?: 'plugin'
   readonly address: string
   readonly after?: string
   readonly use?: AgentUse
@@ -569,6 +760,10 @@ export class Agents {
   readonly #env: AgentEnvironment
   readonly #mcpUrl: () => string
   #custom: CustomAgent[]
+  #plugins: AgentDefinition[] = []
+  #problems: PluginProblem[] = []
+  /** What an agent's own command last said about whether it lists the workbench: asking takes a second or two. */
+  readonly #listedCache = new Map<string, { at: number; value: boolean | undefined }>()
   readonly #uses = new Map<string, AgentUse>()
   /** A client's user agent, once its `initialize` said who it is: later calls carry no name. */
   readonly #namesByUserAgent = new Map<string, { name: string; version?: string }>()
@@ -600,12 +795,30 @@ export class Agents {
     } catch {
       // Unreadable: start over. What it held was a list and a history, nothing the person cannot redo.
     }
-    return new Agents(file, env, mcpUrl, saved)
+    const agents = new Agents(file, env, mcpUrl, saved)
+    await agents.#loadPlugins()
+    return agents
+  }
+
+  /** The folder of agent plugins, beside the graph. */
+  get pluginFolder(): string {
+    return join(dirname(this.#file), 'agent-plugins')
+  }
+
+  async #loadPlugins(): Promise<void> {
+    const { definitions, problems } = await loadPlugins(
+      this.pluginFolder,
+      this.#env,
+      new Set(KNOWN_AGENTS.map((definition) => definition.id)),
+    )
+    this.#plugins = definitions
+    this.#problems = problems
   }
 
   #definitions(): AgentDefinition[] {
     return [
       ...KNOWN_AGENTS,
+      ...this.#plugins,
       ...this.#custom.map(
         (custom): AgentDefinition => ({
           id: custom.id,
@@ -643,15 +856,31 @@ export class Agents {
     if (definition.cli !== undefined && command !== undefined && onPath(command, this.#env))
       return 'command'
     if (definition.settings !== undefined) return 'settings'
+    if (definition.skill !== undefined) return 'skill'
     return 'manual'
   }
 
+  #address(definition: AgentDefinition): string {
+    return definition.untagged === true ? this.#mcpUrl() : addressFor(this.#mcpUrl(), definition.id)
+  }
+
+  async #listed(definition: AgentDefinition): Promise<boolean | undefined> {
+    const cached = this.#listedCache.get(definition.id)
+    if (cached !== undefined && Date.now() - cached.at < 30_000) return cached.value
+    const value = await definition.listed!(this.#env).catch(() => undefined)
+    this.#listedCache.set(definition.id, { at: Date.now(), value })
+    return value
+  }
+
   async #view(definition: AgentDefinition): Promise<AgentView> {
-    const address = addressFor(this.#mcpUrl(), definition.id)
+    const address = this.#address(definition)
+    const installed = this.#installed(definition)
     let connected: boolean | undefined
     let current: boolean | undefined
+    let file: string | undefined
     const target = definition.settings?.(this.#env)
     if (target !== undefined) {
+      file = target.file
       try {
         const { entry } = await entryIn(target)
         connected = entry !== undefined
@@ -660,7 +889,12 @@ export class Agents {
         connected = undefined
       }
     } else if (definition.listed !== undefined) {
-      connected = await definition.listed(this.#env).catch(() => undefined)
+      connected = installed ? await this.#listed(definition) : false
+    } else if (definition.skill !== undefined) {
+      file = skillFile(definition.skill(this.#env))
+      const text = await readText(file).catch(() => undefined)
+      connected = text?.includes(SKILL_MARK) === true
+      if (connected) current = text!.includes(address)
     }
     const use = [...this.#uses.values()]
       .filter((candidate) => candidate.agent === definition.id)
@@ -670,11 +904,12 @@ export class Agents {
       name: definition.name,
       ...(definition.maker === undefined ? {} : { maker: definition.maker }),
       kind: definition.kind,
-      installed: this.#installed(definition),
+      installed,
       connected,
       ...(current === undefined ? {} : { current }),
       how: this.#how(definition),
-      ...(target === undefined ? {} : { file: target.file }),
+      ...(file === undefined ? {} : { file }),
+      ...(definition.source === undefined ? {} : { source: definition.source }),
       address,
       ...(definition.after === undefined ? {} : { after: definition.after }),
       ...(use === undefined ? {} : { use }),
@@ -682,7 +917,13 @@ export class Agents {
   }
 
   /** Every known agent and every custom one, installed ones first; and clients seen that match none of them. */
-  async list(): Promise<{ agents: AgentView[]; others: AgentUse[] }> {
+  async list(): Promise<{
+    agents: AgentView[]
+    others: AgentUse[]
+    plugins: { folder: string; problems: PluginProblem[] }
+  }> {
+    // A plugin dropped into the folder, or taken out, shows the next time the list is asked for.
+    await this.#loadPlugins()
     const agents = await Promise.all(
       this.#definitions().map((definition) => this.#view(definition)),
     )
@@ -691,18 +932,27 @@ export class Agents {
     const others = [...this.#uses.values()]
       .filter((use) => use.agent === undefined || !ids.has(use.agent))
       .sort((a, b) => b.lastSeen - a.lastSeen)
-    return { agents, others }
+    return { agents, others, plugins: { folder: this.pluginFolder, problems: this.#problems } }
   }
 
-  /** Connects one agent, with its own command when it has one, else through its settings file. */
+  /** Connects one agent, with its own command when it has one, else through its settings file or a skill. */
   async connect(id: string): Promise<{ agent: AgentView; said?: string }> {
     const definition = this.#definition(id)
     if (!this.#installed(definition)) {
       throw new AgentFailure('not_installed', `这台电脑上没有找到 ${definition.name}。`)
     }
-    const address = addressFor(this.#mcpUrl(), definition.id)
+    this.#listedCache.delete(definition.id)
+    const address = this.#address(definition)
     const target = definition.settings?.(this.#env)
     let said: string | undefined
+    if (this.#how(definition) === 'skill') {
+      const folder = join(definition.skill!(this.#env), SERVER_NAME)
+      await this.#serialized(async () => {
+        await mkdir(folder, { recursive: true })
+        await writeFile(join(folder, 'SKILL.md'), skillText(address, cliOf(this.#env)))
+      })
+      return { agent: await this.#view(definition) }
+    }
     if (this.#how(definition) === 'command') {
       const command = definition.commands![0]!
       // Adding refuses a name that is already there, so an old entry, at another address, goes first.
@@ -729,7 +979,17 @@ export class Agents {
   /** Removes the workbench from one agent's settings. Its other servers and settings stay. */
   async disconnect(id: string): Promise<{ agent: AgentView }> {
     const definition = this.#definition(id)
+    this.#listedCache.delete(definition.id)
     const target = definition.settings?.(this.#env)
+    if (this.#how(definition) === 'skill') {
+      const file = skillFile(definition.skill!(this.#env))
+      // Only a skill Episteme wrote is taken away: one the person wrote with the same name stays.
+      const text = await readText(file)
+      if (text?.includes(SKILL_MARK) === true) {
+        await this.#serialized(() => rm(dirname(file), { recursive: true, force: true }))
+      }
+      return { agent: await this.#view(definition) }
+    }
     if (this.#how(definition) === 'command') {
       const removed = await this.#env.run(definition.commands![0]!, definition.cli!.remove)
       if (removed.ok || target === undefined) return { agent: await this.#view(definition) }
@@ -782,6 +1042,46 @@ export class Agents {
     }
     this.#custom = this.#custom.filter((custom) => custom.id !== id)
     await this.#save()
+  }
+
+  /** Keeps a plugin the person gave, as `<id>.json` in the plugin folder, once it is checked. */
+  async importPlugin(text: string): Promise<{ agent: AgentView }> {
+    const errors: ParseError[] = []
+    const parsed = parse(text, errors, { allowTrailingComma: true }) as unknown
+    if (errors.length > 0) throw new AgentFailure('invalid_request', '插件不是能读懂的 JSON。')
+    let manifest: AgentPluginManifest
+    try {
+      manifest = checkManifest(parsed, new Set(KNOWN_AGENTS.map((definition) => definition.id)))
+      pluginDefinition(manifest, this.#env)
+    } catch (error) {
+      if (error instanceof PluginRefused) throw new AgentFailure('invalid_request', error.message)
+      throw error
+    }
+    await this.#serialized(async () => {
+      await mkdir(this.pluginFolder, { recursive: true })
+      await writeFile(
+        join(this.pluginFolder, `${manifest.id}.json`),
+        `${JSON.stringify(manifest, null, 2)}\n`,
+      )
+    })
+    await this.#loadPlugins()
+    return { agent: await this.#view(this.#definition(manifest.id)) }
+  }
+
+  /** Takes a plugin out of the folder. The agent's settings stay as they are: disconnect it first for that. */
+  async removePlugin(id: string): Promise<void> {
+    if (!this.#plugins.some((plugin) => plugin.id === id)) {
+      throw new AgentFailure('unknown_agent', '没有这个插件。')
+    }
+    const file = join(this.pluginFolder, `${id}.json`)
+    if (!existsSync(file)) {
+      throw new AgentFailure(
+        'invalid_request',
+        `这个插件不在 ${id}.json 里，请到 ${this.pluginFolder} 里自己删掉它的文件。`,
+      )
+    }
+    await this.#serialized(() => rm(file))
+    await this.#loadPlugins()
   }
 
   /** Notes one MCP message: who sent it, as far as it says, and when. */
@@ -863,6 +1163,55 @@ export class Agents {
       await rename(temporary, this.#file)
     })
   }
+}
+
+/** In every skill Episteme writes, so it never takes away one it did not write. */
+const SKILL_MARK = '<!-- written by the Episteme workbench -->'
+
+function skillFile(folder: string): string {
+  return join(folder, SERVER_NAME, 'SKILL.md')
+}
+
+/** The command-line client beside the relay. */
+function cliOf(env: AgentEnvironment): { command: string; script: string } {
+  const relay = env.bridge.args[0] ?? 'mcp-bridge.js'
+  return { command: env.bridge.command, script: join(dirname(relay), 'episteme-cli.js') }
+}
+
+/** The skill for an agent that runs commands but reads no MCP settings. */
+export function skillText(address: string, cli: { command: string; script: string }): string {
+  const run = `"${cli.command}" "${cli.script}" --url "${address}"`
+  return `---
+name: episteme
+description: 查询和记录这个人在 Episteme 里的理解。回答学习相关的问题前先用它找出这个人已经懂了什么；对话里出现值得记下的理解时，用它提出候选，由本人自己确认。
+---
+
+${SKILL_MARK}
+
+# Episteme 工作台
+
+Episteme 记着这个人自己确认过的理解。你通过下面的命令调用它的工具；命令只访问这台电脑上的工作台（${address}）。
+
+列出全部工具和参数：
+
+\`\`\`
+${run} tools
+\`\`\`
+
+调用一个工具，参数是一个 JSON 对象；参数长或含引号时，用 \`-\` 从标准输入读：
+
+\`\`\`
+${run} call recall "{\\"question\\": \\"贝叶斯定理\\"}"
+echo {"kind":"claim","label":"…","rationale":"…"} | ${run} call propose -
+\`\`\`
+
+## 规则
+
+- 回答前先 \`recall\`，看这个人已经懂了什么、记过什么。
+- 你只能提出候选（\`propose\`、\`distill\`），不能替这个人确认理解：候选会进入他的审阅队列，由他本人决定。
+- 不要说“你已经掌握了”。把对话交给 \`thread_open\` / \`thread_append\` 保存时，学生的话要原样记下。
+- 工作台没开时命令会说连不上，请这个人先打开 Episteme。
+`
 }
 
 function lastLines(output: string): string {

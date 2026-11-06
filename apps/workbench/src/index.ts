@@ -1,5 +1,6 @@
 export * from './agent-sessions.js'
 export * from './agents.js'
+export * from './agent-plugins.js'
 export * from './answer.js'
 export * from './blocks.js'
 export * from './chunk.js'

@@ -86,8 +86,21 @@ textarea {
 
 .desk {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) minmax(300px, 34%);
+  grid-template-columns: 250px minmax(0, 1fr);
   height: 100%;
+}
+
+/* The side column opens only for source text, and the page gives up room for it. */
+.desk[data-side="open"] {
+  grid-template-columns: 250px minmax(0, 1fr) minmax(300px, 34%);
+}
+
+.desk[data-side="closed"] .side {
+  display: none;
+}
+
+.space-nav .row[data-waiting="true"] {
+  font-weight: 600;
 }
 
 .switcher {
@@ -138,7 +151,8 @@ textarea {
   background: var(--paper-raised);
 }
 
-.row[aria-current="true"] {
+.row[aria-current="true"],
+.row[aria-current="page"] {
   background: var(--paper-raised);
   box-shadow: inset 3px 0 0 var(--ink);
   font-weight: 600;
@@ -398,6 +412,24 @@ button:disabled {
   gap: 16px;
   padding: 0 20px;
   border-bottom: 1px solid var(--rule);
+}
+
+.side-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 20px 9px;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 600;
+}
+
+.review .pending,
+.understanding .understood {
+  max-width: 62ch;
+}
+
+.understanding .map {
+  max-width: 640px;
 }
 
 [role="tab"] {

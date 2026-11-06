@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   api,
   type BlockInfo,
@@ -134,6 +134,8 @@ export function PlanView(props: {
   onCite: (citation: Citation, evidence?: Evidence) => void
   onCandidates: (thread: string, reply: string) => Promise<string | undefined>
   onShowOverview: () => void
+  /** A way to turn what was said here into items for review. */
+  extract?: ReactNode
 }) {
   const { guard, onChanged } = props
   const [detail, setDetail] = useState<PlanDetail>()
@@ -221,6 +223,7 @@ export function PlanView(props: {
           )}
         </p>
         {props.notice !== undefined && <p className="hint">{props.notice}</p>}
+        {started && props.extract}
         {editing ? (
           <PlanEditor
             plan={plan}

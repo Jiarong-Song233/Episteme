@@ -32,12 +32,14 @@ import { PlanShelf, PlanView } from './Learning.js'
 import { Outcomes } from './Outcomes.js'
 import {
   hrefOf,
+  olderPlace,
   opensSide,
   panelOf,
+  sectionOf,
   usePlace,
   type Panel,
   type Place,
-  type SideTab,
+  type Section,
 } from './routes.js'
 import { AgentTurn, LearnerTurn, Links, messageOf } from './Turns.js'
 import { UnderstandingPanel, wordsOf } from './Understanding.js'
@@ -171,6 +173,13 @@ function Desk({
     [go],
   )
 
+  // An older link keeps review or understanding in its query: it opens on that page instead.
+  const older = olderPlace(place, window.location.search)
+  const olderHref = older === undefined ? undefined : hrefOf(older, panel)
+  useEffect(() => {
+    if (olderHref !== undefined) navigate(olderHref, { replace: true })
+  }, [olderHref, navigate])
+
   /** The space on show. Public results have no space of their own, so the last one stays beside them. */
   const [heldSpace, setHeldSpace] = useState<string | undefined>(remembered() ?? undefined)
   const spaceId = 'space' in place ? place.space : heldSpace
@@ -178,8 +187,8 @@ function Desk({
   const planId = place.kind === 'plan' ? place.plan : undefined
   const commons = place.kind === 'commons'
   const publication = place.kind === 'commons' ? place.publication : undefined
-  const tab: SideTab = panel.side ?? 'source'
-  const selectedNode = panel.node
+  const section = sectionOf(place)
+  const selectedNode = place.kind === 'understanding' ? place.node : undefined
   const focusedTurn = panel.turn
 
   const [model, setModel] = useState<{ name: string; simulated: boolean }>()
@@ -239,7 +248,7 @@ function Desk({
     }
     window.addEventListener('popstate', moved)
     return () => window.removeEventListener('popstate', moved)
-  }, [panel.side, panel.node, panel.material, panel.turn])
+  }, [panel.material, panel.turn])
 
   useEffect(() => {
     if (focusedTurn === undefined) return undefined
@@ -443,18 +452,9 @@ function Desk({
     })
   }
 
-  /** Opens a side tab over whatever the side column was showing. */
-  const showTab = useCallback(
-    (side: SideTab): void => {
-      showPanel({ ...here.current.panel, side })
-      setPane('side')
-    },
-    [showPanel],
-  )
-
   const cite = (citation: Citation, evidence?: Evidence): void => {
     showPanel(
-      { ...panel, side: 'source', material: citation.materialId },
+      { ...panel, material: citation.materialId },
       {
         cited: {
           materialId: citation.materialId,
@@ -471,9 +471,9 @@ function Desk({
     reply: string,
   ): Promise<string | undefined> => {
     if (spaceId === undefined || thread === undefined) return undefined
+    // What it made waits on the review page; the person stays in the conversation.
     const made = await api.candidates(spaceId, thread, reply)
     await refreshUnderstanding()
-    if (made.suggestions.length > 0) showTab('pending')
     return made.message
   }
 
@@ -481,13 +481,11 @@ function Desk({
     if (spaceId === undefined) return undefined
     const made = await api.candidatesFromTurn(spaceId, thread, turn)
     await refreshUnderstanding()
-    if (made.suggestions.length > 0) showTab('pending')
     return made.message
   }
 
   const openNode = (node: string): void => {
-    showPanel({ ...panel, side: 'understood', node })
-    setPane('side')
+    if (spaceId !== undefined) moveTo({ kind: 'understanding', space: spaceId, node })
   }
 
   const openPublication = (id: string): void => {
@@ -528,10 +526,22 @@ function Desk({
     setLearned((held) => held + 1)
   }
 
-  /** Enters a space where the person left off, on the side tab they were reading. */
+  /** Enters a space on its overview. A source from another space would not belong beside it. */
   const enterSpace = (id: string): void => {
-    go({ kind: 'space', space: id }, panel.side === undefined ? {} : { side: panel.side })
+    go({ kind: 'space', space: id }, {})
   }
+
+  const showSection = (to: Section): void => {
+    if (spaceId === undefined) return
+    if (to === 'overview') moveTo({ kind: 'space', space: spaceId })
+    if (to === 'review') moveTo({ kind: 'review', space: spaceId })
+    if (to === 'understanding') moveTo({ kind: 'understanding', space: spaceId })
+    if (to === 'learning') moveTo(resume?.to ?? { kind: 'new', space: spaceId })
+  }
+
+  const heldCount = understanding.nodes.filter(
+    (node) => node.revisedTo === undefined && !node.withdrawn,
+  ).length
 
   return (
     <Links.Provider
@@ -546,10 +556,18 @@ function Desk({
         offer: offerTurn,
       }}
     >
-      <div className="desk" data-pane={pane}>
+      <div className="desk" data-pane={pane} data-side={opensSide(panel) ? 'open' : 'closed'}>
         <Shelf
           spaces={spaces}
           current={spaceId}
+          nav={
+            <SpaceNav
+              section={section}
+              pending={understanding.pending.length}
+              held={heldCount}
+              onShow={showSection}
+            />
+          }
           materials={materials}
           sessions={sessions.filter((session) => !plans.some((plan) => plan.thread === session.id))}
           thread={planId === undefined ? threadId : undefined}
@@ -594,7 +612,7 @@ function Desk({
           }}
           onMaterialsChanged={refreshMaterials}
           onOpenMaterial={(material) => {
-            showPanel({ ...panel, side: 'source', material: material.id })
+            showPanel({ ...panel, material: material.id })
             setPane('side')
           }}
           onSelectThread={(id) => {
@@ -636,15 +654,45 @@ function Desk({
               }
               onChanged={decided}
               onOpenNode={(space, node) => {
-                if (space === spaceId) {
-                  openNode(node)
-                  return
-                }
-                go({ kind: 'space', space }, { side: 'understood', node })
-                setPane('side')
+                go({ kind: 'understanding', space, node }, {})
+                setPane('talk')
               }}
             />
-          ) : lostSpace ? null : place.kind === 'space' ? (
+          ) : lostSpace ? null : place.kind === 'review' || place.kind === 'understanding' ? (
+            !planLoaded ? (
+              <p className="working" role="status">
+                正在打开…
+              </p>
+            ) : place.kind === 'review' ? (
+              <div className="page review">
+                <h2 className="space-title">待确认</h2>
+                <p className="hint page-hint">
+                  这些是从对话里提出来的理解。只有你确认的才会成为你的理解，Agent 不能替你确认。
+                </p>
+                <PendingList pending={understanding.pending} guard={guard} onDecided={decided} />
+              </div>
+            ) : (
+              <div className="page understanding">
+                <h2 className="space-title">我的理解</h2>
+                <UnderstandingPanel
+                  space={place.space}
+                  understanding={understanding}
+                  selected={selectedNode}
+                  simulated={model?.simulated === true}
+                  guard={guard}
+                  onSelect={(node) =>
+                    moveTo(
+                      node === undefined
+                        ? { kind: 'understanding', space: place.space }
+                        : { kind: 'understanding', space: place.space, node },
+                    )
+                  }
+                  onChanged={decided}
+                  onJump={jumpTo}
+                />
+              </div>
+            )
+          ) : place.kind === 'space' ? (
             planLoaded ? (
               <Outcomes
                 space={place.space}
@@ -659,7 +707,7 @@ function Desk({
                     : { label: resume.label, open: () => moveTo(resume.to) }
                 }
                 onNewThread={() => moveTo({ kind: 'new', space: place.space })}
-                onReview={() => showTab('pending')}
+                onReview={() => moveTo({ kind: 'review', space: place.space })}
                 onOpenThread={(thread) => jumpTo(thread, undefined)}
               />
             ) : (
@@ -678,6 +726,13 @@ function Desk({
               onAsk={ask}
               onCite={cite}
               onCandidates={(reply) => makeCandidates(threadId, reply)}
+              extract={
+                <ExtractFromThread
+                  space={spaceId}
+                  thread={threadId}
+                  onMade={refreshUnderstanding}
+                />
+              }
             />
           ) : planInView?.origin === 'host' && spaceId !== undefined ? (
             <Outcomes
@@ -689,7 +744,7 @@ function Desk({
               pending={understanding.pending}
               resume={undefined}
               onNewThread={() => moveTo({ kind: 'new', space: spaceId })}
-              onReview={() => showTab('pending')}
+              onReview={() => moveTo({ kind: 'review', space: spaceId })}
               onOpenThread={(thread) => jumpTo(thread, undefined)}
             />
           ) : !planLoaded ? (
@@ -719,50 +774,33 @@ function Desk({
               onShowOverview={() => {
                 if (spaceId !== undefined) moveTo({ kind: 'space', space: spaceId })
               }}
+              extract={
+                <ExtractFromThread
+                  space={spaceId}
+                  thread={threadInView}
+                  onMade={refreshUnderstanding}
+                />
+              }
             />
           )}
         </main>
         <Side
-          tab={tab}
-          onTab={(side) => showPanel({ ...panel, side })}
           source={source}
-          understanding={understanding}
-          guard={guard}
-          onDecided={decided}
-          pending={
-            <ExtractFromThread
-              space={spaceId}
-              thread={threadInView}
-              onMade={refreshUnderstanding}
-            />
-          }
-          understood={
-            spaceId === undefined ? null : (
-              <UnderstandingPanel
-                space={spaceId}
-                understanding={understanding}
-                selected={selectedNode}
-                simulated={model?.simulated === true}
-                guard={guard}
-                onSelect={(node) => {
-                  const { node: _dropped, ...rest } = panel
-                  showPanel(node === undefined ? rest : { ...rest, node })
-                }}
-                onChanged={decided}
-                onJump={jumpTo}
-              />
-            )
-          }
+          onClose={() => {
+            const { material: _dropped, ...rest } = panel
+            showPanel(rest)
+            setPane('talk')
+          }}
         />
         <nav className="switcher" aria-label="切换页面">
           <button type="button" aria-current={pane === 'shelf'} onClick={() => setPane('shelf')}>
             空间
           </button>
           <button type="button" aria-current={pane === 'talk'} onClick={() => setPane('talk')}>
-            对话
+            这一页
           </button>
           <button type="button" aria-current={pane === 'side'} onClick={() => setPane('side')}>
-            原文与理解
+            原文
           </button>
         </nav>
       </div>
@@ -800,6 +838,40 @@ function Identity(props: {
         </button>
       )}
     </section>
+  )
+}
+
+/** The pages of the open space. The counts say what waits and what is held, before anyone opens them. */
+function SpaceNav(props: {
+  section: Section | undefined
+  pending: number
+  held: number
+  onShow: (section: Section) => void
+}) {
+  const entries: readonly (readonly [Section, string])[] = [
+    ['overview', '概览'],
+    ['learning', '学习'],
+    ['review', `待确认（${props.pending}）`],
+    ['understanding', `我的理解（${props.held}）`],
+  ]
+  return (
+    <nav className="space-nav" aria-label="这个空间">
+      <ul className="list">
+        {entries.map(([id, label]) => (
+          <li key={id}>
+            <button
+              type="button"
+              className="row"
+              aria-current={props.section === id ? 'page' : undefined}
+              data-waiting={id === 'review' && props.pending > 0}
+              onClick={() => props.onShow(id)}
+            >
+              {label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
   )
 }
 
@@ -843,6 +915,7 @@ function ExtractFromThread(props: {
 function Shelf(props: {
   spaces: readonly Space[]
   current: string | undefined
+  nav: ReactNode
   materials: readonly MaterialSummary[]
   sessions: readonly Session[]
   thread: string | undefined
@@ -1002,6 +1075,10 @@ function Shelf(props: {
       {currentSpace !== undefined && (
         <>
           <section>
+            <h2>这个空间</h2>
+            {props.nav}
+          </section>
+          <section>
             <h2>材料</h2>
             <ul className="list">
               {materials.map((material) => (
@@ -1117,6 +1194,7 @@ function Conversation(props: {
   onAsk: (question: string, retry: boolean) => void
   onCite: (citation: Citation, evidence?: Evidence) => void
   onCandidates: (reply: string) => Promise<string | undefined>
+  extract: ReactNode
 }) {
   const { space, turns, asking, failed } = props
   const [draft, setDraft] = useState('')
@@ -1153,6 +1231,7 @@ function Conversation(props: {
               : '先上传一份材料，再就它提问。'}
           </p>
         )}
+        {turns.length > 0 && props.extract}
         {turns.map((turn) =>
           turn.speaker === 'learner' ? (
             <LearnerTurn key={turn.id} turn={turn} thread={props.thread} />
@@ -1205,53 +1284,20 @@ function Conversation(props: {
   )
 }
 
-function Side(props: {
-  tab: SideTab
-  onTab: (tab: SideTab) => void
-  source: SourceRequest | undefined
-  understanding: Understanding
-  guard: (work: () => Promise<unknown>) => void
-  onDecided: () => Promise<void>
-  pending: ReactNode
-  understood: ReactNode
-}) {
-  const { tab, understanding } = props
-  const tabs: readonly (readonly [SideTab, string])[] = [
-    ['source', '原文'],
-    ['pending', `待确认（${understanding.pending.length}）`],
-    [
-      'understood',
-      `我的理解（${understanding.nodes.filter((node) => node.revisedTo === undefined && !node.withdrawn).length}）`,
-    ],
-  ]
+/** The side column holds one thing: the source text a citation or a material name opened. */
+function Side(props: { source: SourceRequest | undefined; onClose: () => void }) {
   return (
-    <aside className="side" aria-label="原文与理解">
-      <div className="tabs" role="tablist">
-        {tabs.map(([id, label]) => (
-          <button
-            type="button"
-            role="tab"
-            key={id}
-            aria-selected={tab === id}
-            onClick={() => props.onTab(id)}
-          >
-            {label}
+    <aside className="side" aria-label="原文">
+      <div className="side-head">
+        <span>原文</span>
+        {props.source !== undefined && (
+          <button type="button" className="link" onClick={props.onClose}>
+            关上原文
           </button>
-        ))}
+        )}
       </div>
       <div className="side-body">
-        {tab === 'source' && <SourceView request={props.source} />}
-        {tab === 'pending' && (
-          <>
-            {props.pending}
-            <PendingList
-              pending={understanding.pending}
-              guard={props.guard}
-              onDecided={props.onDecided}
-            />
-          </>
-        )}
-        {tab === 'understood' && props.understood}
+        <SourceView request={props.source} />
       </div>
     </aside>
   )

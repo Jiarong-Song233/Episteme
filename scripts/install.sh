@@ -22,7 +22,6 @@ os=$(uname -s)
 arch=$(uname -m)
 case "$os/$arch" in
   Darwin/arm64) pattern='_aarch64.dmg' ;;
-  Darwin/x86_64) pattern='_x64.dmg' ;;
   Linux/x86_64) pattern='_amd64.AppImage' ;;
   *) fail "no package for $os $arch yet; see https://github.com/$repo/releases" ;;
 esac

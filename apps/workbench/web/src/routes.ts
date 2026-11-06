@@ -13,6 +13,10 @@ export type Place =
   | { readonly kind: 'connect' }
   /** Which language model writes the answers. */
   | { readonly kind: 'model' }
+  /** Every conversation of the workbench, to rename and archive. */
+  | { readonly kind: 'conversations' }
+  /** The conversations the agents of this computer keep, or one of them. */
+  | { readonly kind: 'agent-sessions'; readonly agent?: string; readonly session?: string }
   /** A space's overview: what waits for the person, what is still a gap, and what came of learning lately. */
   | { readonly kind: 'space'; readonly space: string }
   /** What the space learns from. */
@@ -56,6 +60,8 @@ export interface Panel {
 export function usePlace(): Place {
   const [connect] = useRoute('/connect')
   const [modelPage] = useRoute('/model')
+  const [conversations] = useRoute('/conversations')
+  const [, agentSessions] = useRoute('/agent-sessions/:agent?/:session?')
   const [, commons] = useRoute('/commons/:publication?')
   const [, thread] = useRoute('/spaces/:space/threads/:thread')
   const [, plan] = useRoute('/spaces/:space/plans/:plan')
@@ -66,6 +72,15 @@ export function usePlace(): Place {
   const [, space] = useRoute('/spaces/:space')
   if (connect) return { kind: 'connect' }
   if (modelPage) return { kind: 'model' }
+  if (conversations) return { kind: 'conversations' }
+  if (agentSessions !== null) {
+    const { agent, session } = agentSessions
+    return {
+      kind: 'agent-sessions',
+      ...(agent === undefined ? {} : { agent }),
+      ...(agent === undefined || session === undefined ? {} : { session }),
+    }
+  }
   if (commons !== null) {
     const { publication } = commons
     return publication === undefined ? { kind: 'commons' } : { kind: 'commons', publication }
@@ -96,6 +111,14 @@ function pathOf(place: Place): string {
       return '/connect'
     case 'model':
       return '/model'
+    case 'conversations':
+      return '/conversations'
+    case 'agent-sessions':
+      return place.agent === undefined
+        ? '/agent-sessions'
+        : place.session === undefined
+          ? `/agent-sessions/${part(place.agent)}`
+          : `/agent-sessions/${part(place.agent)}/${part(place.session)}`
     case 'space':
       return `/spaces/${part(place.space)}`
     case 'materials':

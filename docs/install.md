@@ -37,6 +37,12 @@ curl -fsSL https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scrip
 
 `EPISTEME_VERSION=v0.2.0` 可以装指定版本。
 
+## 在程序里接入其他 Agent
+
+打开 Episteme，点左栏底部的“接入 Agent”。页面会列出这台电脑上找到的 Agent，点“接入”即可，不用自己改配置。支持 Claude Code、Codex、Gemini CLI、Qwen Code、Kimi CLI、CodeBuddy、opencode、Trae、Cursor、VS Code、Cline、Roo Code、Windsurf、Kiro、Zed 和 Claude Desktop；不在列表里的 Agent，可以在“添加自定义 Agent”里填它的 MCP 配置文件，或者用页面下方的地址手动接入。
+
+接入时只加一项 `episteme`，Agent 的其他设置不动；改文件前会留一份 `<原文件名>.before-episteme` 备份。点“断开”只去掉这一项。
+
 ## 让 Agent 帮你安装
 
 把这句话发给 Claude Code、Codex 或其他能运行命令的 Agent：

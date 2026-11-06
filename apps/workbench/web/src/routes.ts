@@ -11,6 +11,8 @@ export type Place =
   | { readonly kind: 'commons'; readonly publication?: string }
   /** How an agent connects to this service. */
   | { readonly kind: 'connect' }
+  /** Which language model writes the answers. */
+  | { readonly kind: 'model' }
   /** A space's overview: what waits for the person, what is still a gap, and what came of learning lately. */
   | { readonly kind: 'space'; readonly space: string }
   /** What the space learns from. */
@@ -53,6 +55,7 @@ export interface Panel {
 
 export function usePlace(): Place {
   const [connect] = useRoute('/connect')
+  const [modelPage] = useRoute('/model')
   const [, commons] = useRoute('/commons/:publication?')
   const [, thread] = useRoute('/spaces/:space/threads/:thread')
   const [, plan] = useRoute('/spaces/:space/plans/:plan')
@@ -62,6 +65,7 @@ export function usePlace(): Place {
   const [, understanding] = useRoute('/spaces/:space/understanding/:node?')
   const [, space] = useRoute('/spaces/:space')
   if (connect) return { kind: 'connect' }
+  if (modelPage) return { kind: 'model' }
   if (commons !== null) {
     const { publication } = commons
     return publication === undefined ? { kind: 'commons' } : { kind: 'commons', publication }
@@ -90,6 +94,8 @@ function pathOf(place: Place): string {
       return place.publication === undefined ? '/commons' : `/commons/${part(place.publication)}`
     case 'connect':
       return '/connect'
+    case 'model':
+      return '/model'
     case 'space':
       return `/spaces/${part(place.space)}`
     case 'materials':

@@ -85,7 +85,7 @@ function failureOf(error: unknown): ModelFailure {
 /** Models that think aloud put it in these tags. It is not the answer. */
 const THINKING = /<think>[\s\S]*?<\/think>/g
 
-const DEFAULT_OUTPUT_TOKENS = 2048
+export const DEFAULT_OUTPUT_TOKENS = 2048
 
 /** A client for any OpenAI-compatible service, with a timeout and one retry so a failure is bounded. */
 export function remoteModel(options: RemoteModelOptions): ModelClient {

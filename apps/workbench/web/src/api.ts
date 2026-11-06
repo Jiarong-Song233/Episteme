@@ -302,6 +302,21 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return payload as T
 }
 
+/** The model behind answers, as the page may see it: never the key. */
+export interface ModelInfo {
+  readonly name: string
+  readonly simulated: boolean
+  readonly source?: 'environment' | 'settings' | 'none'
+  readonly baseUrl?: string
+  readonly model?: string
+  readonly hasKey?: boolean
+  readonly reasoningEffort?: string
+}
+
+export type ModelChange =
+  | { readonly model: ModelInfo }
+  | { readonly failure: { readonly code: string; readonly message: string } }
+
 const scene = (path: string, body?: unknown): Promise<unknown> =>
   request(`/scene/workbench${path}`, body)
 
@@ -375,7 +390,14 @@ export const api = {
   publicationUpdates: () =>
     scene('/sharing/updates') as Promise<{ updates: readonly PublicationUpdate[] }>,
   keepCited: (newer: string) => scene('/sharing/updates/keep', { newer }),
-  model: () => scene('/model') as Promise<{ name: string; simulated: boolean }>,
+  model: () => scene('/model') as Promise<ModelInfo>,
+  saveModel: (settings: {
+    baseUrl: string
+    model: string
+    apiKey?: string
+    reasoningEffort?: string
+  }) => scene('/model/settings', settings) as Promise<ModelChange>,
+  clearModel: () => scene('/model/clear', {}) as Promise<ModelChange>,
   spaces: () => scene('/spaces') as Promise<{ spaces: readonly Space[] }>,
   createSpace: (name: string) => scene('/spaces', { name }) as Promise<{ space: Space }>,
   updateSpace: (space: string, change: { name?: string; archived?: boolean }) =>

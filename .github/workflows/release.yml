@@ -1,0 +1,110 @@
+# Builds the desktop program on each platform. A pull request that touches it only builds, to prove it still does;
+# a version tag (v*) also gathers the packages and their SHA256SUMS into a DRAFT release. Nothing here publishes:
+# a person reads the draft and presses Publish, and only then do the install scripts find it.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/workbench/**'
+      - 'scripts/install.*'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            packages: |
+              apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+              apps/desktop/src-tauri/target/release/bundle/msi/*.msi
+          - name: macos-arm64
+            os: macos-latest
+            packages: |
+              apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          - name: linux-x64
+            os: ubuntu-22.04
+            packages: |
+              apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+              apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
+
+      # The program carries the Node it was bundled with, so this is the Node users get.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # The runners ship rustup; no third-party action is needed to get a stable toolchain.
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - name: Linux libraries for the webview and the tray
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @episteme/desktop build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: episteme-${{ matrix.name }}
+          path: ${{ matrix.packages }}
+          if-no-files-found: error
+          retention-days: 14
+
+  draft:
+    name: draft release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: packages
+        run: |
+          ls -la
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+      # A draft is visible only to the repository's maintainers until someone publishes it by hand.
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" packages/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "Episteme $TAG" \
+            --notes "安装说明见 https://github.com/$GITHUB_REPOSITORY/blob/main/docs/install.md 。安装包没有代码签名。"

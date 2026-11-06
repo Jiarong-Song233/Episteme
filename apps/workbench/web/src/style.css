@@ -1491,3 +1491,149 @@ li[data-status="skipped"] > span:first-child {
     transition: none !important;
   }
 }
+
+/* The model page: a form in the panel, a row of common services above it. */
+.model-form label {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.model-form label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.presets button {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.model-form .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 8px;
+}
+
+.row-note {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The first visit: one statement of what this is for, then the steps in order. */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 72px;
+}
+
+.welcome > * {
+  width: 100%;
+  max-width: 600px;
+}
+
+.welcome-title {
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.welcome-lead {
+  margin: 12px 0 32px;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.steps {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  counter-reset: step;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 18px 20px;
+  counter-increment: step;
+}
+
+.step + .step {
+  border-top: 1px solid var(--rule);
+}
+
+.step::before {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  content: counter(step);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.step[data-done="true"]::before {
+  background: var(--accent);
+  color: var(--accent-ink);
+  content: "✓";
+}
+
+.step h3 {
+  margin-bottom: 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.step .inline-form {
+  margin-top: 12px;
+}
+
+.step .inline-form input {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .welcome {
+    padding-top: 32px;
+  }
+
+  .step {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .step > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

@@ -7,6 +7,7 @@ import { objectivesOf, sessionsOf, unlinkedIn } from './evidence.js'
 import { learningRoutes } from './learning.js'
 import { MaterialStore } from './materials.js'
 import { ModelFailure, type ModelClient, type ModelMessage } from './model.js'
+import type { ModelSettings } from './model-settings.js'
 import { MAX_MATERIAL_BYTES, MaterialRefusal, parseMaterial } from './parse.js'
 import { sharingRoutes } from './sharing.js'
 import { recalledFor, understandingRoutes } from './understanding.js'
@@ -73,6 +74,8 @@ export interface WorkbenchRouteOptions {
   readonly now?: () => number
   /** The ways of learning on offer. Defaults to the built-in ones. */
   readonly library?: Library
+  /** Lets the person choose the model on the page. `model` should then be this same object. */
+  readonly modelSettings?: ModelSettings
 }
 
 /** The routes over one graph. Make one set per service: its material store belongs to that graph's connection. */
@@ -158,7 +161,54 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     ...learningRoutes({ model, library, now, materialsOf }),
     ...understandingRoutes({ model, now, materialsOf }),
     ...sharingRoutes({ now }),
-    route('GET', '/model', () => ({ name: model.name, simulated: model.simulated })),
+    route('GET', '/model', () =>
+      options.modelSettings === undefined
+        ? { name: model.name, simulated: model.simulated }
+        : { ...options.modelSettings.view() },
+    ),
+    // Choosing the model is the person's: neither route is open to an agent's credential (route-access.ts).
+    route('POST', '/model/settings', async ({ body }) => {
+      const settings = options.modelSettings
+      if (settings === undefined) refuse('not_found', '这个服务不能在页面上设置模型。')
+      const address = text(body, 'baseUrl', 500).trim()
+      let parsed: URL
+      try {
+        parsed = new URL(address)
+      } catch {
+        refuse('invalid_request', '服务地址要以 http:// 或 https:// 开头。')
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        refuse('invalid_request', '服务地址要以 http:// 或 https:// 开头。')
+      }
+      // Left out: keep what was saved. An empty string: remove it.
+      const optional = (key: string): string | undefined =>
+        body[key] === undefined ? undefined : body[key] === '' ? '' : text(body, key, 500).trim()
+      const apiKey = optional('apiKey')
+      const reasoningEffort = optional('reasoningEffort')
+      try {
+        return {
+          model: await settings.save({
+            baseUrl: address.replace(/\/+$/, ''),
+            model: text(body, 'model', 200).trim(),
+            ...(apiKey === undefined ? {} : { apiKey }),
+            ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+          }),
+        }
+      } catch (error) {
+        if (!(error instanceof ModelFailure)) throw error
+        return { failure: { code: error.code, message: error.message } }
+      }
+    }),
+    route('POST', '/model/clear', async () => {
+      const settings = options.modelSettings
+      if (settings === undefined) refuse('not_found', '这个服务不能在页面上设置模型。')
+      try {
+        return { model: await settings.clear() }
+      } catch (error) {
+        if (!(error instanceof ModelFailure)) throw error
+        return { failure: { code: error.code, message: error.message } }
+      }
+    }),
     // What came of learning, session by session. No turn text: reaching the words is a separate step.
     route('GET', '/outcomes', ({ view, query }) => {
       const space = spaceOf(view, required(query, 'space'))

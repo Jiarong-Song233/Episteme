@@ -239,6 +239,21 @@ describe('answers a host can read as text', () => {
     expect(text(listed)).toContain(space.id)
     expect(text(threaded)).toContain(thread.id)
   })
+
+  it('say to use label when an objective is named by words instead of an id', async () => {
+    const { space } = await made<Spaced>('learn_space_open', { name: '误把文字当 id' })
+    const { thread } = await ok<Threaded>('thread_open', { title: '计划', scope: space.scope })
+    const answer = await host.call('learn_plan_start', {
+      submission: submission(),
+      space: space.id,
+      topic: '条件概率',
+      thread: thread.id,
+      steps: [{ activity: 'explain', objective: '条件概率的含义' }],
+    })
+    expect(answer.isError).toBe(true)
+    expect(answer.structuredContent).toMatchObject({ code: 'objective_outside_plan' })
+    expect(JSON.stringify(answer.structuredContent)).toContain('label')
+  })
 })
 
 describe('objectives', () => {

@@ -189,7 +189,10 @@ export function hostLearningTools(options: {
         | Objective
         | undefined
       if (held === undefined || held.space !== space) {
-        refuse('objective_outside_plan', `no objective "${named.objective}" in this space`)
+        refuse(
+          'objective_outside_plan',
+          `no objective "${named.objective}" in this space; objective takes an id from learn_context, and a new objective is named with label`,
+        )
       }
       return held
     }

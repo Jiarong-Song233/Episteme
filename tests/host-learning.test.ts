@@ -234,7 +234,7 @@ describe('answers a host can read as text', () => {
     const threaded = await host.call('thread_open', { title: '文字', scope: space.scope })
     const { thread } = threaded.structuredContent as unknown as Threaded
     const text = (answer: typeof listed) =>
-      answer.content.map((block) => (block.type === 'text' ? block.text : '')).join('\n')
+      (answer.content ?? []).map((block) => (block.type === 'text' ? block.text : '')).join('\n')
     expect(text(opened)).toContain(space.id)
     expect(text(listed)).toContain(space.id)
     expect(text(threaded)).toContain(thread.id)

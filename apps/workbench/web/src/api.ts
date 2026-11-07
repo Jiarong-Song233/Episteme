@@ -36,6 +36,10 @@ export interface Session {
   readonly id: string
   readonly title: string
   readonly createdAt: number
+  /** The conversation this one branched from, and the turn it branched at. Absent on one that never branched. */
+  readonly parent?: { readonly thread: string; readonly turn: string }
+  /** Turns said on this line itself, not carried over from the one it left. */
+  readonly ownTurns?: number
 }
 
 export interface Turn {
@@ -46,6 +50,8 @@ export interface Turn {
   /** Absent only on a turn still being sent. */
   readonly by?: string
   readonly writtenWith?: 'person' | 'agent'
+  /** Carried over from the conversation this branch left, not said on it. */
+  readonly inherited?: boolean
 }
 
 export interface MaterialText {
@@ -534,6 +540,9 @@ export const api = {
     scene(`/sessions?space=${encoded(space)}`) as Promise<{ sessions: readonly Session[] }>,
   session: (thread: string) =>
     scene(`/session?thread=${encoded(thread)}`) as Promise<{ turns: readonly Turn[] }>,
+  /** A new line of a conversation from one of the turns it shows. The original stays as it is. */
+  fork: (space: string, thread: string, turn: string) =>
+    scene('/sessions/fork', { space, thread, turn }) as Promise<{ session: Session }>,
   ask: (space: string, question: string, thread: string | undefined, retry: boolean) =>
     scene('/ask', {
       space,

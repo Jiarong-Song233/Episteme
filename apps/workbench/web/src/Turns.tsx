@@ -19,6 +19,11 @@ export interface TurnLinks {
   /** Whether this service allows publishing at all. */
   readonly sharing: boolean
   readonly offer: (thread: string, turn: string) => Promise<string | undefined>
+  /**
+   * Opens a new line of the conversation on show from one of its turns. Absent where no branch can start: a plan,
+   * an archived space, or while a question is still being answered.
+   */
+  readonly fork?: ((turn: string) => Promise<void>) | undefined
 }
 
 export const Links = createContext<TurnLinks>({
@@ -40,6 +45,40 @@ function sourceNote(turn: Turn): string | undefined {
     : '来源未记录'
 }
 
+/**
+ * Starts a new line of the conversation from this turn. The original keeps everything said after it; the branch
+ * carries the conversation up to here and goes on from it.
+ */
+function ForkHere({ turn }: { turn: Turn }) {
+  const links = useContext(Links)
+  const [working, setWorking] = useState(false)
+  const [note, setNote] = useState<string>()
+  const { fork } = links
+  // A turn still being sent has no id to branch from yet.
+  if (fork === undefined || turn.id === 'asking') return null
+  return (
+    <>
+      <button
+        type="button"
+        className="link fork-here"
+        // Every turn has one; the words it starts from tell them apart when read aloud.
+        aria-label={`从这里分叉：${turn.text.slice(0, 24)}`}
+        disabled={working}
+        onClick={() => {
+          setWorking(true)
+          setNote(undefined)
+          fork(turn.id)
+            .catch((error: unknown) => setNote(messageOf(error)))
+            .finally(() => setWorking(false))
+        }}
+      >
+        {working ? '正在分叉…' : '从这里分叉'}
+      </button>
+      {note !== undefined && <span className="hint"> {note}</span>}
+    </>
+  )
+}
+
 /** What the person said, which they can make their own, or see what it became. */
 export function LearnerTurn({ turn, thread }: { turn: Turn; thread: string | undefined }) {
   const links = useContext(Links)
@@ -53,30 +92,33 @@ export function LearnerTurn({ turn, thread }: { turn: Turn; thread: string | und
     <div id={`turn-${turn.id}`} className="learner-turn" data-focused={links.focused === turn.id}>
       <p className="question">{turn.text}</p>
       {source !== undefined && <p className="hint turn-source">{source}</p>}
-      {made !== undefined ? (
-        <button type="button" className="link" onClick={() => links.openNode(made.nodeId)}>
-          已记成理解，去看看
-        </button>
-      ) : (
-        canOffer && (
-          <button
-            type="button"
-            className="link own-words"
-            disabled={working}
-            onClick={() => {
-              setWorking(true)
-              setNote(undefined)
-              links
-                .offer(thread, turn.id)
-                .then(setNote)
-                .catch((error: unknown) => setNote(messageOf(error)))
-                .finally(() => setWorking(false))
-            }}
-          >
-            {working ? '正在记下…' : '这是我的理解'}
+      <p className="turn-actions">
+        {made !== undefined ? (
+          <button type="button" className="link" onClick={() => links.openNode(made.nodeId)}>
+            已记成理解，去看看
           </button>
-        )
-      )}
+        ) : (
+          canOffer && (
+            <button
+              type="button"
+              className="link own-words"
+              disabled={working}
+              onClick={() => {
+                setWorking(true)
+                setNote(undefined)
+                links
+                  .offer(thread, turn.id)
+                  .then(setNote)
+                  .catch((error: unknown) => setNote(messageOf(error)))
+                  .finally(() => setWorking(false))
+              }}
+            >
+              {working ? '正在记下…' : '这是我的理解'}
+            </button>
+          )
+        )}
+        <ForkHere turn={turn} />
+      </p>
       {note !== undefined && made === undefined && <p className="hint">{note}</p>}
     </div>
   )
@@ -127,9 +169,16 @@ export function AgentTurn(props: {
   const [note, setNote] = useState<string>()
   if (turn.answer === undefined) {
     return (
-      <p id={`turn-${turn.id}`} className="answer" data-focused={links.focused === turn.id}>
-        {turn.text}
-      </p>
+      <>
+        <p id={`turn-${turn.id}`} className="answer" data-focused={links.focused === turn.id}>
+          {turn.text}
+        </p>
+        {links.fork !== undefined && (
+          <p className="turn-actions">
+            <ForkHere turn={turn} />
+          </p>
+        )}
+      </>
     )
   }
   const usable = turn.answer.segments.some(
@@ -144,28 +193,31 @@ export function AgentTurn(props: {
       <Recalled answer={turn.answer} />
       <AnswerBody answer={turn.answer} onCite={props.onCite} />
       {note !== undefined && <p className="hint">{note}</p>}
-      {usable && (
-        <button
-          type="button"
-          className="link"
-          disabled={state !== 'idle'}
-          onClick={() => {
-            setState('working')
-            props
-              .onCandidates(turn.id)
-              .then((message) => {
-                setNote(message)
-                setState('done')
-              })
-              .catch((error: unknown) => {
-                setNote(messageOf(error))
-                setState('idle')
-              })
-          }}
-        >
-          {state === 'working' ? '正在提炼…' : state === 'done' ? '已提炼' : '提炼成待确认的理解'}
-        </button>
-      )}
+      <p className="turn-actions">
+        {usable && (
+          <button
+            type="button"
+            className="link"
+            disabled={state !== 'idle'}
+            onClick={() => {
+              setState('working')
+              props
+                .onCandidates(turn.id)
+                .then((message) => {
+                  setNote(message)
+                  setState('done')
+                })
+                .catch((error: unknown) => {
+                  setNote(messageOf(error))
+                  setState('idle')
+                })
+            }}
+          >
+            {state === 'working' ? '正在提炼…' : state === 'done' ? '已提炼' : '提炼成待确认的理解'}
+          </button>
+        )}
+        <ForkHere turn={turn} />
+      </p>
     </article>
   )
 }

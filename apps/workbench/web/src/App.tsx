@@ -16,6 +16,7 @@ import {
   type Citation,
   type Evidence,
   type Failure,
+  type HeldNode,
   type MaterialSummary,
   type MaterialText,
   type Me,
@@ -51,7 +52,7 @@ import {
 import { AgentTurn, LearnerTurn, Links, messageOf } from './Turns.js'
 import { UnderstandingPanel, wordsOf } from './Understanding.js'
 
-type Pane = 'shelf' | 'talk' | 'side'
+type Pane = 'shelf' | 'talk' | 'side' | 'rail'
 
 const LAST_SPACE = 'workbench.space'
 
@@ -71,6 +72,37 @@ function remember(space: string): void {
     return
   }
 }
+
+const RAIL = 'workbench.rail'
+
+/** Whether the understanding layer was left open. It opens by default: it is the point of the page. */
+function railWasOpen(): boolean {
+  try {
+    return localStorage.getItem(RAIL) !== 'closed'
+  } catch {
+    return true
+  }
+}
+
+function keepRail(open: boolean): void {
+  try {
+    localStorage.setItem(RAIL, open ? 'open' : 'closed')
+  } catch {
+    // Only a convenience: it opens again next time.
+    return
+  }
+}
+
+/** Pages that are the understanding layer already, or that belong to no space, have no rail beside them. */
+const WITHOUT_RAIL: ReadonlySet<Place['kind']> = new Set([
+  'review',
+  'understanding',
+  'connect',
+  'model',
+  'conversations',
+  'agent-sessions',
+  'commons',
+])
 
 const NO_UNDERSTANDING: Understanding = { nodes: [], pending: [], challenges: [], dimensions: [] }
 /** A jump to a turn waits for the conversation it lies in to load, up to this many tries, 100 ms apart. */
@@ -237,6 +269,7 @@ function Desk({
   const [plans, setPlans] = useState<readonly Plan[]>([])
   const [planNotice, setPlanNotice] = useState<string>()
   const [learned, setLearned] = useState(0)
+  const [railOpen, setRailOpen] = useState(railWasOpen)
 
   const space = spaces.find((candidate) => candidate.id === spaceId)
   const spaceKnown = space !== undefined
@@ -570,9 +603,28 @@ function Desk({
     if (to === 'learning') moveTo(resume?.to ?? { kind: 'new', space: spaceId })
   }
 
-  const heldCount = understanding.nodes.filter(
+  const heldNodes = understanding.nodes.filter(
     (node) => node.revisedTo === undefined && !node.withdrawn,
-  ).length
+  )
+  const heldCount = heldNodes.length
+
+  const railAllowed = spaceKnown && !welcoming && !WITHOUT_RAIL.has(place.kind)
+  const right = opensSide(panel) ? 'source' : railAllowed && railOpen ? 'rail' : 'none'
+  const toggleRail = (): void => {
+    const next = !(right === 'rail')
+    setRailOpen(next)
+    keepRail(next)
+    if (next && opensSide(panel)) {
+      const { material: _closed, ...rest } = panel
+      showPanel(rest)
+    }
+    setPane(next ? 'rail' : 'talk')
+  }
+  const crumbs = crumbsOf(place, {
+    space: space?.name,
+    thread: sessions.find((session) => session.id === threadId)?.title,
+    plan: planInView?.topic,
+  })
 
   return (
     <Links.Provider
@@ -587,7 +639,12 @@ function Desk({
         offer: offerTurn,
       }}
     >
-      <div className="desk" data-pane={pane} data-side={opensSide(panel) ? 'open' : 'closed'}>
+      <div
+        className="desk"
+        data-pane={pane}
+        data-right={right}
+        data-rail={railAllowed ? 'allowed' : undefined}
+      >
         <Shelf
           spaces={spaces}
           current={spaceId}
@@ -700,6 +757,37 @@ function Desk({
           }}
         />
         <main className="talk">
+          <header className="topbar">
+            <p className="crumbs">
+              {crumbs.map((crumb, index) => (
+                // The same words can stand twice, a space and a conversation named alike.
+                // biome-ignore lint/suspicious/noArrayIndexKey: the crumbs are a fixed path, never reordered
+                <span key={index}>{crumb}</span>
+              ))}
+            </p>
+            {railAllowed && (
+              <button
+                type="button"
+                className="tool"
+                aria-pressed={right === 'rail'}
+                aria-label={
+                  understanding.pending.length > 0
+                    ? `理解层，${understanding.pending.length} 条等你确认`
+                    : '理解层'
+                }
+                data-waiting={understanding.pending.length > 0}
+                onClick={toggleRail}
+              >
+                <LayerGlyph />
+                理解层
+                {understanding.pending.length > 0 && (
+                  <span className="count" aria-hidden="true">
+                    {understanding.pending.length}
+                  </span>
+                )}
+              </button>
+            )}
+          </header>
           {lostSpace && (
             <p className="banner banner-error" role="alert">
               找不到这个地址里的空间，它可能已被删除，或者你没有权限查看。可以从左边选一个空间。
@@ -947,6 +1035,21 @@ function Desk({
             setPane('talk')
           }}
         />
+        {railAllowed && spaceId !== undefined && (
+          <Rail
+            pending={understanding.pending}
+            held={heldNodes}
+            guard={guard}
+            onDecided={decided}
+            onOpenNode={(node) => moveTo({ kind: 'understanding', space: spaceId, node })}
+            onOpenAll={() => moveTo({ kind: 'understanding', space: spaceId })}
+            onClose={() => {
+              setRailOpen(false)
+              keepRail(false)
+              setPane('talk')
+            }}
+          />
+        )}
         <nav className="switcher" aria-label="切换页面">
           <button type="button" aria-current={pane === 'shelf'} onClick={() => setPane('shelf')}>
             空间
@@ -957,6 +1060,11 @@ function Desk({
           <button type="button" aria-current={pane === 'side'} onClick={() => setPane('side')}>
             原文
           </button>
+          {railAllowed && (
+            <button type="button" aria-current={pane === 'rail'} onClick={() => setPane('rail')}>
+              理解层
+            </button>
+          )}
         </nav>
       </div>
     </Links.Provider>
@@ -1358,6 +1466,131 @@ function Conversation(props: {
   )
 }
 
+const PAGE_NAMES: Partial<Record<Place['kind'], string>> = {
+  space: '概览',
+  materials: '材料',
+  review: '待确认',
+  understanding: '我的理解',
+  new: '新对话',
+  connect: '接入 Agent',
+  model: '模型',
+  conversations: '所有对话',
+  'agent-sessions': 'Agent 会话记录',
+  commons: '公开成果',
+}
+
+/** Where the page is, as the title bar says it: the space, then the page or the conversation open in it. */
+function crumbsOf(
+  place: Place,
+  names: {
+    readonly space: string | undefined
+    readonly thread: string | undefined
+    readonly plan: string | undefined
+  },
+): readonly string[] {
+  const page =
+    place.kind === 'thread'
+      ? (names.thread ?? '对话')
+      : place.kind === 'plan'
+        ? (names.plan ?? '学习计划')
+        : PAGE_NAMES[place.kind]
+  const inSpace = 'space' in place && names.space !== undefined
+  return [inSpace ? names.space : undefined, page].filter(
+    (crumb): crumb is string => crumb !== undefined,
+  )
+}
+
+/** Two sheets, one solid and one dashed: what is held, and what waits above it. */
+function LayerGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" fill="none">
+      <rect
+        x="2.5"
+        y="7.5"
+        width="11"
+        height="6"
+        rx="1.5"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <rect
+        x="2.5"
+        y="2.5"
+        width="11"
+        height="6"
+        rx="1.5"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeDasharray="2 1.6"
+      />
+    </svg>
+  )
+}
+
+/**
+ * The understanding layer, beside whatever page is open: what waits for the person's decision, and what they
+ * already hold. Deciding here is the same as on the review page; only the person can do it.
+ */
+function Rail(props: {
+  pending: readonly PendingCandidate[]
+  held: readonly HeldNode[]
+  guard: (work: () => Promise<unknown>) => void
+  onDecided: () => Promise<void>
+  onOpenNode: (node: string) => void
+  onOpenAll: () => void
+  onClose: () => void
+}) {
+  const { pending, held } = props
+  return (
+    <aside className="rail" aria-label="理解层">
+      <div className="rail-head">
+        <h2>理解层</h2>
+        <button type="button" className="tool" onClick={props.onClose}>
+          收起
+        </button>
+      </div>
+      <div className="rail-body">
+        <p className="rail-rule">Agent 只能提议。只有你确认过的，才算你的理解。</p>
+        <section className="rail-section">
+          <h3 data-waiting={pending.length > 0}>
+            等你确认
+            <span className="count">{pending.length}</span>
+          </h3>
+          {pending.length === 0 ? (
+            <p className="rail-empty">现在没有等你确认的提议。Agent 提出的理解会先停在这里。</p>
+          ) : (
+            <PendingList pending={pending} guard={props.guard} onDecided={props.onDecided} />
+          )}
+        </section>
+        <section className="rail-section">
+          <h3>
+            你已确认
+            <span className="count">{held.length}</span>
+          </h3>
+          {held.length === 0 ? (
+            <p className="rail-empty">还没有。确认一条提议，它就会出现在这里。</p>
+          ) : (
+            <ul className="held">
+              {held.map((node) => (
+                <li key={node.nodeId}>
+                  <button type="button" onClick={() => props.onOpenNode(node.nodeId)}>
+                    {node.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <p className="rail-foot">
+          <button type="button" className="link" onClick={props.onOpenAll}>
+            打开理解图和每一条的来历
+          </button>
+        </p>
+      </div>
+    </aside>
+  )
+}
+
 /** The side column holds one thing: the source text a citation or a material name opened. */
 function Side(props: { source: SourceRequest | undefined; onClose: () => void }) {
   return (
@@ -1365,7 +1598,7 @@ function Side(props: { source: SourceRequest | undefined; onClose: () => void })
       <div className="side-head">
         <span>原文</span>
         {props.source !== undefined && (
-          <button type="button" className="link" onClick={props.onClose}>
+          <button type="button" className="tool" onClick={props.onClose}>
             关上原文
           </button>
         )}

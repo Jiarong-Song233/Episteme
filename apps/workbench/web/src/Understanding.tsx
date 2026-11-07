@@ -709,6 +709,19 @@ function TrailLine(props: {
               </button>
             </>
           )}
+          {/* Words a branch carried over: they were said further up, and this was made on the branch. */}
+          {entry.madeIn !== undefined && (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="link"
+                onClick={() => props.onJump(entry.madeIn ?? '', entry.turn)}
+              >
+                看提炼时的分支
+              </button>
+            </>
+          )}
         </p>
       )
     case 'revised_from':

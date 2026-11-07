@@ -104,6 +104,10 @@ export interface SceneWrites {
   appendTurn(
     ...args: Parameters<CognitiveSession['appendTurn']>
   ): ReturnType<CognitiveSession['appendTurn']>
+  /** A new line of one of the caller's own threads, from a turn it shows (ADR 0015, decision 3). */
+  forkThread(
+    ...args: Parameters<CognitiveSession['forkThread']>
+  ): ReturnType<CognitiveSession['forkThread']>
   log(name: string): SceneLog
 }
 
@@ -115,6 +119,8 @@ export function sceneWritesOf(session: CognitiveSession): SceneWrites {
       session.openThread(...args),
     appendTurn: (...args: Parameters<CognitiveSession['appendTurn']>) =>
       session.appendTurn(...args),
+    forkThread: (...args: Parameters<CognitiveSession['forkThread']>) =>
+      session.forkThread(...args),
     log: (name: string) => session.sceneLog(name),
   })
 }

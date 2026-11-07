@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { SceneWrites, Turn } from '@episteme/application'
+import type { SceneView, SceneWrites, Thread, Turn } from '@episteme/application'
 import type { SceneRoute, SceneRouteContext } from '@episteme/service'
 import { answerFrom, answerText, relevant, type Answer } from './answer.js'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
@@ -64,6 +64,17 @@ function historyOf(turns: readonly Turn[]): readonly ModelMessage[] {
 }
 
 /** A short title from the first question. */
+/** The turns said on this thread itself, without those it carries over from the line it branched from. */
+function ownTurnsOf(view: SceneView, thread: string): readonly Turn[] {
+  return (view.threadView(thread)?.turns ?? []).filter((turn) => turn.thread === thread)
+}
+
+/** "Title · 分支 n": a branch is told apart from its line and from the line's other branches. */
+function branchTitle(view: SceneView, from: Thread): string {
+  const siblings = view.threads(from.scope).filter((thread) => thread.parent?.thread === from.id)
+  return `${shownThread(view, from).title} · 分支 ${siblings.length + 1}`.slice(0, MAX_NAME)
+}
+
 function titleFrom(question: string): string {
   const line = question.trim().split('\n')[0] ?? ''
   return line.length > THREAD_TITLE ? `${line.slice(0, THREAD_TITLE)}…` : line
@@ -305,24 +316,50 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
 
     route('GET', '/sessions', ({ view, query }) => {
       const space = spaceOf(view, required(query, 'space'))
-      // As the person named them, without the ones they archived (conversations.ts).
+      // As the person named them, without the ones they archived (conversations.ts). A branch names its `parent`;
+      // `ownTurns` counts only what was said on it, not what it carries over from the line it left.
       return {
         sessions: view
           .threads(scopeOf(space.id))
-          .map((thread) => shownThread(view, thread))
+          .map((thread) => ({
+            ...shownThread(view, thread),
+            ownTurns: ownTurnsOf(view, thread.id).length,
+          }))
           .filter((thread) => !thread.archived),
       }
     }),
     route('GET', '/session', ({ view, query }) => {
       const thread = view.threadView(required(query, 'thread'))
       if (thread === undefined) refuse('unknown_thread', '这段对话不存在。')
+      const id = thread.thread.id
       return {
         thread: shownThread(view, thread.thread),
+        // `inherited`: the turn was said on a line this branch left, before it left.
         turns: thread.turns.map((turn) => {
           const answer = view.records.get(`${ANSWER_PREFIX}${turn.id}`)
-          return answer === undefined ? turn : { ...turn, answer: answer.value as Answer }
+          const shown = { ...turn, inherited: turn.thread !== id }
+          return answer === undefined ? shown : { ...shown, answer: answer.value as Answer }
         }),
       }
+    }),
+    // The person's: a new line of a conversation from one of its turns. The original and its other lines stay as
+    // they are. Not named in route-access.ts, so an agent's credential cannot open one here.
+    route('POST', '/sessions/fork', async ({ view, writes, body }) => {
+      const space = openSpaceOf(view, text(body, 'space'))
+      const from = view.threadView(text(body, 'thread', 200))
+      if (from === undefined || from.thread.scope !== scopeOf(space.id)) {
+        refuse('unknown_thread', '这个空间里没有这段对话。')
+      }
+      const turn = text(body, 'turn', 200)
+      if (!from.turns.some((each) => each.id === turn)) {
+        refuse('unknown_turn', '这段对话里没有这句话。')
+      }
+      const title =
+        body['title'] === undefined || body['title'] === ''
+          ? branchTitle(view, from.thread)
+          : text(body, 'title', MAX_NAME).trim().replace(/\s+/g, ' ')
+      const fork = await writes.forkThread(from.thread.id, turn, title)
+      return { session: { ...shownThread(view, fork), ownTurns: 0 } }
     }),
 
     route('POST', '/ask', ask),

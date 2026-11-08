@@ -27,6 +27,13 @@ export interface SceneView {
   expand(...args: Parameters<CognitiveSession['expand']>): ReturnType<CognitiveSession['expand']>
   vocabulary(): ReturnType<CognitiveSession['vocabulary']>
   pendingSuggestions(): ReturnType<CognitiveSession['pendingSuggestions']>
+  /**
+   * The candidate refs of a keyed submission the caller already made under this id, by `by`, that `distill` would
+   * answer again rather than read afresh; `undefined` when there is none. Only the caller's own.
+   */
+  submittedRefs(
+    ...args: Parameters<CognitiveSession['submittedRefs']>
+  ): ReturnType<CognitiveSession['submittedRefs']>
   /** The caller's own threads, newest first (ADR 0015). Never another person's. */
   threads(scope?: string): ReturnType<CognitiveSession['threads']>
   /** One of the caller's own threads with its turns, or `undefined` for any thread that is not theirs. */
@@ -75,6 +82,7 @@ export function sceneViewOf(session: CognitiveSession): SceneView {
     expand: (...args: Parameters<CognitiveSession['expand']>) => session.expand(...args),
     vocabulary: () => session.vocabulary(),
     pendingSuggestions: () => session.pendingSuggestions(),
+    submittedRefs: (by: string, submissionId: string) => session.submittedRefs(by, submissionId),
     threads: (scope?: string) => session.threads(scope),
     threadView: (threadId: string) => session.threadView(threadId),
     browsePublications: (...args: Parameters<CognitiveSession['browsePublications']>) =>

@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { addPerson, addToken, startService, type EpistemeService } from '@episteme/service'
+import { exportGraph, importGraph } from '@episteme/storage-sqlite'
 import {
   workbenchProfile,
   type HeldNode,
@@ -74,9 +75,9 @@ async function call<T = Record<string, unknown>>(path: string, body?: unknown, a
   return { status: response.status, body: (await response.json()) as T & { code?: string } }
 }
 
-const start = async (): Promise<void> => {
+const start = async (graph = join(directory, 'graph.db')): Promise<void> => {
   service = await startService({
-    graph: join(directory, 'graph.db'),
+    graph,
     port: 0,
     profile: workbenchProfile({ model }),
   })
@@ -182,7 +183,7 @@ afterEach(async () => {
 })
 
 describe('where an understanding came from, across branches', () => {
-  beforeEach(start)
+  beforeEach(() => start())
 
   it('leaves a conversation that never branched as it was', async () => {
     const space = await spaceWithNotes()
@@ -412,6 +413,153 @@ describe('where an understanding came from, across branches', () => {
       await proposed(space, (await nodeSaying(space, '我认为位置编码告诉模型词的顺序')).nodeId),
     ).toEqual(trail)
   })
+})
+
+describe('offering the same words again, across branches', () => {
+  beforeEach(() => start())
+
+  const TWO = '位置编码把序列的顺序告诉模型[1]。注意力机制看不出词的先后'
+
+  const dismiss = async (id: string): Promise<void> => {
+    expect((await call('/suggestions/decide', { id, action: 'dismiss' })).status).toBe(200)
+  }
+
+  /** What waits in the space, by its words. */
+  const waiting = async (space: string): Promise<readonly string[]> =>
+    (
+      await call<{ pending: readonly { proposal: { label?: string } }[] }>(
+        `${scene}/understanding?space=${space}`,
+      )
+    ).body.pending.map(({ proposal }) => (proposal.label ?? '').replace(/。$/u, ''))
+
+  it('answers a conversation’s own offer again as it was first made, whatever a branch offered since', async () => {
+    const space = await spaceWithNotes()
+    const root = await ask(space, '位置编码有什么用', TWO)
+    const first = await offerAnswer(space, root.thread, root.reply)
+    expect(first.suggestions).toHaveLength(2)
+    const [positional, attention] = first.suggestions
+    await dismiss(positional?.id ?? '')
+
+    // Dismissed here, so it can be raised again on a branch; the other sentence still waits from here.
+    const branch = await fork(space, root.thread, root.reply)
+    const raised = await offerAnswer(space, branch, root.reply)
+    expect(raised.suggestions.map(({ proposal }) => proposal.label)).toEqual([
+      positional?.proposal.label,
+    ])
+    expect(raised.refused.map(({ code }) => code)).toEqual(['already_pending'])
+
+    // The first offer, made again where it was made: answered from what it stored, not refused as a conflict.
+    const again = await call<Submitted>(`${scene}/candidates`, {
+      space,
+      thread: root.thread,
+      reply: root.reply,
+    })
+    expect(again.status).toBe(200)
+    expect(again.body.suggestions.map(({ id }) => id)).toEqual([attention?.id])
+    // And the branch's offer again, as the branch made it.
+    const branchAgain = await call<Submitted>(`${scene}/candidates`, {
+      space,
+      thread: branch,
+      reply: root.reply,
+    })
+    expect(branchAgain.status).toBe(200)
+    expect(branchAgain.body.suggestions.map(({ id }) => id)).toEqual(
+      raised.suggestions.map(({ id }) => id),
+    )
+    // Nothing waits twice.
+    expect([...(await waiting(space))].sort()).toEqual(
+      ['位置编码把序列的顺序告诉模型', '注意力机制看不出词的先后'].sort(),
+    )
+  })
+
+  it('answers the person’s own words offered again where they were offered, whatever a branch offered since', async () => {
+    const space = await spaceWithNotes()
+    const root = await ask(space, '我认为位置编码告诉模型词的顺序', '位置编码把序列的顺序告诉模型')
+    const first = await offerTurn(space, root.thread, root.turn)
+    expect(first.suggestions).toHaveLength(1)
+    await dismiss(first.suggestions[0]?.id ?? '')
+
+    // Dismissed, then raised again from a branch that carries the same turn.
+    const branch = await fork(space, root.thread, root.reply)
+    const raised = await offerTurn(space, branch, root.turn)
+    expect(raised.suggestions).toHaveLength(1)
+
+    // The first offer again: answered from what it stored, not refused as waiting elsewhere.
+    const again = await call<Submitted>(`${scene}/candidates/turn`, {
+      space,
+      thread: root.thread,
+      turn: root.turn,
+    })
+    expect(again.status).toBe(200)
+    expect(again.body.refused.map(({ code }) => code)).not.toContain('already_pending')
+    expect(again.body.suggestions).toEqual([])
+    expect(await waiting(space)).toEqual(['我认为位置编码告诉模型词的顺序'])
+  })
+
+  it('keeps each branch’s offers its own when two branches take turns', async () => {
+    const space = await spaceWithNotes()
+    const root = await ask(space, '我认为位置编码告诉模型词的顺序', TWO)
+    const left = await fork(space, root.thread, root.reply)
+    const right = await fork(space, root.thread, root.reply)
+
+    const leftAnswer = await offerAnswer(space, left, root.reply)
+    const leftTurn = await offerTurn(space, left, root.turn)
+    expect(leftAnswer.suggestions).toHaveLength(2)
+    expect(leftTurn.suggestions).toHaveLength(1)
+    for (let round = 0; round < 2; round += 1) {
+      // The other branch is told they already wait, and keeps no submission of its own for them.
+      expect((await offerAnswer(space, right, root.reply)).message).toBe('这条已经在待确认里了。')
+      expect((await offerTurn(space, right, root.turn)).message).toBe('这条已经在待确认里了。')
+      // The branch that made them is answered with what it made.
+      expect((await offerAnswer(space, left, root.reply)).suggestions.map(({ id }) => id)).toEqual(
+        leftAnswer.suggestions.map(({ id }) => id),
+      )
+      expect((await offerTurn(space, left, root.turn)).suggestions.map(({ id }) => id)).toEqual(
+        leftTurn.suggestions.map(({ id }) => id),
+      )
+    }
+    expect(await waiting(space)).toHaveLength(3)
+  })
+
+  it('reads the same origins from a graph exported and imported again', async () => {
+    const space = await spaceWithNotes()
+    const { root, middle, second, deep } = await threeLevels(space)
+    await accept(await offerTurn(space, deep, root.turn))
+    await accept(await offerAnswer(space, deep, second.reply))
+    const own = await ask(
+      space,
+      '我觉得没有位置编码时词序信息会丢失',
+      '自注意力让每个词根据其他词调整自己的表示',
+      deep,
+    )
+    await accept(await offerTurn(space, deep, own.turn))
+    const before = (await nodes(space)).map((node) => ({ label: node.label, origin: node.origin }))
+    const trails = await Promise.all(
+      (await nodes(space)).map(({ nodeId }) => proposed(space, nodeId)),
+    )
+    expect(before.map(({ origin }) => [origin?.thread, origin?.madeIn])).toEqual(
+      expect.arrayContaining([
+        [root.thread, deep],
+        [middle, deep],
+        [deep, undefined],
+      ]),
+    )
+
+    await service?.close()
+    service = undefined
+    const archive = join(directory, 'graph.episteme.json')
+    const restored = join(directory, 'restored.db')
+    await exportGraph(join(directory, 'graph.db'), archive, { build: 'test-build' })
+    await importGraph(archive, restored)
+    await start(restored)
+
+    expect(
+      (await nodes(space)).map((node) => ({ label: node.label, origin: node.origin })),
+    ).toEqual(before)
+    expect(
+      await Promise.all((await nodes(space)).map(({ nodeId }) => proposed(space, nodeId))),
+    ).toEqual(trails)
+  }, 60_000)
 })
 
 describe('where an understanding came from, in a shared service', () => {

@@ -2066,6 +2066,21 @@ export class CognitiveSession {
   }
 
   /**
+   * The candidate refs of a keyed submission (ADR 0011 §5) this person made under `submissionId`, by `by`, that
+   * landed: every ref it sent, kept or refused, as its receipt names them. That is the submission `distill` would
+   * answer from what it stored if the same payload came again, and refuse as `submission_conflict` if another did,
+   * so a host can tell a retry from a new request and send the candidates it sent then. `undefined` when there is
+   * none, or when its drafts never landed: `distill` reads such an attempt again. Reads only.
+   */
+  submittedRefs(by: string, submissionId: string): readonly string[] | undefined {
+    const earlier = this.#sources.submission(this.#actor, by, submissionId)
+    if (earlier === undefined) return undefined
+    if (this.#suggestions.landing(this.#actor, by, submissionId) === undefined) return undefined
+    const { kept, refused } = earlier.submission.receipt
+    return [...new Set([...kept.map(({ ref }) => ref), ...refused.map(({ ref }) => ref)])]
+  }
+
+  /**
    * Applies the learner's decision on a pending suggestion: the one path from a human decision to the graph
    * (ADR 0008).
    *

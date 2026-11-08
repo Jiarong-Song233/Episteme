@@ -739,14 +739,25 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
         message: '这条回答里没有可以提炼的、有引用依据的句子。',
       }
     }
-    const already = items.flatMap((item) =>
-      item.kind === 'node' && waitingElsewhere(view, space.id, threadId, replyId, item.label ?? '')
-        ? [{ ref: item.ref ?? '', code: 'already_pending', message: 'already waiting' }]
-        : [],
-    )
-    const fresh = items.filter(
-      (item) => item.kind !== 'node' || !already.some((each) => each.ref === item.ref),
-    )
+    const submission = submissionOf(threadId, reply)
+    // Made before under this key: the candidates it sent then go again, whatever waits elsewhere now, and the
+    // engine answers from what it stored. Only a new request is checked against the other branches.
+    const sent = view.submittedRefs(REQUESTED_BY, submission)
+    const already =
+      sent !== undefined
+        ? []
+        : items.flatMap((item) =>
+            item.kind === 'node' &&
+            waitingElsewhere(view, space.id, threadId, replyId, item.label ?? '')
+              ? [{ ref: item.ref ?? '', code: 'already_pending', message: 'already waiting' }]
+              : [],
+          )
+    const fresh =
+      sent !== undefined
+        ? items.filter((item) => sent.includes(item.ref ?? ''))
+        : items.filter(
+            (item) => item.kind !== 'node' || !already.some((each) => each.ref === item.ref),
+          )
     if (fresh.length === 0) {
       return { suggestions: [], refused: already, message: refusalMessage(already) }
     }
@@ -756,7 +767,7 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
       { title: thread?.thread.title ?? '', text: reply.text },
       fresh,
       () => ({ at: now(), speaker: 'model', basis: 'inferred', thread: threadId, turn: replyId }),
-      { session: threadId, submission: submissionOf(threadId, reply) },
+      { session: threadId, submission },
     )
     return replyOf({ ...outcome, refused: [...outcome.refused, ...already] })
   }
@@ -773,7 +784,11 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
     }
     const { material, lines, ranges } = dialogue([turn])
     const words = lines[0]?.words ?? ''
-    if (waitingElsewhere(view, space.id, threadId, turnId, words)) {
+    const submission = submissionOf(threadId, turn)
+    if (
+      view.submittedRefs(REQUESTED_BY, submission) === undefined &&
+      waitingElsewhere(view, space.id, threadId, turnId, words)
+    ) {
       const refused = [{ ref: 'words', code: 'already_pending', message: 'already waiting' }]
       return { suggestions: [], refused, message: refusalMessage(refused) }
     }
@@ -795,7 +810,7 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
       () => ({ at: now(), speaker: 'learner', basis: 'stated', thread: threadId, turn: turnId }),
       {
         session: threadId,
-        submission: submissionOf(threadId, turn),
+        submission,
         thread: { id: threadId, turns: ranges },
       },
     )

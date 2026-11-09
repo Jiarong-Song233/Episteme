@@ -239,8 +239,8 @@ export function Outcomes(props: {
             {pending.length > PENDING_SHOWN && (
               <p className="hint">还有 {pending.length - PENDING_SHOWN} 条。</p>
             )}
-            <p>
-              <button type="button" className="link" onClick={props.onReview}>
+            <p className="next-action">
+              <button type="button" onClick={props.onReview}>
                 去确认
               </button>
             </p>
@@ -268,9 +268,9 @@ export function Outcomes(props: {
       {focus === undefined && (
         <section>
           <h3>接着学</h3>
-          <p className="quiet-actions">
+          <p className="next-action">
             {resume !== undefined && (
-              <button type="button" className="link" onClick={resume.open}>
+              <button type="button" onClick={resume.open}>
                 回到“{resume.label}”
               </button>
             )}

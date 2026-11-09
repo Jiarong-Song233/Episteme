@@ -179,7 +179,7 @@ textarea {
   background: var(--paper-raised);
 }
 
-button:not(.row, .link, .cite, .node-row, [role="tab"]),
+button:not(.row, .link, .cite, .node-row, .material-title, [role="tab"]),
 .upload {
   flex: none;
   padding: 5px 12px;
@@ -306,6 +306,8 @@ button:disabled {
 }
 
 .page-hint {
+  max-width: 62ch;
+  margin-bottom: 20px;
   font-size: 15px;
 }
 
@@ -1234,6 +1236,14 @@ li[data-status="skipped"] > span:first-child {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.next-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-top: 12px;
 }
 
 .reading {

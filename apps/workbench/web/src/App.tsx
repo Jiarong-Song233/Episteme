@@ -33,6 +33,7 @@ import { Commons, SignIn } from './Commons.js'
 import { AgentSessionsPage } from './AgentSessions.js'
 import { ConnectPage } from './Connect.js'
 import { ConversationsPage } from './Conversations.js'
+import { UnfiledPage } from './Unfiled.js'
 import { ModelPage } from './Model.js'
 import { Welcome } from './Welcome.js'
 import { PlanShelf, PlanView } from './Learning.js'
@@ -100,6 +101,7 @@ const WITHOUT_RAIL: ReadonlySet<Place['kind']> = new Set([
   'connect',
   'model',
   'conversations',
+  'unfiled',
   'agent-sessions',
   'commons',
 ])
@@ -248,6 +250,8 @@ function Desk({
   const [model, setModel] = useState<ModelInfo>()
   const [spaces, setSpaces] = useState<readonly Space[]>([])
   const [listed, setListed] = useState(false)
+  /** How many candidates wait without a space, so the way to them shows before anyone looks. */
+  const [unfiled, setUnfiled] = useState(0)
   /** The space whose materials, conversations and plans are in hand. */
   const [loadedFor, setLoadedFor] = useState<string>()
   const [materials, setMaterials] = useState<readonly MaterialSummary[]>([])
@@ -339,6 +343,7 @@ function Desk({
       setModel(await api.model())
       setLibrary(await api.workflows())
       setSpaces((await api.spaces()).spaces)
+      setUnfiled((await api.unfiled()).pending.length)
       setListed(true)
     })
   }, [guard])
@@ -351,6 +356,7 @@ function Desk({
     place.kind === 'connect' ||
     place.kind === 'model' ||
     place.kind === 'conversations' ||
+    place.kind === 'unfiled' ||
     place.kind === 'agent-sessions'
   useEffect(() => {
     if (addressedSpace !== undefined) {
@@ -746,6 +752,18 @@ function Desk({
               <button
                 type="button"
                 className="row"
+                aria-current={place.kind === 'unfiled' ? 'page' : undefined}
+                onClick={() => {
+                  moveTo({ kind: 'unfiled' })
+                  setPane('talk')
+                }}
+              >
+                未分类待确认
+                {unfiled > 0 && <span className="row-note">{unfiled} 条</span>}
+              </button>
+              <button
+                type="button"
+                className="row"
                 aria-current={place.kind === 'agent-sessions' ? 'page' : undefined}
                 onClick={() => {
                   moveTo({ kind: 'agent-sessions' })
@@ -851,6 +869,8 @@ function Desk({
                 setPane('talk')
               }}
             />
+          ) : place.kind === 'unfiled' ? (
+            <UnfiledPage nameOf={nameOf} spaces={spaces} guard={guard} onChanged={setUnfiled} />
           ) : place.kind === 'agent-sessions' ? (
             <AgentSessionsPage
               agent={place.agent}
@@ -1637,6 +1657,7 @@ const PAGE_NAMES: Partial<Record<Place['kind'], string>> = {
   connect: '接入 Agent',
   model: '模型',
   conversations: '所有对话',
+  unfiled: '未分类待确认',
   'agent-sessions': 'Agent 会话记录',
   commons: '公开成果',
 }

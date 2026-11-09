@@ -93,6 +93,18 @@ export interface PendingCandidate {
   readonly link?: { readonly fromLabel: string; readonly toLabel: string; readonly ready: boolean }
 }
 
+/** A candidate proposed outside any space: who proposed it, for whom, and from where. */
+export interface UnfiledCandidate extends PendingCandidate {
+  readonly owner: string
+  readonly proposedBy: string
+  readonly proposedAt: string
+  readonly speaker?: string
+  /** Whether it can be filed in a space; only a node or a claim can. */
+  readonly fileable: boolean
+  /** The person already holds an understanding in exactly these words. */
+  readonly held?: boolean
+}
+
 export interface Dimension {
   readonly id: string
   readonly labelZh: string
@@ -613,8 +625,13 @@ export const api = {
     }>,
   understanding: (space: string) =>
     scene(`/understanding?space=${encoded(space)}`) as Promise<Understanding>,
+  unfiled: () =>
+    scene('/understanding/unfiled') as Promise<{ pending: readonly UnfiledCandidate[] }>,
   // The person's decision, through the API's own decision route. The workbench has no other way to make one.
   accept: (id: string) => request('/suggestions/decide', { id, action: 'accept' }),
+  /** Accepts a candidate proposed outside any space and files it in the space the person chose. */
+  acceptInto: (id: string, space: string) =>
+    request('/suggestions/decide', { id, action: 'accept', scope: `workbench:${space}` }),
   dismiss: (id: string) => request('/suggestions/decide', { id, action: 'dismiss' }),
   acceptEdited: (candidate: PendingCandidate, label: string) =>
     request('/suggestions/decide', {

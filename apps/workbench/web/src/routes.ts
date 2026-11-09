@@ -15,6 +15,8 @@ export type Place =
   | { readonly kind: 'model' }
   /** Every conversation of the workbench, to rename and archive. */
   | { readonly kind: 'conversations' }
+  /** What waits for the person's decision but was proposed outside any space. */
+  | { readonly kind: 'unfiled' }
   /** The conversations the agents of this computer keep, or one of them. */
   | { readonly kind: 'agent-sessions'; readonly agent?: string; readonly session?: string }
   /** A space's overview: what waits for the person, what is still a gap, and what came of learning lately. */
@@ -61,6 +63,7 @@ export function usePlace(): Place {
   const [connect] = useRoute('/connect')
   const [modelPage] = useRoute('/model')
   const [conversations] = useRoute('/conversations')
+  const [unfiled] = useRoute('/unfiled')
   const [, agentSessions] = useRoute('/agent-sessions/:agent?/:session?')
   const [, commons] = useRoute('/commons/:publication?')
   const [, thread] = useRoute('/spaces/:space/threads/:thread')
@@ -73,6 +76,7 @@ export function usePlace(): Place {
   if (connect) return { kind: 'connect' }
   if (modelPage) return { kind: 'model' }
   if (conversations) return { kind: 'conversations' }
+  if (unfiled) return { kind: 'unfiled' }
   if (agentSessions !== null) {
     const { agent, session } = agentSessions
     return {
@@ -113,6 +117,8 @@ function pathOf(place: Place): string {
       return '/model'
     case 'conversations':
       return '/conversations'
+    case 'unfiled':
+      return '/unfiled'
     case 'agent-sessions':
       return place.agent === undefined
         ? '/agent-sessions'

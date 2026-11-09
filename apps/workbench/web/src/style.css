@@ -946,6 +946,28 @@ mark {
   margin-top: 10px;
 }
 
+/* Where a candidate without a space came from, read as a short ledger beside its words. */
+.unfiled-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 14px;
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.unfiled-facts dd {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.unfiled-space {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* A tick in the accent: what the person confirmed, and the only thing that counts. */
 .understood li {
   position: relative;

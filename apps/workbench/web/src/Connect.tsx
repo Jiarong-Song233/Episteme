@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError, type AgentInfo, type AgentUse, type Me } from './api.js'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { api, ApiError, type AgentInfo, type AgentUse, type LaunchPlan, type Me } from './api.js'
 
 /**
  * The agents of this computer and their connection to the workbench: which are installed, which are connected, and
@@ -79,6 +79,7 @@ function Copyable(props: { label: string; text: string }) {
 
 function status(agent: AgentInfo): { text: string; tone: 'on' | 'off' | 'warn' } {
   if (agent.connected === undefined) {
+    if (agent.confirms === true) return { text: '未检查', tone: 'off' }
     return agent.how === 'manual'
       ? { text: '需要手动接入', tone: 'off' }
       : { text: '配置读不懂', tone: 'warn' }
@@ -114,6 +115,16 @@ function AgentRow(props: {
           {shown.text}
         </span>
         <div className="agent-actions">
+          {canAct && agent.confirms === true && agent.connected === undefined && (
+            <button
+              type="button"
+              className="secondary"
+              disabled={props.busy}
+              onClick={props.onDisconnect}
+            >
+              断开
+            </button>
+          )}
           {canAct &&
             (agent.connected === true && agent.current !== false ? (
               <button
@@ -142,7 +153,13 @@ function AgentRow(props: {
       {agent.installed && <p className="hint agent-used">{usedLine(agent.use)}</p>}
       {open && (
         <div className="agent-detail">
-          {agent.how === 'command' && <p className="hint">用它自己的 mcp 命令接入和断开。</p>}
+          {agent.how === 'command' && (
+            <p className="hint">
+              用它自己的 mcp 命令接入和断开。
+              {agent.confirms === true &&
+                '这个命令来自插件：打开列表不会运行它，接入或断开前会先列出要运行的程序和参数，确认后才运行。'}
+            </p>
+          )}
           {agent.how === 'skill' && (
             <p className="hint">
               它不读 MCP 配置，但会读技能。接入时放进一个 episteme
@@ -177,6 +194,56 @@ function AgentRow(props: {
         </div>
       )}
     </li>
+  )
+}
+
+/** A plugin's command, laid out word for word before it runs. Nothing runs until the person presses run. */
+function LaunchConfirm(props: {
+  plan: LaunchPlan
+  busy: boolean
+  onRun: () => void
+  onCancel: () => void
+}) {
+  const { plan } = props
+  const verb = plan.action === 'connect' ? '接入' : '断开'
+  const run = useRef<HTMLButtonElement>(null)
+  // The row pressed may be far down the page: bring what will run to the person.
+  useEffect(() => {
+    run.current?.scrollIntoView({ block: 'center' })
+    run.current?.focus({ preventScroll: true })
+  }, [plan])
+  return (
+    <section
+      className="panel launch-confirm"
+      role="dialog"
+      aria-label={`确认运行 ${plan.name} 的命令`}
+    >
+      <h3>{`${verb} ${plan.name} 要运行这些命令`}</h3>
+      <p className="hint">
+        它们来自插件文件 <code>{plan.source}</code>
+        ，不是工作台内置的。确认后才会运行；取消则什么都不运行。
+      </p>
+      <ol className="launch-steps">
+        {plan.steps.map((step, index) => (
+          <li key={index}>
+            <p className="hint">
+              程序：<code>{step.program}</code>
+            </p>
+            <pre aria-label={`第 ${index + 1} 条命令`}>
+              {[step.command, ...step.args].join(' ')}
+            </pre>
+          </li>
+        ))}
+      </ol>
+      <div className="actions">
+        <button ref={run} type="button" disabled={props.busy} onClick={props.onRun}>
+          {props.busy ? '正在运行…' : `运行并${verb}`}
+        </button>
+        <button type="button" className="secondary" disabled={props.busy} onClick={props.onCancel}>
+          取消
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -353,6 +420,7 @@ export function ConnectPage({ me }: { me: Me }) {
   const [busy, setBusy] = useState<string>()
   const [message, setMessage] = useState<{ ok: boolean; text: string }>()
   const [showMissing, setShowMissing] = useState(false)
+  const [pending, setPending] = useState<{ agent: AgentInfo; plan: LaunchPlan }>()
   const [plugins, setPlugins] = useState<{
     folder: string
     problems: readonly { file: string; reason: string }[]
@@ -421,13 +489,40 @@ export function ConnectPage({ me }: { me: Me }) {
       .finally(() => setBusy(undefined))
   }
 
+  /** A plugin's command is shown first; anything else connects at once, as before. */
+  const launch = (agent: AgentInfo, action: 'connect' | 'disconnect') => {
+    const run = (confirm?: string) =>
+      action === 'connect'
+        ? act(agent, () => api.connectAgent(agent.id, confirm), 'connected')
+        : act(agent, () => api.disconnectAgent(agent.id, confirm), 'disconnected')
+    if (agent.confirms !== true) {
+      run()
+      return
+    }
+    setMessage(undefined)
+    setBusy(agent.id)
+    api
+      .agentPlan(agent.id, action)
+      .then((reply) => {
+        if (reply.plan === null) run()
+        else setPending({ agent, plan: reply.plan })
+      })
+      .catch((error: unknown) =>
+        setMessage({
+          ok: false,
+          text: error instanceof ApiError ? error.message : '读不到要运行的命令。',
+        }),
+      )
+      .finally(() => setBusy(undefined))
+  }
+
   const row = (agent: AgentInfo) => (
     <AgentRow
       key={agent.id}
       agent={agent}
       busy={busy === agent.id}
-      onConnect={() => act(agent, () => api.connectAgent(agent.id), 'connected')}
-      onDisconnect={() => act(agent, () => api.disconnectAgent(agent.id), 'disconnected')}
+      onConnect={() => launch(agent, 'connect')}
+      onDisconnect={() => launch(agent, 'disconnect')}
       {...(agent.kind === 'custom' || agent.source === 'plugin'
         ? {
             onRemove: () => {
@@ -462,6 +557,26 @@ export function ConnectPage({ me }: { me: Me }) {
         <p className={message.ok ? 'banner' : 'banner banner-error'} role="status">
           {message.text}
         </p>
+      )}
+
+      {pending !== undefined && (
+        <LaunchConfirm
+          plan={pending.plan}
+          busy={busy === pending.agent.id}
+          onCancel={() => {
+            setPending(undefined)
+            setMessage({ ok: true, text: `没有运行 ${pending.plan.name} 的命令。` })
+          }}
+          onRun={() => {
+            const { agent, plan } = pending
+            setPending(undefined)
+            if (plan.action === 'connect') {
+              act(agent, () => api.connectAgent(agent.id, plan.confirm), 'connected')
+            } else {
+              act(agent, () => api.disconnectAgent(agent.id, plan.confirm), 'disconnected')
+            }
+          }}
+        />
       )}
 
       <section className="panel">

@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -116,6 +117,8 @@ export interface AgentDefinition {
   readonly untagged?: boolean
   /** Where the definition came from, when not from this file. */
   readonly source?: 'plugin'
+  /** For a plugin: the file it was read from. */
+  readonly pluginFile?: string
   /** Said after connecting, such as that the program has to be restarted. */
   readonly after?: string
 }
@@ -602,7 +605,9 @@ export class AgentFailure extends Error {
       | 'not_installed'
       | 'cannot_connect'
       | 'unreadable_settings'
-      | 'invalid_request',
+      | 'invalid_request'
+      | 'confirmation_required'
+      | 'busy',
     message: string,
   ) {
     super(message)
@@ -659,6 +664,11 @@ async function writeEntry(
 }
 
 function onPath(command: string, env: AgentEnvironment): boolean {
+  return programOnPath(command, env) !== undefined
+}
+
+/** The file `command` names on the PATH, the first one found, as the shell would find it. Nothing is run. */
+function programOnPath(command: string, env: AgentEnvironment): string | undefined {
   const folders = (env.env['PATH'] ?? env.env['Path'] ?? '')
     .split(delimiter)
     .filter((folder) => folder !== '')
@@ -668,15 +678,37 @@ function onPath(command: string, env: AgentEnvironment): boolean {
           .split(';')
           .filter((extension) => extension !== '')
       : ['']
-  return folders.some((folder) =>
-    extensions.some((extension) => {
+  for (const folder of folders) {
+    for (const extension of extensions) {
+      const path = join(folder, command + extension)
       try {
-        return statSync(join(folder, command + extension)).isFile()
+        if (statSync(path).isFile()) return path
       } catch {
-        return false
+        // Not here.
       }
-    }),
-  )
+    }
+  }
+  return undefined
+}
+
+/**
+ * What launching a plugin's command will run, shown to the person before anything runs. `confirm` names exactly
+ * this: the plugin file as it reads now, the program found on the PATH and every word. Launching with any other
+ * `confirm`, because the plugin, the program or the address changed since, runs nothing.
+ */
+export interface LaunchPlan {
+  readonly agent: string
+  readonly name: string
+  readonly action: 'connect' | 'disconnect'
+  /** The plugin file the command comes from. */
+  readonly source: string
+  readonly steps: readonly {
+    readonly command: string
+    /** The file the command names on the PATH. */
+    readonly program: string
+    readonly args: readonly string[]
+  }[]
+  readonly confirm: string
 }
 
 export interface CustomAgent {
@@ -745,6 +777,8 @@ export interface AgentView {
   readonly how: 'command' | 'settings' | 'skill' | 'manual'
   readonly file?: string
   readonly source?: 'plugin'
+  /** Connecting or disconnecting runs a plugin's command, so it asks the person to confirm what will run first. */
+  readonly confirms?: true
   readonly address: string
   readonly after?: string
   readonly use?: AgentUse
@@ -764,6 +798,8 @@ export class Agents {
   #problems: PluginProblem[] = []
   /** What an agent's own command last said about whether it lists the workbench: asking takes a second or two. */
   readonly #listedCache = new Map<string, { at: number; value: boolean | undefined }>()
+  /** Agents whose plugin command is running now. */
+  readonly #launching = new Set<string>()
   readonly #uses = new Map<string, AgentUse>()
   /** A client's user agent, once its `initialize` said who it is: later calls carry no name. */
   readonly #namesByUserAgent = new Map<string, { name: string; version?: string }>()
@@ -864,6 +900,75 @@ export class Agents {
     return definition.untagged === true ? this.#mcpUrl() : addressFor(this.#mcpUrl(), definition.id)
   }
 
+  /** Whether connecting `definition` runs a command a plugin named, rather than one built into the workbench. */
+  #runsPlugin(definition: AgentDefinition): boolean {
+    return definition.source === 'plugin' && this.#how(definition) === 'command'
+  }
+
+  /**
+   * What connecting or disconnecting a plugin's agent will run, for the person to read before it runs; `undefined`
+   * when it runs no plugin command. Reading the plugin file and finding the program runs nothing.
+   */
+  async plan(id: string, action: 'connect' | 'disconnect'): Promise<LaunchPlan | undefined> {
+    await this.#loadPlugins()
+    const definition = this.#definition(id)
+    if (!this.#runsPlugin(definition)) return undefined
+    const source = definition.pluginFile
+    if (source === undefined) {
+      throw new AgentFailure('cannot_connect', `${definition.name} 的插件文件找不到了。`)
+    }
+    const text = await readText(source)
+    if (text === undefined) {
+      throw new AgentFailure('cannot_connect', `${definition.name} 的插件文件找不到了。`)
+    }
+    const command = definition.commands![0]!
+    const program = programOnPath(command, this.#env)
+    if (program === undefined) {
+      throw new AgentFailure('not_installed', `这台电脑上没有找到 ${command}。`)
+    }
+    const words =
+      action === 'connect'
+        ? // Adding refuses a name that is already there, so an old entry, at another address, goes first.
+          [definition.cli!.remove, definition.cli!.add(this.#address(definition))]
+        : [definition.cli!.remove]
+    const steps = words.map((args) => ({ command, program, args }))
+    const confirm = createHash('sha256')
+      .update(JSON.stringify({ id, action, source, text, steps }))
+      .digest('hex')
+    return { agent: id, name: definition.name, action, source, steps, confirm }
+  }
+
+  /**
+   * Runs a plugin's command only with the person's confirmation of exactly what runs, and one launch at a time per
+   * agent. Without `confirm`, or with one for something else, nothing runs.
+   */
+  async #launch<T>(
+    definition: AgentDefinition,
+    action: 'connect' | 'disconnect',
+    confirm: string | undefined,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    if (!this.#runsPlugin(definition)) return work()
+    const plan = await this.plan(definition.id, action)
+    if (confirm === undefined || plan === undefined || confirm !== plan.confirm) {
+      throw new AgentFailure(
+        'confirmation_required',
+        confirm === undefined
+          ? `${definition.name} 来自插件，要运行它自己的命令。请先看清要运行什么，确认后再${action === 'connect' ? '接入' : '断开'}。`
+          : `${definition.name} 的插件、程序或地址在你确认之后变了，没有运行。请重新查看后再确认。`,
+      )
+    }
+    if (this.#launching.has(definition.id)) {
+      throw new AgentFailure('busy', `${definition.name} 的命令还在运行，请等它结束。`)
+    }
+    this.#launching.add(definition.id)
+    try {
+      return await work()
+    } finally {
+      this.#launching.delete(definition.id)
+    }
+  }
+
   async #listed(definition: AgentDefinition): Promise<boolean | undefined> {
     const cached = this.#listedCache.get(definition.id)
     if (cached !== undefined && Date.now() - cached.at < 30_000) return cached.value
@@ -910,6 +1015,7 @@ export class Agents {
       how: this.#how(definition),
       ...(file === undefined ? {} : { file }),
       ...(definition.source === undefined ? {} : { source: definition.source }),
+      ...(this.#runsPlugin(definition) ? { confirms: true as const } : {}),
       address,
       ...(definition.after === undefined ? {} : { after: definition.after }),
       ...(use === undefined ? {} : { use }),
@@ -936,8 +1042,15 @@ export class Agents {
   }
 
   /** Connects one agent, with its own command when it has one, else through its settings file or a skill. */
-  async connect(id: string): Promise<{ agent: AgentView; said?: string }> {
+  async connect(id: string, confirm?: string): Promise<{ agent: AgentView; said?: string }> {
     const definition = this.#definition(id)
+    if (!this.#installed(definition)) {
+      throw new AgentFailure('not_installed', `这台电脑上没有找到 ${definition.name}。`)
+    }
+    return this.#launch(definition, 'connect', confirm, () => this.#connect(definition))
+  }
+
+  async #connect(definition: AgentDefinition): Promise<{ agent: AgentView; said?: string }> {
     if (!this.#installed(definition)) {
       throw new AgentFailure('not_installed', `这台电脑上没有找到 ${definition.name}。`)
     }
@@ -977,8 +1090,12 @@ export class Agents {
   }
 
   /** Removes the workbench from one agent's settings. Its other servers and settings stay. */
-  async disconnect(id: string): Promise<{ agent: AgentView }> {
+  async disconnect(id: string, confirm?: string): Promise<{ agent: AgentView }> {
     const definition = this.#definition(id)
+    return this.#launch(definition, 'disconnect', confirm, () => this.#disconnect(definition))
+  }
+
+  async #disconnect(definition: AgentDefinition): Promise<{ agent: AgentView }> {
     this.#listedCache.delete(definition.id)
     const target = definition.settings?.(this.#env)
     if (this.#how(definition) === 'skill') {

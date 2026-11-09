@@ -34,14 +34,28 @@ export function agentRoutes(agents: Agents): readonly SceneRoute[] {
   return [
     { method: 'GET', path: '/agents', handle: () => agents.list() },
     {
+      // What connecting or disconnecting will run, when that is a plugin's command. Reading it runs nothing.
+      method: 'POST',
+      path: '/agents/plan',
+      handle: ({ body }) =>
+        refusing(async () => {
+          const action = body['action']
+          if (action !== 'connect' && action !== 'disconnect') {
+            refuse('invalid_request', '"action" must be "connect" or "disconnect"')
+          }
+          const plan = await agents.plan(id(body), action)
+          return plan === undefined ? { plan: null } : { plan }
+        }),
+    },
+    {
       method: 'POST',
       path: '/agents/connect',
-      handle: ({ body }) => refusing(() => agents.connect(id(body))),
+      handle: ({ body }) => refusing(() => agents.connect(id(body), optional(body, 'confirm'))),
     },
     {
       method: 'POST',
       path: '/agents/disconnect',
-      handle: ({ body }) => refusing(() => agents.disconnect(id(body))),
+      handle: ({ body }) => refusing(() => agents.disconnect(id(body), optional(body, 'confirm'))),
     },
     {
       method: 'POST',

@@ -18,7 +18,8 @@ import {
  * built-in list does not know: how to find it, and where it keeps its MCP servers, its command for adding one, or its
  * skills folder. A plugin only describes; connecting it does the same as for a built-in agent, so a plugin can
  * neither run anything but the agent's own command with fixed words and the workbench's address, nor write anything
- * but the `episteme` entry or skill.
+ * but the `episteme` entry or skill. Importing, loading or listing a plugin runs nothing: its command runs only when
+ * the person connects or disconnects it and confirms the exact program, words and plugin file shown to them.
  *
  *   {
  *     "id": "my-agent", "name": "我的 Agent", "maker": "…", "kind": "desktop",
@@ -199,6 +200,7 @@ export function expandPath(path: string, env: AgentEnvironment): string {
 export function pluginDefinition(
   manifest: AgentPluginManifest,
   env: AgentEnvironment,
+  file?: string,
 ): AgentDefinition {
   // Paths are checked now, so a plugin with a path that cannot be used is refused as a whole.
   const detect = (manifest.detect ?? []).map((path) => expandPath(path, env))
@@ -228,22 +230,17 @@ export function pluginDefinition(
             style: manifest.settings!.style ?? 'url',
           }),
         }),
-    ...(cli === undefined
+    // No `listed`: a plugin's program runs only when the person launches it and confirms what will run, never to
+    // show the list or on import. `cli.list` is still accepted so an existing plugin file keeps loading.
+    ...(cli === undefined || command === undefined
       ? {}
       : {
           cli: {
             add: (url: string) => cli.add.map((word) => (word === '{url}' ? url : word)),
             remove: cli.remove,
           },
-          ...(cli.list === undefined || command === undefined || settingsFile !== undefined
-            ? {}
-            : {
-                listed: async (environment: AgentEnvironment) => {
-                  const { ok, output } = await environment.run(command, cli.list!)
-                  return ok ? /^\s*episteme(\s|$)/m.test(output) : undefined
-                },
-              }),
         }),
+    ...(file === undefined ? {} : { pluginFile: file }),
     ...(skills === undefined ? {} : { skill: () => skills }),
     ...(manifest.untagged === true ? { untagged: true } : {}),
     ...(manifest.after === undefined ? {} : { after: manifest.after }),
@@ -274,7 +271,7 @@ export async function loadPlugins(
       }) as unknown
       if (errors.length > 0) refuse('不是能读懂的 JSON。')
       const manifest = checkManifest(parsed, seen)
-      definitions.push(pluginDefinition(manifest, env))
+      definitions.push(pluginDefinition(manifest, env, file))
       seen.add(manifest.id)
     } catch (error) {
       problems.push({ file, reason: error instanceof PluginRefused ? error.message : '读不出来。' })

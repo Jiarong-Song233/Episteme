@@ -4,6 +4,7 @@ import { pipeline } from 'node:stream/promises'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import type { CognitiveSession } from '@episteme/application'
 import {
+  type AuthInfo,
   createMcpHandler,
   hostHeaderValidationResponse,
   localhostAllowedHostnames,
@@ -141,10 +142,17 @@ export function createMcpEndpoint(
   // One codec for the endpoint's lifetime: a server is built per request, and the round that verifies a
   // learner's answer is a different request from the one that asked.
   const codec = createDecisionCodec()
-  // The SDK hands the factory the request it serves, so the caller the host established travels with it.
-  const callers = new WeakMap<Request, McpCaller>()
-  const handler = createMcpHandler(({ requestInfo }) => {
-    const caller = requestInfo === undefined ? undefined : callers.get(requestInfo)
+  // The caller the host established travels to the factory through the SDK's `authInfo`, which the SDK passes
+  // through untouched and never fills from request headers. It does not travel with the `Request`: the SDK
+  // clones a POST before serving it, so anything keyed on the request object is lost on the way.
+  const handler = createMcpHandler(({ authInfo }) => {
+    // Every request this endpoint serves carries a binding, even one with no caller. A request that arrives
+    // without one lost its caller on the way, so it is refused rather than served as the session's own person.
+    const binding = bindingOf(authInfo)
+    if (binding === undefined) {
+      throw new Error('the caller of this MCP request could not be established; refusing it')
+    }
+    const caller = binding.caller
     // An agent acts for the person its credential belongs to, so it reads and proposes in their session.
     const own = caller === undefined ? session : session.forActor(caller.actorId)
     return createEpistemeMcpServer(own, codec, sceneTools, {
@@ -154,7 +162,6 @@ export function createMcpEndpoint(
   })
 
   const fetch = async (request: Request, caller?: McpCaller): Promise<Response> => {
-    if (caller !== undefined) callers.set(request, caller)
     const refused =
       hostHeaderValidationResponse(request, hostnames) ?? originValidationResponse(request, origins)
     if (refused !== undefined) return refused
@@ -167,7 +174,7 @@ export function createMcpEndpoint(
         }
       }
     }
-    return handler.fetch(request)
+    return handler.fetch(request, { authInfo: authInfoFor(caller) })
   }
 
   return {
@@ -178,6 +185,35 @@ export function createMcpEndpoint(
     },
     close: () => handler.close(),
   }
+}
+
+/** Where the binding sits in `AuthInfo.extra`. Only this endpoint writes it; the SDK never fills `authInfo`. */
+const BINDING = 'episteme.caller'
+
+interface CallerBinding {
+  /** The caller the host established, or `undefined` for a request it served without a credential. */
+  readonly caller: McpCaller | undefined
+}
+
+/**
+ * The SDK's `authInfo` for one request. Never the secret: `token` names the credential, not its value, so
+ * nothing downstream that logs or echoes `authInfo` can leak it.
+ */
+function authInfoFor(caller: McpCaller | undefined): AuthInfo {
+  const binding: CallerBinding = { caller }
+  return {
+    token: caller?.credentialId ?? 'none',
+    clientId: caller?.label ?? 'none',
+    scopes: caller === undefined ? [] : [caller.kind],
+    extra: { [BINDING]: binding },
+  }
+}
+
+/** The binding `authInfoFor` made, or `undefined` when the request reached the factory without one. */
+function bindingOf(authInfo: AuthInfo | undefined): CallerBinding | undefined {
+  const binding = authInfo?.extra?.[BINDING]
+  if (typeof binding !== 'object' || binding === null || !('caller' in binding)) return undefined
+  return binding as CallerBinding
 }
 
 /**

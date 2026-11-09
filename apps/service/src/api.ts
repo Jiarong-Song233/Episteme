@@ -55,14 +55,18 @@ const DECISION_PATTERNS: readonly RegExp[] = [
 export function operationOf(
   method: string,
   path: string,
-  profile: Pick<SceneProfile, 'name' | 'proposingRoutes'>,
+  profile: Pick<SceneProfile, 'name' | 'proposingRoutes' | 'privateRoutes'>,
 ): Operation {
   const route = `${method} ${path}`
   if (DECISION_ROUTES.includes(route) || DECISION_PATTERNS.some((pattern) => pattern.test(route))) {
     return 'decide'
   }
   const scene = `${API_PREFIX}/scene/${profile.name}`
-  if (method === 'GET' || !path.startsWith(`${scene}/`)) return 'read'
+  if (!path.startsWith(`${scene}/`)) return 'read'
+  if (method === 'GET') {
+    // Only the person's own credential reads these, as only it decides.
+    return profile.privateRoutes?.includes(path.slice(scene.length)) === true ? 'decide' : 'read'
+  }
   return profile.proposingRoutes?.includes(path.slice(scene.length)) === true ? 'read' : 'decide'
 }
 

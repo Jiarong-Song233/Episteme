@@ -12,6 +12,7 @@ import {
   importGraph,
 } from '@episteme/application'
 import { addPerson, addToken, startService } from '@episteme/service'
+import { Agents, localAgentEnvironment } from './agents.js'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { modelFromEnvironment } from './model.js'
 import { serviceModel } from './model-settings.js'
@@ -146,6 +147,13 @@ const { model, modelSettings } = await serviceModel({
   shared: values.shared === true,
 })
 const library = await libraryFromEnvironment()
+// Only on one person's own computer: a shared service never changes the settings of the machine it runs on.
+let mcpUrl = `http://127.0.0.1:${port}/mcp`
+const computer = values.shared === true ? undefined : localAgentEnvironment()
+const agents =
+  computer === undefined
+    ? undefined
+    : await Agents.open(join(dirname(graph), 'agents.json'), computer, () => mcpUrl)
 try {
   const service = await startService({
     graph,
@@ -154,7 +162,10 @@ try {
       model,
       library,
       ...(modelSettings === undefined ? {} : { modelSettings }),
+      ...(agents === undefined ? {} : { agents }),
+      ...(computer === undefined ? {} : { agentEnvironment: computer }),
     }),
+    ...(agents === undefined ? {} : { onMcpActivity: (activity) => agents.note(activity) }),
     workspace: page,
     ...(values.shared === true && usersFile !== undefined
       ? {
@@ -165,6 +176,7 @@ try {
       : {}),
     ...(values.sharing === true ? { sharing: true } : {}),
   })
+  mcpUrl = service.mcpUrl
   process.stdout.write(
     `\nEPISTEME · 学习工作台\n\n  打开：${service.workspaceUrl ?? service.url}\n  图谱：${service.graph}\n` +
       `  模型：${model.simulated ? '模拟模型（只摘录材料，不会真正回答）' : model.name}\n` +
@@ -174,6 +186,7 @@ try {
   const stop = (): void => {
     if (stopping) return
     stopping = true
+    void agents?.flush().catch(() => undefined)
     service
       .close()
       .then(() => process.exit(0))

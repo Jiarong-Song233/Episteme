@@ -1,11 +1,14 @@
 import { learnScene, recordableDimensions, type SessionScene } from '@episteme/application'
 import { asId, defineDomainPack, type DimensionId } from '@episteme/core'
 import { BLANK_TOPIC, type SceneProfile } from '@episteme/service'
+import { agentRoutes } from './agent-routes.js'
+import { agentSessionRoutes } from './agent-sessions.js'
+import type { AgentEnvironment, Agents } from './agents.js'
 import { BUILT_IN_LIBRARY, type Library } from './blocks.js'
 import { hostLearningTools } from './host-learning.js'
 import type { ModelClient } from './model.js'
 import type { ModelSettings } from './model-settings.js'
-import { WORKBENCH_PROPOSING_ROUTES } from './route-access.js'
+import { WORKBENCH_PRIVATE_ROUTES, WORKBENCH_PROPOSING_ROUTES } from './route-access.js'
 import { workbenchRoutes } from './routes.js'
 import { STANCE } from './understanding.js'
 
@@ -57,13 +60,24 @@ export function workbenchProfile(options: {
   readonly now?: () => number
   readonly library?: Library
   readonly modelSettings?: ModelSettings
+  /** The agents of this computer, for the page that connects them. Without it there is no such page. */
+  readonly agents?: Agents
+  /** This computer, for reading the conversations its agents keep. Without it there is no such page. */
+  readonly agentEnvironment?: AgentEnvironment
 }): SceneProfile {
   return {
     name: WORKBENCH_SCENE,
     proposingRoutes: WORKBENCH_PROPOSING_ROUTES,
+    privateRoutes: WORKBENCH_PRIVATE_ROUTES,
     seed: BLANK_TOPIC,
     scene: workbenchScene,
-    routes: workbenchRoutes(options),
+    routes: [
+      ...workbenchRoutes(options),
+      ...(options.agents === undefined ? [] : agentRoutes(options.agents)),
+      ...(options.agentEnvironment === undefined
+        ? []
+        : agentSessionRoutes(options.agentEnvironment)),
+    ],
     mcpTools: hostLearningTools({
       library: options.library ?? BUILT_IN_LIBRARY,
       now: options.now ?? Date.now,

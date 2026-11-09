@@ -219,6 +219,50 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     expect(await page.locator('.shelf').getByText('编码笔记.md').count()).toBe(0)
   }, 60_000)
 
+  it('says how to connect an agent, with an address that answers MCP', async () => {
+    await newSpace('机器学习')
+    await page.locator('.shelf-foot').getByRole('button', { name: '接入 Agent' }).click()
+    await page.waitForURL(/#\/connect$/)
+    await main().getByRole('heading', { name: '接入 Agent' }).waitFor()
+
+    const address = new URL('/mcp', service.workspaceUrl ?? '').href
+    expect(await page.getByLabel('MCP 地址').innerText()).toBe(address)
+    expect(await page.getByLabel('Claude Code 的接入方式').innerText()).toBe(
+      `claude mcp add --transport http --scope user episteme ${address}`,
+    )
+
+    // What the page tells an agent to use is the service's own MCP endpoint, not a guess.
+    const response = await fetch(address, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'routes-test', version: '0' },
+        },
+      }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('"serverInfo"')
+
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.getByRole('button', { name: '复制' }).first().click()
+    await page.getByRole('button', { name: '已复制' }).waitFor()
+    expect(await page.evaluate<string>('navigator.clipboard.readText()')).toBe(address)
+
+    // The page keeps its address, and the space stays in the sidebar beside it.
+    await page.reload()
+    await main().getByRole('heading', { name: '接入 Agent' }).waitFor()
+    await page.getByRole('button', { name: '机器学习', exact: true }).waitFor()
+  }, 60_000)
+
   it('installs as an app of its own, and the worker keeps the page but none of the data', async () => {
     await newSpace('机器学习')
     await upload('编码笔记.md')

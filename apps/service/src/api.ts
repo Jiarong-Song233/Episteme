@@ -484,9 +484,20 @@ export async function handleApi(
       const body = await readJson(request)
       const id = asString(body['id'], 'id')
       const userAgent = request.headers['user-agent']
+      const decision = decisionFrom(body)
+      // A space the scene owns must be one this person can open, or the node would land where no page shows it.
+      const filing = decision.action === 'dismiss' ? undefined : decision.scope
+      if (filing !== undefined && profile.checkFiling !== undefined) {
+        const check = profile.checkFiling
+        const checked = await refusing(response, () => {
+          check(sceneViewOf(session), filing)
+          return Promise.resolve(true)
+        })
+        if (checked === undefined) return
+      }
       const result = await session.decide(
         id,
-        decisionFrom(body),
+        decision,
         'learn-review',
         caller === undefined
           ? undefined

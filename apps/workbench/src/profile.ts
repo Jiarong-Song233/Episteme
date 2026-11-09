@@ -8,6 +8,7 @@ import { BUILT_IN_LIBRARY, type Library } from './blocks.js'
 import { hostLearningTools } from './host-learning.js'
 import type { ModelClient } from './model.js'
 import type { ModelSettings } from './model-settings.js'
+import { checkFiling } from './requests.js'
 import { WORKBENCH_PRIVATE_ROUTES, WORKBENCH_PROPOSING_ROUTES } from './route-access.js'
 import { workbenchRoutes } from './routes.js'
 import { STANCE } from './understanding.js'
@@ -69,6 +70,7 @@ export function workbenchProfile(options: {
     name: WORKBENCH_SCENE,
     proposingRoutes: WORKBENCH_PROPOSING_ROUTES,
     privateRoutes: WORKBENCH_PRIVATE_ROUTES,
+    checkFiling,
     seed: BLANK_TOPIC,
     scene: workbenchScene,
     routes: [

@@ -246,6 +246,106 @@ describe('with several people', () => {
     })
   })
 
+  /** Every node Lin can see, and whether one of Lin's spaces shows it. */
+  async function reachable(spaces: readonly string[]) {
+    const state = (await call<{ nodes: { nodeId: string; label: string }[] }>('/state', lin.token))
+      .body.nodes
+    const shown = new Set<string>()
+    for (const space of spaces) {
+      for (const node of (
+        await scene<{ nodes: readonly { nodeId: string }[] }>(
+          `/understanding?space=${space}`,
+          lin.token,
+        )
+      ).body.nodes) {
+        shown.add(node.nodeId)
+      }
+    }
+    return state.map((node) => ({ label: node.label, shown: shown.has(node.nodeId) }))
+  }
+
+  it('refuses to file a candidate in a workbench space that does not exist', async () => {
+    const { space } = (
+      await scene<{ space: { id: string } }>('/spaces', lin.token, { name: '林的空间' })
+    ).body
+    const id = await agentWire(lin.agent).propose('归到一个不存在的空间')
+    const refused = await call('/suggestions/decide', lin.token, {
+      id,
+      action: 'accept',
+      scope: 'workbench:sp_does-not-exist',
+    })
+    expect(refused.status).toBe(422)
+    expect(refused.body.code).toBe('unknown_space')
+    // Nothing landed where no page shows it, and the candidate still waits.
+    expect(await reachable([space.id])).toEqual([])
+    expect((await unfiled(lin.token)).map((each) => each.id)).toEqual([id])
+  })
+
+  it("refuses to file a candidate in another person's space", async () => {
+    const { space: linsSpace } = (
+      await scene<{ space: { id: string } }>('/spaces', lin.token, { name: '林的空间' })
+    ).body
+    const { space: meisSpace } = (
+      await scene<{ space: { id: string } }>('/spaces', mei.token, { name: '梅的空间' })
+    ).body
+    const id = await agentWire(lin.agent).propose('归到梅的空间')
+    const refused = await call('/suggestions/decide', lin.token, {
+      id,
+      action: 'accept',
+      scope: `workbench:${meisSpace.id}`,
+    })
+    expect(refused.status).toBe(422)
+    expect(refused.body.code).toBe('unknown_space')
+    expect(await reachable([linsSpace.id])).toEqual([])
+    expect(
+      (
+        await scene<{ nodes: readonly unknown[] }>(
+          `/understanding?space=${meisSpace.id}`,
+          mei.token,
+        )
+      ).body.nodes,
+    ).toEqual([])
+    expect((await unfiled(lin.token)).map((each) => each.id)).toEqual([id])
+  })
+
+  it('checks the space however the request names it: padded, reworded or archived', async () => {
+    const { space } = (
+      await scene<{ space: { id: string } }>('/spaces', lin.token, { name: '要归档的空间' })
+    ).body
+    const id = await agentWire(lin.agent).propose('一条')
+    const padded = await call('/suggestions/decide', lin.token, {
+      id,
+      action: 'accept',
+      scope: '  workbench:sp_does-not-exist  ',
+    })
+    expect(padded.body.code).toBe('unknown_space')
+    const reworded = await call('/suggestions/decide', lin.token, {
+      id,
+      action: 'modify',
+      scope: `workbench:${mei.id}`,
+      proposal: { kind: 'claim', label: '改过的一条' },
+    })
+    expect(reworded.body.code).toBe('unknown_space')
+    await scene('/spaces/update', lin.token, { space: space.id, archived: true })
+    const archived = await call('/suggestions/decide', lin.token, {
+      id,
+      action: 'accept',
+      scope: `workbench:${space.id}`,
+    })
+    expect(archived.body.code).toBe('space_archived')
+    expect((await unfiled(lin.token)).map((each) => each.id)).toEqual([id])
+  })
+
+  it('still files a scope outside the workbench as the engine always has', async () => {
+    const id = await agentWire(lin.agent).propose('一个通用的 scope')
+    const decided = await call('/suggestions/decide', lin.token, {
+      id,
+      action: 'accept',
+      scope: 'ml-2026',
+    })
+    expect(decided.status).toBe(200)
+  })
+
   it('shows each person only their own, and only the owner can decide it', async () => {
     const linsId = await agentWire(lin.agent).propose('林的 Agent 提出的一条')
     const meisId = await agentWire(mei.agent).propose('梅的 Agent 提出的一条')

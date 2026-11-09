@@ -6,12 +6,12 @@ import { useRoute } from 'wouter'
  * address holds ids only: the words of a citation travel in the history entry instead.
  */
 
-export type SideTab = 'source' | 'pending' | 'understood' | 'status'
+export type SideTab = 'source' | 'pending' | 'understood'
 
 export type Place =
   | { readonly kind: 'home' }
   | { readonly kind: 'commons'; readonly publication?: string }
-  /** A space with nothing chosen in it yet, which resolves to where the person left off. */
+  /** A space's overview: what waits for the person, what is still a gap, and what came of learning lately. */
   | { readonly kind: 'space'; readonly space: string }
   | { readonly kind: 'new'; readonly space: string }
   | { readonly kind: 'thread'; readonly space: string; readonly thread: string }
@@ -25,7 +25,7 @@ export interface Panel {
   readonly turn?: string
 }
 
-const SIDE_TABS: readonly string[] = ['pending', 'understood', 'status', 'source']
+const SIDE_TABS: readonly string[] = ['pending', 'understood', 'source']
 
 export function usePlace(): Place {
   const [, commons] = useRoute('/commons/:publication?')

@@ -3,15 +3,21 @@ import {
   api,
   type BlockInfo,
   type ObjectiveReading,
+  type PendingCandidate,
   type SessionEvent,
   type SessionOutcome,
 } from './api.js'
+import { StatusView } from './Learning.js'
 import { messageOf } from './Turns.js'
 
 /**
- * What came of learning with an agent, by session. The conversation itself stays out unless it is asked for, and what
- * an agent judged is never shown as what the person confirmed.
+ * A space's overview: what waits for the person, where the gaps are, and what came of learning, by session. The
+ * conversation itself stays out unless it is asked for, and what an agent judged is never shown as what the person
+ * confirmed.
  */
+
+/** Enough to see what is waiting; the whole list and the decisions stay in the review column. */
+const PENDING_SHOWN = 3
 
 const VERDICT: Readonly<Record<string, string>> = {
   supports: '答对',
@@ -158,13 +164,18 @@ function Session(props: {
 export function Outcomes(props: {
   space: string
   name: string
+  /** The session a person came to read. Without one, this is the overview and the latest session leads. */
   focus: string | undefined
   version: number
   blocks: readonly BlockInfo[]
+  pending: readonly PendingCandidate[]
+  /** Where the person left off, when there is somewhere to go back to. */
+  resume: { readonly label: string; readonly open: () => void } | undefined
+  onNewThread: () => void
   onReview: () => void
   onOpenThread: (thread: string) => void
 }) {
-  const { space, version } = props
+  const { space, version, pending, focus, resume } = props
   const [outcomes, setOutcomes] = useState<Awaited<ReturnType<typeof api.outcomes>>>()
   const [failure, setFailure] = useState<string>()
 
@@ -194,43 +205,94 @@ export function Outcomes(props: {
     )
   }
   if (outcomes === undefined) return null
-  const waiting = outcomes.objectives.some((each) => each.confirmation === 'pending')
-  const { unlinked } = outcomes
+  const { unlinked, objectives } = outcomes
+  const sessions = [...outcomes.sessions].sort((a, b) => b.startedAt - a.startedAt)
+  const leading = focus === undefined ? sessions.slice(0, 1) : sessions
+  const earlier = focus === undefined ? sessions.slice(1) : []
+  const show = (session: SessionOutcome) => (
+    <Session
+      key={session.plan}
+      session={session}
+      focused={session.plan === focus}
+      blocks={props.blocks}
+      onOpenThread={props.onOpenThread}
+    />
+  )
   return (
     <div className="page outcomes">
       <h2 className="space-title">{props.name}</h2>
       <section>
-        <h3>现在的情况</h3>
-        <p className="hint">答题记录和你的确认分开看。两者都不代表已经掌握。</p>
-        {outcomes.objectives.map((objective) => (
-          <div className="reading" key={objective.id} data-gap={objective.gap?.status}>
-            <strong>{objective.label}</strong>
-            <span>{evidenceWords(objective)}</span>
-            <span className="hint">{CONFIRMATION[objective.confirmation]}</span>
-          </div>
-        ))}
-        {unlinked > 0 && (
-          <p className="hint">
-            另有 {unlinked} 条候选没有关联到上面的学习目标。确认后会成为你的理解，但不会计入这里。
-          </p>
-        )}
-        {(waiting || unlinked > 0) && (
-          <p>
-            <button type="button" className="link" onClick={props.onReview}>
-              去确认
-            </button>
-          </p>
+        <h3>等你确认（{pending.length}）</h3>
+        {pending.length === 0 ? (
+          <p className="hint">现在没有等你确认的内容。</p>
+        ) : (
+          <>
+            <ul>
+              {pending.slice(0, PENDING_SHOWN).map((candidate) => (
+                <li key={candidate.id}>
+                  {candidate.link === undefined
+                    ? (candidate.proposal.label ?? candidate.rationale)
+                    : `${candidate.link.fromLabel} 和 ${candidate.link.toLabel} 的关系`}
+                </li>
+              ))}
+            </ul>
+            {pending.length > PENDING_SHOWN && (
+              <p className="hint">还有 {pending.length - PENDING_SHOWN} 条。</p>
+            )}
+            <p>
+              <button type="button" className="link" onClick={props.onReview}>
+                去确认
+              </button>
+            </p>
+          </>
         )}
       </section>
-      {outcomes.sessions.map((session) => (
-        <Session
-          key={session.plan}
-          session={session}
-          focused={session.plan === props.focus}
-          blocks={props.blocks}
-          onOpenThread={props.onOpenThread}
-        />
-      ))}
+      {objectives.length > 0 && (
+        <section>
+          <h3>现在的情况</h3>
+          <p className="hint">答题记录和你的确认分开看。两者都不代表已经掌握。</p>
+          {objectives.map((objective) => (
+            <div className="reading" key={objective.id} data-gap={objective.gap?.status}>
+              <strong>{objective.label}</strong>
+              <span>{evidenceWords(objective)}</span>
+              <span className="hint">{CONFIRMATION[objective.confirmation]}</span>
+            </div>
+          ))}
+          {unlinked > 0 && (
+            <p className="hint">
+              另有 {unlinked} 条候选没有关联到上面的学习目标。确认后会成为你的理解，但不会计入这里。
+            </p>
+          )}
+        </section>
+      )}
+      {focus === undefined && (
+        <section>
+          <h3>接着学</h3>
+          <p className="quiet-actions">
+            {resume !== undefined && (
+              <button type="button" className="link" onClick={resume.open}>
+                回到“{resume.label}”
+              </button>
+            )}
+            <button type="button" className="link" onClick={props.onNewThread}>
+              问一个新问题
+            </button>
+          </p>
+        </section>
+      )}
+      {leading.map(show)}
+      {earlier.length > 0 && (
+        <details>
+          <summary>更早的 {earlier.length} 次学习</summary>
+          {earlier.map(show)}
+        </details>
+      )}
+      {focus === undefined && (
+        <section>
+          <h3>练习和复习</h3>
+          <StatusView space={space} version={version} />
+        </section>
+      )}
     </div>
   )
 }

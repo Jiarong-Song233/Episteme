@@ -68,10 +68,11 @@ describe.skipIf(browser === undefined)('outcomes in a browser', () => {
     )
   }, 120_000)
 
+  // Closing the browser can take a while when the other browser files are running too.
   afterAll(async () => {
     await browser?.close()
     await rm(built, { recursive: true, force: true })
-  })
+  }, HOOK_TIMEOUT)
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'episteme-outcomes-'))
@@ -169,6 +170,7 @@ describe.skipIf(browser === undefined)('outcomes in a browser', () => {
     expect(shown).not.toContain('actor_')
 
     await main.getByRole('button', { name: '去确认' }).click()
+    await main.getByRole('heading', { name: '待确认' }).waitFor()
     const confirm = page.getByRole('button', { name: '确认为我的理解' })
     await page
       .locator('*')
@@ -176,6 +178,8 @@ describe.skipIf(browser === undefined)('outcomes in a browser', () => {
       .last()
       .getByRole('button', { name: '确认为我的理解' })
       .click()
+    await page.getByRole('button', { name: '待确认（1）' }).waitFor()
+    await page.getByRole('button', { name: '概览', exact: true }).click()
     await reading.getByText('你确认过').waitFor()
     // Confirming says nothing about the attempts: the gap stays what they showed.
     await reading.getByText('还有缺口：把校验失败当成可跳过').waitFor()

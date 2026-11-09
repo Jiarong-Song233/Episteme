@@ -76,8 +76,9 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
     await page.getByLabel('你的问题').fill('位置编码有什么用')
     await page.getByRole('button', { name: '提问' }).click()
     await page.getByRole('button', { name: '提炼成待确认的理解' }).click()
+    await page.getByRole('button', { name: '待确认（1）' }).click()
     await page.getByRole('button', { name: '确认为我的理解' }).click()
-    await page.getByRole('tab', { name: '我的理解（1）' }).click()
+    await page.getByRole('button', { name: '我的理解（1）' }).click()
     await page.locator('.understood li', { hasText: '位置编码' }).locator('button').first().click()
   }
 

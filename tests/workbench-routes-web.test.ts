@@ -152,7 +152,7 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     await main().getByText('位置编码有什么用').first().waitFor()
   }, 120_000)
 
-  it('keeps the side column and the cited passage through a refresh', async () => {
+  it('keeps the cited passage beside the page through a refresh, and beside review', async () => {
     await newSpace('机器学习')
     await upload('编码笔记.md')
     await ask('位置编码有什么用')
@@ -166,16 +166,44 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     await page.reload()
     await expect.poll(() => page.locator('mark').textContent()).toContain('位置编码把序列的顺序')
 
-    await page.getByRole('tab', { name: /待确认/ }).click()
-    await page.waitForURL(/side=pending/)
+    // Review is a page of its own; the source stays open beside it.
+    await page.getByRole('button', { name: /待确认（/ }).click()
+    await page.waitForURL(/#\/spaces\/[^/]+\/review/)
     await page.reload()
-    await expect
-      .poll(() => page.getByRole('tab', { name: /待确认/ }).getAttribute('aria-selected'))
-      .toBe('true')
+    await main().getByRole('heading', { name: '待确认' }).waitFor()
+    await expect.poll(() => page.locator('mark').textContent()).toContain('位置编码把序列的顺序')
+    expect(await page.getByRole('button', { name: /待确认（/ }).getAttribute('aria-current')).toBe(
+      'page',
+    )
 
+    await page.goBack()
+    await main().getByText('位置编码有什么用').first().waitFor()
+    await expect.poll(() => page.locator('mark').textContent()).toContain('位置编码把序列的顺序')
+
+    // Closing the source gives the page its room back, and going back opens it again.
+    await page.getByRole('button', { name: '关上原文' }).click()
+    await expect.poll(() => page.locator('.side').isVisible()).toBe(false)
+    expect(page.url()).not.toContain('material=')
     await page.goBack()
     await expect.poll(() => page.locator('mark').textContent()).toContain('位置编码把序列的顺序')
   }, 120_000)
+
+  it('opens a link made when review and understanding lived in the side column', async () => {
+    await newSpace('机器学习')
+    await page.waitForURL(/\/new/)
+    const space = /#\/spaces\/([^/]+)\//.exec(page.url())?.[1] ?? ''
+    const origin = service.workspaceUrl ?? ''
+
+    await page.goto(`${origin}?side=pending#/spaces/${space}/new`)
+    await page.waitForURL(/#\/spaces\/[^/]+\/review/)
+    await main().getByRole('heading', { name: '待确认' }).waitFor()
+    expect(page.url()).not.toContain('side=')
+
+    await page.goto(`${origin}?side=understood&node=node_gone#/spaces/${space}/new`)
+    await page.waitForURL(/#\/spaces\/[^/]+\/understanding\/node_gone/)
+    await main().getByRole('heading', { name: '我的理解' }).waitFor()
+    expect(page.url()).not.toContain('node=')
+  }, 60_000)
 
   it('starts at the first space and does not trap the back button', async () => {
     await newSpace('机器学习')
@@ -197,7 +225,9 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     await ask('位置编码有什么用')
     const conversation = page.url()
     await page.getByRole('button', { name: '提炼成待确认的理解' }).first().click()
-    await page.getByRole('tab', { name: /待确认（[1-9]/ }).waitFor()
+    await page.getByRole('button', { name: /待确认（[1-9]/ }).waitFor()
+    // Distilling leaves the person in the conversation.
+    expect(page.url()).toBe(conversation)
 
     await page.getByRole('button', { name: '机器学习', exact: true }).click()
     await page.waitForURL(/#\/spaces\/[^/]+$/)
@@ -217,7 +247,10 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     expect(page.url()).toBe(overview)
 
     await main().getByRole('button', { name: '去确认' }).click()
-    await page.waitForURL(/side=pending/)
+    await page.waitForURL(/#\/spaces\/[^/]+\/review/)
+    await main().getByRole('button', { name: '确认为我的理解' }).first().waitFor()
+    await page.goBack()
+    await page.waitForURL(overview)
 
     await main().getByRole('button', { name: '回到“位置编码有什么用”' }).click()
     await main().getByText('位置编码有什么用').first().waitFor()

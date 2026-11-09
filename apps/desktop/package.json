@@ -1,0 +1,16 @@
+{
+  "name": "@episteme/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The learning workbench as a desktop program: one installer that carries its own service and Node runtime.",
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "tauri": "tauri",
+    "dev": "node scripts/bundle.mjs && tauri dev",
+    "build": "node scripts/bundle.mjs && tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4"
+  }
+}

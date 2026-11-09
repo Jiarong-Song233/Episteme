@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Episteme</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --paper: #f3f4f2;
+        --ink: #1a1f1c;
+        --muted: #646d67;
+        --line: #e2e5e1;
+        --accent: #2d6a50;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --paper: #111413;
+          --ink: #e4e8e5;
+          --muted: #949d97;
+          --line: #2a302d;
+          --accent: #78c29c;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--paper);
+        color: var(--ink);
+        font: 15px/1.6 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      main {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 24px 16px;
+      }
+      section {
+        width: min(460px, 100%);
+        text-align: center;
+      }
+      .mark {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+      }
+      h1 {
+        margin: 16px 0 4px;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .bar {
+        height: 3px;
+        margin: 20px auto 0;
+        width: 120px;
+        border-radius: 3px;
+        background: var(--line);
+        overflow: hidden;
+      }
+      .bar::after {
+        content: "";
+        display: block;
+        height: 100%;
+        width: 40%;
+        background: var(--accent);
+        border-radius: 3px;
+        animation: slide 1.2s ease-in-out infinite alternate;
+      }
+      @keyframes slide {
+        from {
+          transform: translateX(-10%);
+        }
+        to {
+          transform: translateX(160%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar::after {
+          animation: none;
+          width: 100%;
+        }
+      }
+      pre {
+        margin: 16px 0 0;
+        padding: 12px;
+        text-align: left;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+        color: var(--muted);
+        background: color-mix(in srgb, var(--line) 45%, transparent);
+        border-radius: 8px;
+        max-height: 50vh;
+        overflow: auto;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <img class="mark" src="icon.svg" alt="" />
+        <h1 id="title">正在启动 Episteme</h1>
+        <p id="hint">第一次打开要多等几秒。</p>
+        <div class="bar" id="bar" aria-hidden="true"></div>
+        <pre id="problem" hidden></pre>
+      </section>
+    </main>
+    <script>
+      window.showProblem = (message) => {
+        document.getElementById('title').textContent = 'Episteme 没能启动'
+        document.getElementById('hint').textContent = '按下面的提示处理后，从托盘菜单退出，再重新打开。'
+        document.getElementById('bar').hidden = true
+        const problem = document.getElementById('problem')
+        problem.textContent = message
+        problem.hidden = false
+      }
+    </script>
+  </body>
+</html>

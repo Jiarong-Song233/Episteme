@@ -81,6 +81,23 @@ Core and the layers above it run and are tested with **no model server, no langu
 toolchain**; only the one SQLite file per graph is needed once a graph has to survive a restart. The proofs of the
 loop are the suites in `tests/`, such as `tests/northstar.test.ts`.
 
+## Install the desktop program
+
+The desktop program carries its own runtime and the learning workbench, keeps the service running in the tray,
+and needs no Node or pnpm. Once a release is published:
+
+```powershell
+irm https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scripts/install.ps1 | iex   # Windows
+```
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scripts/install.sh | sh   # macOS, Linux
+```
+
+Or tell your agent: _"按照 https://github.com/Jiarong-Song233/Episteme/blob/main/docs/install.md 帮我安装 Episteme"_.
+Both scripts check the package against the release's `SHA256SUMS` and install for the current user only. See
+[docs/install.md](docs/install.md). To build it yourself: `pnpm --filter @episteme/desktop build` (needs Rust).
+
 ## Quick start
 
 Requires Node >= 22.13 and pnpm 11 (`corepack enable`, or a standalone pnpm). Windows, macOS and Linux all work;

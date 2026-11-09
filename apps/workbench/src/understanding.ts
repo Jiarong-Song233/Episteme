@@ -52,7 +52,14 @@ const REVISES = 'evolves_to'
 /** A person's own version of someone else's published item: their node, pointing at the original. */
 export const FORKS = 'forks_from'
 
-/** Where a candidate came from, kept beside the graph so the page can go back to the words. */
+/**
+ * Where a candidate came from, kept beside the graph so the page can go back to the words.
+ *
+ * As kept, `thread` is the conversation the candidate was made in: the one the person had open. On a branch that is
+ * the branch, even for words it only carries over from the line it left. `turn` names the words themselves, and a
+ * turn keeps its id in every branch that carries it, so the conversation the words were said in is never kept a
+ * second time: it is the turn's own `thread`. {@link shownOrigin} reads both back apart.
+ */
 export interface Origin {
   readonly at: number
   readonly speaker: 'learner' | 'model'
@@ -62,6 +69,28 @@ export interface Origin {
   readonly turn?: string
   /** Why the person changed their mind, for a revision. */
   readonly reason?: string
+}
+
+/**
+ * An origin as the page reads it. `thread` is where the words were said, so going back to them lands on that turn
+ * in its own conversation. `madeIn` is the conversation the candidate was made in, set only when that is another
+ * one: a branch that carried the words over. What a model read into them there rests on that branch's whole
+ * conversation, so the branch stays named beside the words' own line.
+ */
+export interface ShownOrigin extends Origin {
+  readonly madeIn?: string
+}
+
+/**
+ * Reads a kept origin back. Nothing is rewritten: an origin kept before branching existed, or on a branch, reads the
+ * same way, because the turn says which conversation it belongs to. A turn that cannot be found any more leaves the
+ * origin as it was kept.
+ */
+export function shownOrigin(view: SceneView, origin: Origin): ShownOrigin {
+  if (origin.thread === undefined || origin.turn === undefined) return origin
+  const said = view.threadView(origin.thread)?.turns.find((turn) => turn.id === origin.turn)?.thread
+  if (said === undefined || said === origin.thread) return origin
+  return { ...origin, thread: said, madeIn: origin.thread }
 }
 
 /**
@@ -117,7 +146,7 @@ export interface HeldNode {
   readonly fromSuggestion?: string
   /** The words it was drawn from. */
   readonly excerpt?: string
-  readonly origin?: Origin
+  readonly origin?: ShownOrigin
   /** Only for words kept as the person's own. */
   readonly wordsBy?: WordsBy
   readonly relations: readonly {
@@ -150,8 +179,11 @@ export type TrailEntry =
       readonly basis?: string
       readonly wordsBy?: WordsBy
       readonly excerpt?: string
+      /** Where the words were said. */
       readonly thread?: string
       readonly turn?: string
+      /** The branch it was made in, when that is not where the words were said. */
+      readonly madeIn?: string
     }
   | {
       readonly kind: 'revised_from'
@@ -311,7 +343,8 @@ export function heldNodes(view: SceneView, space: string): readonly HeldNode[] {
   const held = inSpace.flatMap((node): HeldNode[] => {
     const expanded = view.expand(node.nodeId)
     if (expanded === undefined) return []
-    const origin = originOf(view, node.fromSuggestion)
+    const kept = originOf(view, node.fromSuggestion)
+    const origin = kept === undefined ? undefined : shownOrigin(view, kept)
     const provenance = expanded.origin as { readonly excerpt?: string } | undefined
     const adoption = adoptions.get(node.nodeId)
     const wordsBy = origin === undefined ? undefined : wordsByOrigin(view, origin)
@@ -450,6 +483,7 @@ function trailOf(
           ...(node.excerpt === undefined ? {} : { excerpt: node.excerpt }),
           ...(origin?.thread === undefined ? {} : { thread: origin.thread }),
           ...(origin?.turn === undefined ? {} : { turn: origin.turn }),
+          ...(origin?.madeIn === undefined ? {} : { madeIn: origin.madeIn }),
         }
       : {
           kind: 'adopted',
@@ -558,6 +592,15 @@ export function refusalMessage(refused: readonly { readonly code: string }[]): s
   }
 }
 
+/**
+ * The key one offer of a turn is made under, so that sending it again is answered from what it made. A branch reads
+ * a carried turn under its own title, so each conversation it is offered from keys it apart, and a second branch
+ * offering the same words is told they are known rather than refused as a conflicting repeat. A turn offered where
+ * it was said keeps the key it always had.
+ */
+const submissionOf = (thread: string, turn: { readonly id: string; readonly thread: string }) =>
+  turn.thread === thread ? turn.id : `${thread}/${turn.id}`
+
 /** Hands items to the review queue, keeping where each node's words came from. */
 export async function submit(
   view: SceneView,
@@ -640,6 +683,27 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
     }
   }
 
+  /**
+   * The same words of the same turn, already waiting from another conversation that shows it: the line it was said
+   * on, or a branch that carries it. Offered from one conversation again, they are told apart by the engine as
+   * before; offered from another, it would read them afresh and queue them twice.
+   */
+  const waitingElsewhere = (
+    view: SceneView,
+    space: string,
+    thread: string,
+    turn: string,
+    label: string,
+  ): boolean => {
+    const scope = scopeOf(space)
+    return view.pendingSuggestions().some((suggestion) => {
+      if (suggestion.scope !== scope || suggestion.proposal.kind !== 'node') return false
+      if (suggestion.proposal.label !== label) return false
+      const kept = originOf(view, suggestion.id)
+      return kept?.turn === turn && kept.thread !== thread
+    })
+  }
+
   /** The sentences of an answer that cite real material. They are the model's words until the person says otherwise. */
   async function fromAnswer({ view, body }: SceneRouteContext) {
     const space = openSpaceOf(view, text(body, 'space'))
@@ -675,15 +739,37 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
         message: '这条回答里没有可以提炼的、有引用依据的句子。',
       }
     }
+    const submission = submissionOf(threadId, reply)
+    // Made before under this key: the candidates it sent then go again, whatever waits elsewhere now, and the
+    // engine answers from what it stored. Only a new request is checked against the other branches.
+    const sent = view.submittedRefs(REQUESTED_BY, submission)
+    const already =
+      sent !== undefined
+        ? []
+        : items.flatMap((item) =>
+            item.kind === 'node' &&
+            waitingElsewhere(view, space.id, threadId, replyId, item.label ?? '')
+              ? [{ ref: item.ref ?? '', code: 'already_pending', message: 'already waiting' }]
+              : [],
+          )
+    const fresh =
+      sent !== undefined
+        ? items.filter((item) => sent.includes(item.ref ?? ''))
+        : items.filter(
+            (item) => item.kind !== 'node' || !already.some((each) => each.ref === item.ref),
+          )
+    if (fresh.length === 0) {
+      return { suggestions: [], refused: already, message: refusalMessage(already) }
+    }
     const outcome = await submit(
       view,
       space.id,
       { title: thread?.thread.title ?? '', text: reply.text },
-      items,
+      fresh,
       () => ({ at: now(), speaker: 'model', basis: 'inferred', thread: threadId, turn: replyId }),
-      { session: threadId, submission: replyId },
+      { session: threadId, submission },
     )
-    return replyOf(outcome)
+    return replyOf({ ...outcome, refused: [...outcome.refused, ...already] })
   }
 
   /** One sentence of the person's own, as a candidate. */
@@ -698,6 +784,14 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
     }
     const { material, lines, ranges } = dialogue([turn])
     const words = lines[0]?.words ?? ''
+    const submission = submissionOf(threadId, turn)
+    if (
+      view.submittedRefs(REQUESTED_BY, submission) === undefined &&
+      waitingElsewhere(view, space.id, threadId, turnId, words)
+    ) {
+      const refused = [{ ref: 'words', code: 'already_pending', message: 'already waiting' }]
+      return { suggestions: [], refused, message: refusalMessage(refused) }
+    }
     const outcome = await submit(
       view,
       space.id,
@@ -714,7 +808,11 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
         },
       ],
       () => ({ at: now(), speaker: 'learner', basis: 'stated', thread: threadId, turn: turnId }),
-      { session: threadId, submission: turnId, thread: { id: threadId, turns: ranges } },
+      {
+        session: threadId,
+        submission,
+        thread: { id: threadId, turns: ranges },
+      },
     )
     return replyOf(outcome)
   }

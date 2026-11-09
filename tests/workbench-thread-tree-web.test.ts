@@ -223,6 +223,45 @@ describe.skipIf(browser === undefined)('branching a conversation in a browser', 
     expect([root, first, deep, back].every((id) => id.startsWith('thr_'))).toBe(true)
   }, 120_000)
 
+  it('goes back from an understanding made on a branch to the words where they were said', async () => {
+    await newSpace('机器学习')
+    await upload('编码笔记.md')
+    await ask('我认为位置编码告诉模型词的顺序')
+    const root = threadOf(page.url())
+    const branch = await forkFrom('我认为位置编码告诉模型词的顺序')
+
+    // Carried words made the person's own on the branch.
+    await main()
+      .locator('.carried .learner-turn', { hasText: '我认为位置编码告诉模型词的顺序' })
+      .getByRole('button', { name: '这是我的理解' })
+      .click()
+    await page.getByRole('button', { name: '待确认（1）' }).click()
+    await page.getByRole('button', { name: '确认为我的理解' }).click()
+    await page.getByRole('button', { name: /我的理解（/ }).click()
+    await page.locator('.node-row', { hasText: '我认为位置编码告诉模型词的顺序' }).click()
+
+    // Back to the words: the conversation they were said in, at that turn, not the branch that carries them.
+    await page.getByRole('button', { name: '回到当时的对话' }).click()
+    await page.waitForURL(new RegExp(`\\?turn=turn_[^#]+#/spaces/[^/]+/threads/${root}$`))
+    await page
+      .locator('.learner-turn[data-focused="true"]', { hasText: '我认为位置编码告诉模型词的顺序' })
+      .waitFor()
+    expect(await main().getByRole('separator').count()).toBe(0)
+    await page
+      .locator('.learner-turn', { hasText: '我认为位置编码告诉模型词的顺序' })
+      .getByRole('button', { name: '已记成理解，去看看' })
+      .click()
+
+    // The trail names the branch it was made on, and leads there too.
+    await page.locator('.trail').getByRole('button', { name: '看提炼时的分支' }).click()
+    await page.waitForURL(new RegExp(`/threads/${branch}$`))
+    await page
+      .locator('.carried .learner-turn[data-focused="true"]', {
+        hasText: '我认为位置编码告诉模型词的顺序',
+      })
+      .waitFor()
+  }, 120_000)
+
   it('offers no branching in an archived space, and none in another space', async () => {
     await newSpace('机器学习')
     await upload('编码笔记.md')

@@ -1,10 +1,12 @@
 import { exec } from 'node:child_process'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { startService, type EpistemeService } from '@episteme/service'
-import { SimulatedModel, workbenchProfile } from '@episteme/workbench'
+import { ModelSettings, SimulatedModel, workbenchProfile } from '@episteme/workbench'
 import { chromium, type Browser, type Page } from 'playwright-core'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
@@ -103,6 +105,103 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     await rm(directory, { recursive: true, force: true, maxRetries: 5 })
     expect(errors).toEqual([])
   }, HOOK_TIMEOUT)
+
+  it('welcomes a first visit with the steps in order, and the first space opens from there', async () => {
+    await main().getByRole('heading', { name: '把读过的东西，变成你自己的理解' }).waitFor()
+    const steps = main().locator('.steps > li')
+    expect(await steps.count()).toBe(3)
+    // The welcome says what the banner would, so the banner stays away.
+    expect(await page.locator('.banner').count()).toBe(0)
+
+    await main().getByRole('button', { name: '设置模型' }).click()
+    await page.waitForURL(/#\/model$/)
+    await main().getByRole('heading', { name: '模型', exact: true }).waitFor()
+    await page.goBack()
+
+    await main().getByLabel('第一个空间的名字').fill('线性代数')
+    await main().getByRole('button', { name: '建好并进入' }).click()
+    await page.waitForURL(/#\/spaces\/sp_/)
+    await page.getByRole('heading', { name: '线性代数' }).waitFor()
+    await page.getByRole('button', { name: '线性代数', exact: true }).waitFor()
+    // With a space there is nothing to welcome to: the home address opens the space.
+    await page.goto(service.workspaceUrl ?? '')
+    await page.getByRole('heading', { name: '线性代数' }).waitFor()
+    expect(await page.getByText('把读过的东西').count()).toBe(0)
+  }, 60_000)
+
+  it('chooses a model on its page: a wrong key is shown and not kept, a right one is', async () => {
+    const provider = createServer((request, response) => {
+      request.resume()
+      request.on('end', () => {
+        const right = request.headers['authorization'] === 'Bearer sk-right'
+        response.writeHead(right ? 200 : 401, { 'content-type': 'application/json' })
+        response.end(
+          JSON.stringify(
+            right
+              ? {
+                  id: 'c',
+                  object: 'chat.completion',
+                  created: 0,
+                  model: 'demo-model',
+                  choices: [
+                    {
+                      index: 0,
+                      finish_reason: 'stop',
+                      message: { role: 'assistant', content: '好' },
+                    },
+                  ],
+                  usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+                }
+              : { error: { message: 'bad key' } },
+          ),
+        )
+      })
+    })
+    await new Promise<void>((resolve) => provider.listen(0, '127.0.0.1', resolve))
+    const providerUrl = `http://127.0.0.1:${(provider.address() as AddressInfo).port}/v1`
+    const settings = await ModelSettings.open(join(directory, 'model.json'))
+    const chosen = await startService({
+      graph: join(directory, 'chosen.db'),
+      port: 0,
+      profile: workbenchProfile({ model: settings, modelSettings: settings }),
+      workspace: built,
+    })
+    try {
+      await page.goto(`${chosen.workspaceUrl ?? ''}#/model`)
+      await main().getByText('模拟模型。').waitFor()
+      await page.getByRole('button', { name: /^模型/ }).getByText('未设置').waitFor()
+
+      await main().getByLabel('服务地址').fill(providerUrl)
+      await main().getByLabel('模型名').fill('demo-model')
+      await main().getByLabel('密钥').fill('sk-wrong')
+      await main().getByRole('button', { name: '测试并保存' }).click()
+      await main()
+        .getByText(/没有保存：服务拒绝了这个密钥/)
+        .waitFor()
+      expect(settings.simulated).toBe(true)
+
+      await main().getByLabel('密钥').fill('sk-right')
+      await main().getByRole('button', { name: '测试并保存' }).click()
+      await main()
+        .getByText(/已保存。demo-model 回答了测试问题/)
+        .waitFor()
+      await page.getByRole('button', { name: /^模型/ }).getByText('demo-model').waitFor()
+      expect(await main().getByLabel('密钥').inputValue()).toBe('')
+
+      // After a refresh the page knows a key is saved, and still does not show it.
+      await page.reload()
+      await main().getByText('demo-model', { exact: true }).waitFor()
+      expect(await main().getByLabel('密钥').getAttribute('placeholder')).toBe('已保存，留空就不改')
+      expect(await page.content()).not.toContain('sk-right')
+
+      await main().getByRole('button', { name: '改回模拟模型' }).click()
+      await main().getByText('已改回模拟模型，保存的密钥也删除了。').waitFor()
+      expect(settings.simulated).toBe(true)
+    } finally {
+      await chosen.close()
+      await new Promise<void>((resolve) => provider.close(() => resolve()))
+    }
+  }, 60_000)
 
   it('keeps a conversation through a refresh, and goes back and forward', async () => {
     await newSpace('机器学习')

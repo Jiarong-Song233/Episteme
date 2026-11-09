@@ -14,6 +14,7 @@ import {
 import { addPerson, addToken, startService } from '@episteme/service'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { modelFromEnvironment } from './model.js'
+import { serviceModel } from './model-settings.js'
 import { workbenchProfile } from './profile.js'
 
 /** Starts the workbench: the service, its routes, and the page, on one graph file. */
@@ -136,13 +137,24 @@ async function libraryFromEnvironment(): Promise<Library> {
   return library
 }
 
-const model = modelFromEnvironment()
+// A model in the environment wins; otherwise the one chosen on the page, kept beside the graph. A shared service
+// does not let anyone change it from the page: it is one model for everyone.
+const fromEnvironment = modelFromEnvironment()
+const { model, modelSettings } = await serviceModel({
+  file: join(dirname(graph), 'model.json'),
+  ...(fromEnvironment.simulated ? {} : { fromEnvironment }),
+  shared: values.shared === true,
+})
 const library = await libraryFromEnvironment()
 try {
   const service = await startService({
     graph,
     port,
-    profile: workbenchProfile({ model, library }),
+    profile: workbenchProfile({
+      model,
+      library,
+      ...(modelSettings === undefined ? {} : { modelSettings }),
+    }),
     workspace: page,
     ...(values.shared === true && usersFile !== undefined
       ? {

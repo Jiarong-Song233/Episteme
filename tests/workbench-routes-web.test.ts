@@ -48,12 +48,14 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
   }
 
   const upload = async (name: string): Promise<void> => {
+    await page.getByRole('button', { name: /^材料（/ }).click()
     await page.locator('.upload input').setInputFiles({
       name,
       mimeType: 'text/plain',
       buffer: Buffer.from(NOTES),
     })
-    await page.getByRole('button', { name, exact: true }).waitFor()
+    await page.locator('.material-list').getByRole('button', { name, exact: true }).waitFor()
+    await page.getByRole('button', { name: '学习', exact: true }).click()
   }
 
   const ask = async (question: string): Promise<void> => {
@@ -187,6 +189,35 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     await page.goBack()
     await expect.poll(() => page.locator('mark').textContent()).toContain('位置编码把序列的顺序')
   }, 120_000)
+
+  it('gives the materials a page of their own, with the source opening beside it', async () => {
+    await newSpace('机器学习')
+    // An empty conversation points to where material goes.
+    await main().getByRole('button', { name: '去上传材料' }).click()
+    await page.waitForURL(/#\/spaces\/[^/]+\/materials/)
+    await main().getByText('这个空间还没有材料').waitFor()
+    await page.locator('.upload input').setInputFiles({
+      name: '编码笔记.md',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(NOTES),
+    })
+    const title = main().getByRole('button', { name: '编码笔记.md', exact: true })
+    await title.waitFor()
+    await main()
+      .getByText(/^Markdown，\d+ 字，\d+ 段，/)
+      .waitFor()
+    await page.getByRole('button', { name: '材料（1）' }).waitFor()
+
+    await page.reload()
+    await title.click()
+    await page.locator('.side').getByText('位置编码把序列的顺序').first().waitFor()
+    expect(page.url()).toMatch(/\?material=[^#]+#\/spaces\/[^/]+\/materials$/)
+    expect(await page.getByRole('button', { name: '材料（1）' }).getAttribute('aria-current')).toBe(
+      'page',
+    )
+    // The shelf keeps only the way to learning, not a second list of files.
+    expect(await page.locator('.shelf').getByText('编码笔记.md').count()).toBe(0)
+  }, 60_000)
 
   it('opens a link made when review and understanding lived in the side column', async () => {
     await newSpace('机器学习')

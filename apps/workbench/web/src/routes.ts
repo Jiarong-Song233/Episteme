@@ -11,6 +11,8 @@ export type Place =
   | { readonly kind: 'commons'; readonly publication?: string }
   /** A space's overview: what waits for the person, what is still a gap, and what came of learning lately. */
   | { readonly kind: 'space'; readonly space: string }
+  /** What the space learns from. */
+  | { readonly kind: 'materials'; readonly space: string }
   /** What waits for the person's own decision. */
   | { readonly kind: 'review'; readonly space: string }
   /** What the person holds, or one item of it. */
@@ -20,12 +22,14 @@ export type Place =
   | { readonly kind: 'plan'; readonly space: string; readonly plan: string }
 
 /** The page a place belongs to, for the space's own navigation. */
-export type Section = 'overview' | 'review' | 'understanding' | 'learning'
+export type Section = 'overview' | 'materials' | 'review' | 'understanding' | 'learning'
 
 export function sectionOf(place: Place): Section | undefined {
   switch (place.kind) {
     case 'space':
       return 'overview'
+    case 'materials':
+      return 'materials'
     case 'review':
       return 'review'
     case 'understanding':
@@ -50,6 +54,7 @@ export function usePlace(): Place {
   const [, thread] = useRoute('/spaces/:space/threads/:thread')
   const [, plan] = useRoute('/spaces/:space/plans/:plan')
   const [, fresh] = useRoute('/spaces/:space/new')
+  const [, materials] = useRoute('/spaces/:space/materials')
   const [, review] = useRoute('/spaces/:space/review')
   const [, understanding] = useRoute('/spaces/:space/understanding/:node?')
   const [, space] = useRoute('/spaces/:space')
@@ -60,6 +65,7 @@ export function usePlace(): Place {
   if (thread !== null) return { kind: 'thread', space: thread.space, thread: thread.thread }
   if (plan !== null) return { kind: 'plan', space: plan.space, plan: plan.plan }
   if (fresh !== null) return { kind: 'new', space: fresh.space }
+  if (materials !== null) return { kind: 'materials', space: materials.space }
   if (review !== null) return { kind: 'review', space: review.space }
   if (understanding !== null) {
     const { node } = understanding
@@ -80,6 +86,8 @@ function pathOf(place: Place): string {
       return place.publication === undefined ? '/commons' : `/commons/${part(place.publication)}`
     case 'space':
       return `/spaces/${part(place.space)}`
+    case 'materials':
+      return `/spaces/${part(place.space)}/materials`
     case 'review':
       return `/spaces/${part(place.space)}/review`
     case 'understanding':

@@ -67,12 +67,17 @@ describe.skipIf(browser === undefined)('sharing in a browser', () => {
 
   /** The ordinary way anything comes to be held: asked about, distilled, and confirmed by the person. */
   const holdFromNotes = async (page: Page): Promise<void> => {
+    await page.getByRole('button', { name: '材料（0）' }).click()
     await page.locator('.upload input').setInputFiles({
       name: '编码笔记.md',
       mimeType: 'text/plain',
       buffer: Buffer.from(NOTES),
     })
-    await page.getByRole('button', { name: '编码笔记.md', exact: true }).waitFor()
+    await page
+      .locator('.material-list')
+      .getByRole('button', { name: '编码笔记.md', exact: true })
+      .waitFor()
+    await page.getByRole('button', { name: '学习', exact: true }).click()
     await page.getByLabel('你的问题').fill('位置编码有什么用')
     await page.getByRole('button', { name: '提问' }).click()
     await page.getByRole('button', { name: '提炼成待确认的理解' }).click()

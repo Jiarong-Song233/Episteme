@@ -336,9 +336,25 @@ export interface AgentInfo {
   readonly how: 'command' | 'settings' | 'skill' | 'manual'
   readonly file?: string
   readonly source?: 'plugin'
+  /** Connecting or disconnecting runs a plugin's command, shown first and run only once confirmed. */
+  readonly confirms?: true
   readonly address: string
   readonly after?: string
   readonly use?: AgentUse
+}
+
+/** What launching a plugin's command will run. */
+export interface LaunchPlan {
+  readonly agent: string
+  readonly name: string
+  readonly action: 'connect' | 'disconnect'
+  readonly source: string
+  readonly steps: readonly {
+    readonly command: string
+    readonly program: string
+    readonly args: readonly string[]
+  }[]
+  readonly confirm: string
 }
 
 export interface AgentUse {
@@ -483,10 +499,17 @@ export const api = {
   importAgentPlugin: (manifest: string) =>
     scene('/agents/plugins', { manifest }) as Promise<{ agent: AgentInfo }>,
   removeAgentPlugin: (id: string) => scene('/agents/plugins/remove', { id }),
-  connectAgent: (id: string) =>
-    scene('/agents/connect', { id }) as Promise<{ agent: AgentInfo; said?: string }>,
-  disconnectAgent: (id: string) =>
-    scene('/agents/disconnect', { id }) as Promise<{ agent: AgentInfo }>,
+  agentPlan: (id: string, action: 'connect' | 'disconnect') =>
+    scene('/agents/plan', { id, action }) as Promise<{ plan: LaunchPlan | null }>,
+  connectAgent: (id: string, confirm?: string) =>
+    scene('/agents/connect', { id, ...(confirm === undefined ? {} : { confirm }) }) as Promise<{
+      agent: AgentInfo
+      said?: string
+    }>,
+  disconnectAgent: (id: string, confirm?: string) =>
+    scene('/agents/disconnect', { id, ...(confirm === undefined ? {} : { confirm }) }) as Promise<{
+      agent: AgentInfo
+    }>,
   addCustomAgent: (agent: CustomAgentRequest) =>
     scene('/agents/custom', agent) as Promise<{ agent: AgentInfo }>,
   removeCustomAgent: (id: string) => scene('/agents/custom/remove', { id }),

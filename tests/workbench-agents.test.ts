@@ -2,11 +2,12 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { addPerson, addToken, startService, type EpistemeService } from '@episteme/service'
 import {
   Agents,
   addressFor,
+  localAgentEnvironment,
   SimulatedModel,
   workbenchProfile,
   type AgentEnvironment,
@@ -549,20 +550,188 @@ describe('agent plugins', () => {
         },
       }),
     )
-    expect(agent).toMatchObject({ how: 'command', installed: true, source: 'plugin' })
-    expect(existsSync(join(plugins(), 'tool-agent.json'))).toBe(true)
-    printed['tool'] = 'episteme http://127.0.0.1:4322/mcp?client=tool-agent\n'
-    const connected = await agents.connect('tool-agent')
-    expect(ran.at(-2)).toEqual({
-      command: 'tool',
-      args: ['mcp', 'add', 'episteme', 'http://127.0.0.1:4322/mcp?client=tool-agent'],
+    expect(agent).toMatchObject({
+      how: 'command',
+      installed: true,
+      source: 'plugin',
+      confirms: true,
     })
-    expect(connected.agent.connected).toBe(true)
+    expect(existsSync(join(plugins(), 'tool-agent.json'))).toBe(true)
+    // Importing and listing it ran nothing, not even its `list` command; whether it is connected is not checked.
+    expect(ran).toEqual([])
+    expect((await agents.list()).agents.find((a) => a.id === 'tool-agent')!.connected).toBe(
+      undefined,
+    )
+    expect(ran).toEqual([])
+
+    await expect(agents.connect('tool-agent')).rejects.toMatchObject({
+      code: 'confirmation_required',
+    })
+    expect(ran).toEqual([])
+    const plan = (await agents.plan('tool-agent', 'connect'))!
+    expect(plan).toMatchObject({
+      agent: 'tool-agent',
+      action: 'connect',
+      source: join(plugins(), 'tool-agent.json'),
+      steps: [
+        { command: 'tool', args: ['mcp', 'remove', 'episteme'] },
+        {
+          command: 'tool',
+          args: ['mcp', 'add', 'episteme', 'http://127.0.0.1:4322/mcp?client=tool-agent'],
+        },
+      ],
+    })
+    expect(plan.steps[0]!.program.toLowerCase()).toBe(
+      join(bin, process.platform === 'win32' ? 'tool.cmd' : 'tool').toLowerCase(),
+    )
+    expect(ran).toEqual([])
+    await agents.connect('tool-agent', plan.confirm)
+    expect(ran).toEqual(plan.steps.map(({ command, args }) => ({ command, args })))
 
     await agents.removePlugin('tool-agent')
     expect(existsSync(join(plugins(), 'tool-agent.json'))).toBe(false)
     expect((await agents.list()).agents.some((a) => a.id === 'tool-agent')).toBe(false)
     await expect(agents.removePlugin('cursor')).rejects.toMatchObject({ code: 'unknown_agent' })
+  })
+})
+
+describe('launching a plugin’s command', () => {
+  const plugins = () => join(directory, 'agent-plugins')
+  const manifest = (add = ['mcp', 'add', 'episteme', '{url}']) =>
+    JSON.stringify({
+      id: 'tool-agent',
+      name: 'Tool',
+      kind: 'cli',
+      commands: ['tool'],
+      cli: { add, remove: ['mcp', 'remove', 'episteme'], list: ['mcp', 'list'] },
+    })
+
+  it('runs nothing that was confirmed for another plugin, program or action', async () => {
+    await install('tool')
+    const agents = await open()
+    await agents.importPlugin(manifest())
+    const plan = (await agents.plan('tool-agent', 'connect'))!
+
+    await expect(agents.connect('tool-agent', 'not-the-plan')).rejects.toMatchObject({
+      code: 'confirmation_required',
+    })
+    await expect(agents.disconnect('tool-agent', plan.confirm)).rejects.toMatchObject({
+      code: 'confirmation_required',
+    })
+    // The plugin file changes between showing and running: what was confirmed is no longer what would run.
+    await writeFile(
+      join(plugins(), 'tool-agent.json'),
+      manifest(['mcp', 'add', '-g', 'episteme', '{url}']),
+    )
+    await expect(agents.connect('tool-agent', plan.confirm)).rejects.toMatchObject({
+      code: 'confirmation_required',
+    })
+    expect(ran).toEqual([])
+
+    const again = (await agents.plan('tool-agent', 'disconnect'))!
+    expect(again.steps).toHaveLength(1)
+    await agents.disconnect('tool-agent', again.confirm)
+    expect(ran).toEqual([{ command: 'tool', args: ['mcp', 'remove', 'episteme'] }])
+  })
+
+  it('reports a command that fails, and lets the person launch it again', async () => {
+    await install('tool')
+    const agents = await open()
+    await agents.importPlugin(manifest())
+    commandWorks = false
+    const plan = (await agents.plan('tool-agent', 'connect'))!
+    await expect(agents.connect('tool-agent', plan.confirm)).rejects.toMatchObject({
+      code: 'cannot_connect',
+    })
+    commandWorks = true
+    await agents.connect('tool-agent', plan.confirm)
+    expect(ran).toHaveLength(4)
+  })
+
+  it('runs one launch of an agent at a time', async () => {
+    await install('tool')
+    let finish: () => void = () => undefined
+    const slow: AgentEnvironment = {
+      ...environment(),
+      run: (command, args) => {
+        ran.push({ command, args })
+        return new Promise((resolve) => {
+          finish = () => resolve({ ok: true, output: 'ok' })
+        })
+      },
+    }
+    const agents = await Agents.open(join(directory, 'agents.json'), slow, () => MCP)
+    await agents.importPlugin(manifest())
+    const plan = (await agents.plan('tool-agent', 'disconnect'))!
+    const first = agents.disconnect('tool-agent', plan.confirm)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    await expect(agents.disconnect('tool-agent', plan.confirm)).rejects.toMatchObject({
+      code: 'busy',
+    })
+    finish()
+    await first
+    // Once it has ended, the next launch runs.
+    const second = agents.disconnect('tool-agent', plan.confirm)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    finish()
+    await second
+    expect(ran).toHaveLength(2)
+  })
+
+  it('still connects a built-in agent with its own command, without asking', async () => {
+    await install('claude')
+    const agents = await open()
+    expect(await agents.plan('claude-code', 'connect')).toBeUndefined()
+    const { agent } = await agents.connect('claude-code')
+    expect(agent).not.toHaveProperty('confirms')
+    expect(ran.at(-1)!.command).toBe('claude')
+  })
+
+  it('leaves a real program untouched on import and listing, and runs it once confirmed', async () => {
+    // A harmless marker program: it only notes the words it was given in a file beside itself.
+    const marker = join(bin, 'marker.txt')
+    if (process.platform === 'win32') {
+      await put(join(bin, 'tool.cmd'), `@echo off\r\n>>"%~dp0marker.txt" echo %*\r\nexit /b 0\r\n`)
+    } else {
+      await put(join(bin, 'tool'), `#!/bin/sh\necho "$@" >> "$(dirname "$0")/marker.txt"\n`)
+      const { chmod } = await import('node:fs/promises')
+      await chmod(join(bin, 'tool'), 0o755)
+    }
+    const real = localAgentEnvironment()
+    const path = process.env['PATH']
+    process.env['PATH'] = `${bin}${delimiter}${path ?? ''}`
+    try {
+      const agents = await Agents.open(
+        join(directory, 'agents.json'),
+        { ...environment(), run: real.run },
+        () => MCP,
+      )
+      await agents.importPlugin(manifest())
+      await agents.list()
+      await (
+        await Agents.open(
+          join(directory, 'agents.json'),
+          { ...environment(), run: real.run },
+          () => MCP,
+        )
+      ).list()
+      expect(existsSync(marker)).toBe(false)
+
+      await expect(agents.connect('tool-agent')).rejects.toMatchObject({
+        code: 'confirmation_required',
+      })
+      expect(existsSync(marker)).toBe(false)
+
+      const plan = (await agents.plan('tool-agent', 'connect'))!
+      await agents.connect('tool-agent', plan.confirm)
+      const noted = (await readFile(marker, 'utf8')).split(/\r?\n/).filter((line) => line !== '')
+      expect(noted).toEqual([
+        'mcp remove episteme',
+        'mcp add episteme http://127.0.0.1:4322/mcp?client=tool-agent',
+      ])
+    } finally {
+      process.env['PATH'] = path
+    }
   })
 })
 
@@ -725,6 +894,43 @@ describe('the agents page over the service', () => {
     expect(refused).toMatchObject({ status: 422, body: { code: 'invalid_request' } })
     const removed = await call('/agents/plugins/remove', { id: 'mine' }, service.humanToken)
     expect(removed.status).toBe(200)
+  })
+
+  it('shows a plugin’s command to the person and runs it only with their confirmation', async () => {
+    await install('tool')
+    const agents = await open()
+    service = await startService({
+      graph: join(directory, 'graph.db'),
+      port: 0,
+      profile: workbenchProfile({ model: new SimulatedModel(), agents }),
+    })
+    const person = service.humanToken!
+    const manifest = JSON.stringify({
+      id: 'tool-agent',
+      name: 'Tool',
+      commands: ['tool'],
+      cli: { add: ['mcp', 'add', 'episteme', '{url}'], remove: ['mcp', 'remove', 'episteme'] },
+    })
+    expect((await call('/agents/plugins', { manifest }, person)).status).toBe(200)
+    expect((await call('/agents', undefined, person)).status).toBe(200)
+    expect(ran).toEqual([])
+
+    const unconfirmed = await call('/agents/connect', { id: 'tool-agent' }, person)
+    expect(unconfirmed).toMatchObject({ status: 422, body: { code: 'confirmation_required' } })
+    expect((await call('/agents/plan', { id: 'tool-agent', action: 'connect' })).status).toBe(401)
+    const planned = await call('/agents/plan', { id: 'tool-agent', action: 'connect' }, person)
+    const plan = planned.body['plan'] as { confirm: string; source: string }
+    expect(plan.source).toBe(join(directory, 'agent-plugins', 'tool-agent.json'))
+    expect(ran).toEqual([])
+    const confirmed = await call(
+      '/agents/connect',
+      { id: 'tool-agent', confirm: plan.confirm },
+      person,
+    )
+    expect(confirmed.status).toBe(200)
+    expect(ran).toHaveLength(2)
+    const builtIn = await call('/agents/plan', { id: 'cursor', action: 'connect' }, person)
+    expect(builtIn.body).toMatchObject({ plan: null })
   })
 
   it('refuses an agent’s own credential, so one agent cannot read or change another’s settings', async () => {

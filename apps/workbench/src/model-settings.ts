@@ -84,6 +84,22 @@ function savedFrom(value: unknown): SavedModel | undefined {
   }
 }
 
+/**
+ * The model a service runs with, and whether the page may change it.
+ *
+ * On one person's own service the page may choose the model. A shared service has one model for everyone, so no
+ * signed-in person may change or clear it: it comes from EPISTEME_MODEL_* or a `model.json` the person running the
+ * service put beside the graph, and the page settings are not offered at all (their routes answer `not_found`).
+ */
+export async function serviceModel(options: {
+  readonly file: string
+  readonly fromEnvironment?: ModelClient
+  readonly shared: boolean
+}): Promise<{ readonly model: ModelClient; readonly modelSettings?: ModelSettings }> {
+  const model = await ModelSettings.open(options.file, options.fromEnvironment)
+  return options.shared ? { model } : { model, modelSettings: model }
+}
+
 /** A model whose provider can change while the service runs. Every call goes to the current one. */
 export class ModelSettings implements ModelClient {
   #client: ModelClient

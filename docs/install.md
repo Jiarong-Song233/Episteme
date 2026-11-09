@@ -71,6 +71,7 @@ curl -fsSL https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scrip
 - “改回模拟模型”会删除 `model.json`。
 - 每次启动后最多调用 100 次、20 万 token，超出后回答会失败，重启程序即可重置。
 - 如果启动时设置了环境变量 `EPISTEME_MODEL_BASE_URL` 和 `EPISTEME_MODEL_NAME`，以环境变量为准，页面上只显示、不能修改。
+- 多人使用（`--shared`）时，所有人共用一个模型，页面上不能设置，任何登录的人和 Agent 都不能修改或清除。由运行服务的人在启动前用上面的环境变量配置，或者在图谱旁边放好 `model.json`。页面上只显示模型名。
 
 ## 卸载
 

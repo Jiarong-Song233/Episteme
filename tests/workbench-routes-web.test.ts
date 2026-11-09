@@ -219,6 +219,52 @@ describe.skipIf(browser === undefined)('addresses in a browser', () => {
     expect(await page.locator('.shelf').getByText('编码笔记.md').count()).toBe(0)
   }, 60_000)
 
+  it('installs as an app of its own, and the worker keeps the page but none of the data', async () => {
+    await newSpace('机器学习')
+    await upload('编码笔记.md')
+    await ask('位置编码有什么用')
+
+    // Run in the page as strings: these tests compile without the DOM's types.
+    const manifest = await page.evaluate<{
+      status: number
+      body: { display: string; icons: { sizes: string; purpose?: string }[] }
+      icons: number[]
+    }>(`(async () => {
+      const link = document.querySelector('link[rel="manifest"]')
+      const answer = await fetch(link.href)
+      const body = await answer.json()
+      const icons = await Promise.all(
+        body.icons.map(async (icon) => (await fetch(new URL(icon.src, answer.url))).status),
+      )
+      return { status: answer.status, body, icons }
+    })()`)
+    expect(manifest.status).toBe(200)
+    expect(manifest.body.display).toBe('standalone')
+    expect(manifest.body.icons.map((icon) => icon.sizes)).toEqual(
+      expect.arrayContaining(['192x192', '512x512']),
+    )
+    expect(manifest.body.icons.some((icon) => icon.purpose === 'maskable')).toBe(true)
+    expect(manifest.icons.every((status) => status === 200)).toBe(true)
+
+    await page.evaluate('navigator.serviceWorker.ready.then(() => true)')
+    await page.reload()
+    await main().getByText('位置编码有什么用').first().waitFor()
+    await expect.poll(() => page.evaluate('navigator.serviceWorker.controller !== null')).toBe(true)
+    const kept = await page.evaluate<string[]>(`(async () => {
+      const paths = []
+      for (const name of await caches.keys()) {
+        for (const request of await (await caches.open(name)).keys()) {
+          paths.push(new URL(request.url).pathname)
+        }
+      }
+      return paths
+    })()`)
+    expect(kept).toContain('/')
+    expect(kept.some((path) => path.startsWith('/assets/'))).toBe(true)
+    // What the person asked and holds comes only from the service.
+    expect(kept.filter((path) => path.startsWith('/api') || path.startsWith('/mcp'))).toEqual([])
+  }, 60_000)
+
   it('opens a link made when review and understanding lived in the side column', async () => {
     await newSpace('机器学习')
     await page.waitForURL(/\/new/)

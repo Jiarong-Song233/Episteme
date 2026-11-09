@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- A page of the exercise book: green paper, ruled in ink, the red margin, and one item ticked as the person's own. -->
+  <rect width="512" height="512" rx="96" fill="#e4eedf"/>
+  <rect x="150" y="96" width="8" height="320" fill="#b3261a"/>
+  <g stroke="#1b2a5c" stroke-width="18" stroke-linecap="round">
+    <line x1="196" y1="170" x2="400" y2="170"/>
+    <line x1="196" y1="256" x2="352" y2="256"/>
+  </g>
+  <path d="M196 344 L236 380 L320 300" fill="none" stroke="#1b2a5c" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -39,7 +39,20 @@ curl -fsSL https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scrip
 
 ## 在程序里接入其他 Agent
 
-打开 Episteme，点左栏底部的“接入 Agent”。页面会列出这台电脑上找到的 Agent，点“接入”即可，不用自己改配置。支持 Claude Code、Codex、Gemini CLI、Qwen Code、Kimi CLI、CodeBuddy、opencode、Trae、Cursor、VS Code、Cline、Roo Code、Windsurf、Kiro、Zed 和 Claude Desktop；不在列表里的 Agent，可以在“添加自定义 Agent”里填它的 MCP 配置文件，或者用页面下方的地址手动接入。
+打开 Episteme，点左栏底部的“接入 Agent”。页面会列出这台电脑上找到的 Agent，点“接入”即可，不用自己改配置。支持这些 Agent：
+
+- 命令行：Claude Code、Codex、Gemini CLI、Antigravity CLI（agy）、Qwen Code、Kimi CLI、CodeBuddy、opencode。
+- 编辑器和扩展：Antigravity、Trae、Trae CN、Qoder、Qoder CN、Cursor、VS Code、Cline、Roo Code、Windsurf、Kiro、Zed。
+- 桌面程序：Claude Desktop、WorkBuddy、豆包工作。
+- 管理程序：通过 magpie 接入 Pi、Hermes、OpenClaw、ZCode 和 DeepSeek Harness。
+
+豆包工作不读 MCP 配置，接入时给它放一个 `episteme` 技能，让它用命令行调用工作台。
+
+不在列表里的 Agent 有三种接法：
+
+- 在“添加自定义 Agent”里填它的 MCP 配置文件。
+- 写一个插件，见 [Agent 插件](agent-plugins.md)。
+- 用页面下方的地址手动接入。
 
 接入时只加一项 `episteme`，Agent 的其他设置不动；改文件前会留一份 `<原文件名>.before-episteme` 备份。点“断开”只去掉这一项。
 

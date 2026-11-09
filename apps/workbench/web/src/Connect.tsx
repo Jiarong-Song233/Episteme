@@ -12,8 +12,16 @@ const KINDS: Record<AgentInfo['kind'], string> = {
   editor: '编辑器',
   desktop: '桌面程序',
   extension: 'VS Code 扩展',
+  manager: '替多个 Agent 管理设置',
   custom: '自定义',
 }
+
+const PLUGIN_EXAMPLE = `{
+  "id": "my-agent",
+  "name": "我的 Agent",
+  "detect": ["~/.my-agent"],
+  "settings": { "file": "~/.my-agent/mcp.json", "key": "mcpServers", "style": "type-http" }
+}`
 
 /** How each style of settings entry looks, for the custom-agent form. */
 const STYLES: readonly { value: string; label: string }[] = [
@@ -97,7 +105,9 @@ function AgentRow(props: {
         <div className="agent-name">
           <strong>{agent.name}</strong>
           <span className="hint">
-            {[agent.maker, KINDS[agent.kind]].filter((part) => part !== undefined).join('，')}
+            {[agent.maker, KINDS[agent.kind], agent.source === 'plugin' ? '插件' : undefined]
+              .filter((part) => part !== undefined)
+              .join('，')}
           </span>
         </div>
         <span className="agent-state" data-tone={shown.tone}>
@@ -133,9 +143,16 @@ function AgentRow(props: {
       {open && (
         <div className="agent-detail">
           {agent.how === 'command' && <p className="hint">用它自己的 mcp 命令接入和断开。</p>}
+          {agent.how === 'skill' && (
+            <p className="hint">
+              它不读 MCP 配置，但会读技能。接入时放进一个 episteme
+              技能，教它用命令行调用工作台；断开时只删这个技能。
+            </p>
+          )}
           {agent.file !== undefined && (
             <p className="hint">
-              配置文件：<code>{agent.file}</code>
+              {agent.how === 'skill' ? '技能文件：' : '配置文件：'}
+              <code>{agent.file}</code>
               {agent.how === 'settings' &&
                 '。只改其中 episteme 这一项，第一次改之前的原文件留在旁边的 .before-episteme。'}
             </p>
@@ -160,6 +177,82 @@ function AgentRow(props: {
         </div>
       )}
     </li>
+  )
+}
+
+function PluginForm(props: {
+  folder: string | undefined
+  problems: readonly { file: string; reason: string }[]
+  onAdded: (name: string) => void
+}) {
+  const [manifest, setManifest] = useState('')
+  const [working, setWorking] = useState(false)
+  const [problem, setProblem] = useState<string>()
+
+  const submit = (event: FormEvent): void => {
+    event.preventDefault()
+    setWorking(true)
+    setProblem(undefined)
+    api
+      .importAgentPlugin(manifest)
+      .then((reply) => {
+        setManifest('')
+        props.onAdded(reply.agent.name)
+      })
+      .catch((error: unknown) =>
+        setProblem(error instanceof ApiError ? error.message : '没有加上，请重试。'),
+      )
+      .finally(() => setWorking(false))
+  }
+
+  return (
+    <form className="panel model-form" onSubmit={submit}>
+      <h3>用插件加入 Agent</h3>
+      <p className="hint">
+        插件是一个 JSON 文件，写明怎么找到这个 Agent、它的 MCP
+        配置在哪，或它的命令、技能文件夹。插件只描述，接入时和内置的 Agent 一样只改 episteme
+        这一项。
+        {props.folder !== undefined && (
+          <>
+            {' '}
+            也可以直接把文件放进 <code>{props.folder}</code>。
+          </>
+        )}
+      </p>
+      <label>
+        插件内容
+        <textarea
+          value={manifest}
+          onChange={(event) => setManifest(event.target.value)}
+          placeholder={PLUGIN_EXAMPLE}
+          rows={7}
+          required
+          spellCheck={false}
+        />
+      </label>
+      <div className="actions">
+        <button type="submit" disabled={working || manifest.trim() === ''}>
+          {working ? '正在加入…' : '加入插件'}
+        </button>
+      </div>
+      {problem !== undefined && (
+        <p className="banner banner-error" role="status">
+          {problem}
+        </p>
+      )}
+      {props.problems.length > 0 && (
+        <div className="banner banner-error" role="status">
+          <p>这些插件文件没有用上：</p>
+          <ul>
+            {props.problems.map((item) => (
+              <li key={item.file}>
+                <code>{item.file}</code>：{item.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </form>
   )
 }
 
@@ -260,6 +353,10 @@ export function ConnectPage({ me }: { me: Me }) {
   const [busy, setBusy] = useState<string>()
   const [message, setMessage] = useState<{ ok: boolean; text: string }>()
   const [showMissing, setShowMissing] = useState(false)
+  const [plugins, setPlugins] = useState<{
+    folder: string
+    problems: readonly { file: string; reason: string }[]
+  }>()
 
   const load = useCallback(() => {
     api
@@ -267,6 +364,7 @@ export function ConnectPage({ me }: { me: Me }) {
       .then((reply) => {
         setAgents(reply.agents)
         setOthers(reply.others)
+        setPlugins(reply.plugins)
       })
       .catch((error: unknown) =>
         setMessage({
@@ -330,12 +428,14 @@ export function ConnectPage({ me }: { me: Me }) {
       busy={busy === agent.id}
       onConnect={() => act(agent, () => api.connectAgent(agent.id), 'connected')}
       onDisconnect={() => act(agent, () => api.disconnectAgent(agent.id), 'disconnected')}
-      {...(agent.kind === 'custom'
+      {...(agent.kind === 'custom' || agent.source === 'plugin'
         ? {
             onRemove: () => {
               setBusy(agent.id)
-              api
-                .removeCustomAgent(agent.id)
+              ;(agent.source === 'plugin'
+                ? api.removeAgentPlugin(agent.id)
+                : api.removeCustomAgent(agent.id)
+              )
                 .then(load)
                 .catch(() => setMessage({ ok: false, text: '没有去掉，请重试。' }))
                 .finally(() => setBusy(undefined))
@@ -419,6 +519,15 @@ export function ConnectPage({ me }: { me: Me }) {
       )}
 
       <CustomForm onAdded={load} />
+
+      <PluginForm
+        folder={plugins?.folder}
+        problems={plugins?.problems ?? []}
+        onAdded={(name) => {
+          setMessage({ ok: true, text: `已加入插件：${name}。` })
+          load()
+        }}
+      />
 
       {missing.length > 0 && (
         <section className="panel">

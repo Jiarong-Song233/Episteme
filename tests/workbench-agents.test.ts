@@ -28,16 +28,21 @@ let home: string
 let bin: string
 let ran: { command: string; args: readonly string[] }[]
 let commandWorks: boolean
+/** What a command prints when it works, by command. */
+let printed: Record<string, string>
 
 function environment(): AgentEnvironment {
   return {
     home,
     platform: process.platform,
     appData: join(home, 'AppData'),
-    env: { PATH: bin, PATHEXT: '.CMD;.EXE' },
+    env: { PATH: bin, PATHEXT: '.CMD;.EXE', LOCALAPPDATA: join(home, 'AppData', 'Local') },
     run: (command, args) => {
       ran.push({ command, args })
-      return Promise.resolve({ ok: commandWorks, output: commandWorks ? 'ok' : 'Error: refused\n' })
+      return Promise.resolve({
+        ok: commandWorks,
+        output: commandWorks ? (printed[command] ?? 'ok') : 'Error: refused\n',
+      })
     },
     bridge: { command: '/path/to/node', args: ['/path/to/mcp-bridge.js'] },
   }
@@ -65,6 +70,7 @@ beforeEach(async () => {
   await mkdir(bin, { recursive: true })
   ran = []
   commandWorks = true
+  printed = {}
 })
 
 afterEach(async () => {
@@ -321,6 +327,245 @@ describe('the agents of this computer', () => {
   })
 })
 
+describe('agents of other kinds', () => {
+  it('writes WorkBuddy, Qoder CN and Antigravity in their own ways', async () => {
+    await mkdir(join(home, '.workbuddy'))
+    await put(join(home, '.qoder-cn', 'settings.json'), '{ "enabledPlugins": { "x": true } }\n')
+    await mkdir(join(home, '.gemini', 'antigravity'), { recursive: true })
+    const agents = await open()
+    for (const id of ['workbuddy', 'qoder-cn', 'antigravity']) await agents.connect(id)
+    const read = async (...path: string[]) =>
+      JSON.parse(await readFile(join(home, ...path), 'utf8')) as {
+        mcpServers: Record<string, unknown>
+        enabledPlugins?: unknown
+      }
+    expect((await read('.workbuddy', 'mcp.json')).mcpServers['episteme']).toEqual({
+      type: 'http',
+      url: 'http://127.0.0.1:4322/mcp?client=workbuddy',
+    })
+    const qoder = await read('.qoder-cn', 'settings.json')
+    expect(qoder.mcpServers['episteme']).toEqual({
+      type: 'http',
+      url: 'http://127.0.0.1:4322/mcp?client=qoder-cn',
+    })
+    expect(qoder.enabledPlugins).toEqual({ x: true })
+    expect(
+      (await read('.gemini', 'antigravity', 'mcp_config.json')).mcpServers['episteme'],
+    ).toEqual({ serverUrl: 'http://127.0.0.1:4322/mcp?client=antigravity' })
+  })
+
+  it('uses the Store version’s settings of Claude Desktop when that is the one there', async () => {
+    if (process.platform !== 'win32') return
+    const file = join(home, 'AppData', 'Local', 'Claude', 'claude_desktop_config.json')
+    await put(file, '{}\n')
+    const agents = await open()
+    const { agent } = await agents.connect('claude-desktop')
+    expect(agent).toMatchObject({ installed: true, connected: true, file })
+    expect(existsSync(join(home, 'AppData', 'Claude', 'claude_desktop_config.json'))).toBe(false)
+  })
+
+  it('connects the Antigravity CLI with agy, and reads from agy whether it lists the workbench', async () => {
+    await install('agy')
+    const agents = await open()
+    printed['agy'] = 'No MCP servers configured.\n'
+    let agy = (await agents.list()).agents.find((agent) => agent.id === 'antigravity-cli')!
+    expect(agy).toMatchObject({ installed: true, connected: false, how: 'command' })
+
+    printed['agy'] = 'NAME      TYPE  STATUS   COMMAND/URL\nepisteme  http  enabled  http://x\n'
+    agy = (await agents.connect('antigravity-cli')).agent
+    expect(ran.slice(-3, -1)).toEqual([
+      { command: 'agy', args: ['mcp', 'remove', 'episteme'] },
+      {
+        command: 'agy',
+        args: [
+          'mcp',
+          'add',
+          '--type',
+          'http',
+          'episteme',
+          'http://127.0.0.1:4322/mcp?client=antigravity-cli',
+        ],
+      },
+    ])
+    expect(agy.connected).toBe(true)
+    // What agy said is kept a little while, so the list does not run it again at once.
+    const before = ran.length
+    await agents.list()
+    expect(ran.length).toBe(before)
+  })
+
+  it('gives magpie the plain address, for the agents only it can write, and reads its library', async () => {
+    await install('magpie')
+    printed['magpie'] = [
+      'Instructions',
+      '  none',
+      'MCP servers',
+      '  episteme → pi, hermes',
+      '  in your agents, not in the library: other (agy)',
+      'Skills',
+      '  episteme-notes → kimi',
+      '',
+    ].join('\n')
+    const agents = await open()
+    const { agent } = await agents.connect('magpie')
+    expect(ran.at(-2)).toEqual({
+      command: 'magpie',
+      args: [
+        'library',
+        'mcp',
+        'add',
+        'episteme',
+        'http://127.0.0.1:4322/mcp',
+        'agents=pi,hermes,openclaw,zcode,dsh',
+      ],
+    })
+    expect(agent).toMatchObject({ kind: 'manager', connected: true, address: MCP })
+
+    printed['magpie'] = 'MCP servers\n  none yet\nSkills\n  episteme → kimi\n'
+    const later = await open()
+    expect((await later.list()).agents.find((a) => a.id === 'magpie')!.connected).toBe(false)
+  })
+
+  it('gives 豆包工作 a skill, and takes away only the one it wrote', async () => {
+    const skills = join(
+      home,
+      'AppData',
+      'Local',
+      'DoubaoWork',
+      'User Data',
+      'Default',
+      '.doubaowork',
+      'agent_mode',
+      'workspace',
+      '.skills',
+    )
+    if (process.platform !== 'win32') return
+    await mkdir(join(skills, 'doubao-search'), { recursive: true })
+    const agents = await open()
+    const { agent } = await agents.connect('doubao-work')
+    const file = join(skills, 'episteme', 'SKILL.md')
+    expect(agent).toMatchObject({ how: 'skill', connected: true, current: true, file })
+    const skill = await readFile(file, 'utf8')
+    expect(skill).toMatch(/^---\nname: episteme\n/)
+    expect(skill).toContain('"/path/to/node" "')
+    expect(skill).toContain('episteme-cli.js" --url "http://127.0.0.1:4322/mcp?client=doubao-work"')
+    expect(skill).toContain('不能替这个人确认理解')
+
+    await agents.disconnect('doubao-work')
+    expect(existsSync(join(skills, 'episteme'))).toBe(false)
+    expect(existsSync(join(skills, 'doubao-search'))).toBe(true)
+
+    // A skill of the same name the person wrote is not theirs to lose.
+    await put(file, '---\nname: episteme\n---\nmine\n')
+    expect((await agents.list()).agents.find((a) => a.id === 'doubao-work')!.connected).toBe(false)
+    await agents.disconnect('doubao-work')
+    expect(await readFile(file, 'utf8')).toContain('mine')
+  })
+})
+
+describe('agent plugins', () => {
+  const plugins = () => join(directory, 'agent-plugins')
+
+  it('lists an agent a plugin describes, connects it, and reports a plugin it cannot use', async () => {
+    await put(
+      join(plugins(), 'lab.json'),
+      JSON.stringify({
+        id: 'lab-agent',
+        name: '实验室 Agent',
+        maker: '某实验室',
+        detect: ['~/.lab'],
+        settings: { file: '{home}/.lab/mcp.json', key: 'servers', style: 'streamable-http' },
+        after: '重启后生效。',
+      }),
+    )
+    await put(join(plugins(), 'broken.json'), '{ "id": "x" ')
+    await put(
+      join(plugins(), 'clash.json'),
+      JSON.stringify({ id: 'cursor', name: 'x', skills: '~/s' }),
+    )
+    await mkdir(join(home, '.lab'))
+    const agents = await open()
+    const listed = await agents.list()
+    const lab = listed.agents.find((agent) => agent.id === 'lab-agent')!
+    expect(lab).toMatchObject({
+      name: '实验室 Agent',
+      source: 'plugin',
+      installed: true,
+      connected: false,
+      how: 'settings',
+    })
+    expect(listed.plugins.problems.map((problem) => problem.file).sort()).toEqual([
+      join(plugins(), 'broken.json'),
+      join(plugins(), 'clash.json'),
+    ])
+    expect(listed.plugins.problems.find((p) => p.file.endsWith('clash.json'))!.reason).toContain(
+      '内置',
+    )
+
+    await agents.connect('lab-agent')
+    expect(JSON.parse(await readFile(join(home, '.lab', 'mcp.json'), 'utf8'))).toEqual({
+      servers: {
+        episteme: {
+          type: 'streamable-http',
+          url: 'http://127.0.0.1:4322/mcp?client=lab-agent',
+        },
+      },
+    })
+  })
+
+  it('runs a plugin’s command only with plain words and the workbench’s address', async () => {
+    const agents = await open()
+    await expect(
+      agents.importPlugin(
+        JSON.stringify({
+          id: 'sneaky',
+          name: 'x',
+          commands: ['x'],
+          cli: { add: ['add', '{url}', '&', 'calc'], remove: ['rm'] },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'invalid_request' })
+    await expect(
+      agents.importPlugin(JSON.stringify({ id: 'a', name: 'x', commands: ['x;y'], cli: {} })),
+    ).rejects.toMatchObject({ code: 'invalid_request' })
+    await expect(
+      agents.importPlugin(JSON.stringify({ id: 'a', name: 'x', settings: { file: 'rel.json' } })),
+    ).rejects.toMatchObject({ code: 'invalid_request' })
+    await expect(
+      agents.importPlugin(JSON.stringify({ id: 'a', name: 'x', extra: 1, skills: '~/s' })),
+    ).rejects.toMatchObject({ code: 'invalid_request' })
+
+    await install('tool')
+    const { agent } = await agents.importPlugin(
+      JSON.stringify({
+        id: 'tool-agent',
+        name: 'Tool',
+        kind: 'cli',
+        commands: ['tool'],
+        cli: {
+          add: ['mcp', 'add', 'episteme', '{url}'],
+          remove: ['mcp', 'remove', 'episteme'],
+          list: ['mcp', 'list'],
+        },
+      }),
+    )
+    expect(agent).toMatchObject({ how: 'command', installed: true, source: 'plugin' })
+    expect(existsSync(join(plugins(), 'tool-agent.json'))).toBe(true)
+    printed['tool'] = 'episteme http://127.0.0.1:4322/mcp?client=tool-agent\n'
+    const connected = await agents.connect('tool-agent')
+    expect(ran.at(-2)).toEqual({
+      command: 'tool',
+      args: ['mcp', 'add', 'episteme', 'http://127.0.0.1:4322/mcp?client=tool-agent'],
+    })
+    expect(connected.agent.connected).toBe(true)
+
+    await agents.removePlugin('tool-agent')
+    expect(existsSync(join(plugins(), 'tool-agent.json'))).toBe(false)
+    expect((await agents.list()).agents.some((a) => a.id === 'tool-agent')).toBe(false)
+    await expect(agents.removePlugin('cursor')).rejects.toMatchObject({ code: 'unknown_agent' })
+  })
+})
+
 describe('the agents page over the service', () => {
   let service: EpistemeService | undefined
   afterEach(async () => {
@@ -425,6 +670,61 @@ describe('the agents page over the service', () => {
     expect(answers.map((answer) => answer.id).sort()).toEqual([1, 2])
     const tools = answers.find((answer) => answer.id === 2)!.result!['tools'] as { name: string }[]
     expect(tools.map((tool) => tool.name)).toContain('recall')
+  })
+
+  it('lets an agent with only a skill call the tools from the command line', async () => {
+    service = await startService({
+      graph: join(directory, 'graph.db'),
+      port: 0,
+      profile: workbenchProfile({ model: new SimulatedModel() }),
+    })
+    const cli = join(import.meta.dirname, '..', 'apps', 'workbench', 'dist', 'episteme-cli.js')
+    const run = (args: string[], input?: string) =>
+      new Promise<{ code: number | null; out: string; err: string }>((resolve) => {
+        const child = spawn(process.execPath, [
+          cli,
+          '--url',
+          `${service!.mcpUrl}?client=doubao-work`,
+          ...args,
+        ])
+        let out = ''
+        let err = ''
+        child.stdout.on('data', (chunk: Buffer) => (out += chunk.toString('utf8')))
+        child.stderr.on('data', (chunk: Buffer) => (err += chunk.toString('utf8')))
+        child.once('exit', (code) => resolve({ code, out, err }))
+        child.stdin.end(input ?? '')
+      })
+    const tools = await run(['tools'])
+    expect(tools.code).toBe(0)
+    expect(tools.out).toMatch(/^recall\(question/m)
+    expect(tools.out).toContain('propose(')
+
+    const recalled = await run(['call', 'recall', '-'], JSON.stringify({ question: '贝叶斯定理' }))
+    expect(recalled).toMatchObject({ code: 0 })
+    expect(recalled.out.trim()).not.toBe('')
+
+    const wrong = await run(['call', 'recall', 'not json'])
+    expect(wrong.code).toBe(2)
+    const elsewhere = spawn(process.execPath, [cli, '--url', 'http://example.com/mcp', 'tools'])
+    expect(await new Promise((resolve) => elsewhere.once('exit', resolve))).toBe(2)
+  })
+
+  it('takes a plugin from the person only', async () => {
+    const agents = await open()
+    service = await startService({
+      graph: join(directory, 'graph.db'),
+      port: 0,
+      profile: workbenchProfile({ model: new SimulatedModel(), agents }),
+    })
+    const manifest = JSON.stringify({ id: 'mine', name: '我的', skills: '~/.mine/skills' })
+    expect((await call('/agents/plugins', { manifest })).status).toBe(401)
+    const imported = await call('/agents/plugins', { manifest }, service.humanToken)
+    expect(imported.status).toBe(200)
+    expect(imported.body['agent']).toMatchObject({ id: 'mine', how: 'skill', source: 'plugin' })
+    const refused = await call('/agents/plugins', { manifest: '{"id":"x"}' }, service.humanToken)
+    expect(refused).toMatchObject({ status: 422, body: { code: 'invalid_request' } })
+    const removed = await call('/agents/plugins/remove', { id: 'mine' }, service.humanToken)
+    expect(removed.status).toBe(200)
   })
 
   it('refuses an agent’s own credential, so one agent cannot read or change another’s settings', async () => {

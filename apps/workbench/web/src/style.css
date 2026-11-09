@@ -307,7 +307,7 @@ input[type="checkbox"] {
 }
 
 /* Buttons: ink for the one thing to do, outlined for the rest, and plain links for the quiet ways. */
-button:not(.row, .link, .cite, .node-row, .material-title, .tool, [role="tab"]),
+button:not(.row, .link, .cite, .node-row, .material-title, .tool, .tree-toggle, [role="tab"]),
 .upload {
   flex: none;
   min-height: 30px;
@@ -324,9 +324,16 @@ button:not(.row, .link, .cite, .node-row, .material-title, .tool, [role="tab"]),
     border-color 0.12s;
 }
 
-button:not(.row, .link, .cite, .node-row, .material-title, .tool, [role="tab"]):hover:not(
-  :disabled
-),
+button:not(
+  .row,
+  .link,
+  .cite,
+  .node-row,
+  .material-title,
+  .tool,
+  .tree-toggle,
+  [role="tab"]
+):hover:not(:disabled),
 .upload:hover {
   background: color-mix(in srgb, var(--button) 84%, var(--paper));
 }
@@ -1803,6 +1810,122 @@ li[data-status="skipped"] > span:first-child {
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Conversations as their branches make them: a hairline down from the line a branch left. */
+.thread-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thread-branches {
+  margin-left: 17px;
+  padding-left: 4px;
+  border-left: 1px solid var(--rule-strong);
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.tree-toggle,
+.tree-spacer {
+  flex: none;
+  width: 18px;
+  height: 30px;
+}
+
+.tree-toggle {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.tree-toggle:hover {
+  color: var(--ink);
+}
+
+.tree-toggle svg {
+  transition: transform 120ms ease;
+}
+
+.tree-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.tree-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The lines the open conversation came from: not current, but on its way. */
+.row[data-above="true"] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* A branch page: what it carries over sits behind a rule, apart from what was said on it. */
+.branch-of {
+  max-width: 62ch;
+  margin-bottom: 8px;
+}
+
+.carried {
+  max-width: 62ch;
+  padding-left: 14px;
+  border-left: 2px solid var(--rule-strong);
+  color: var(--ink-soft);
+}
+
+.carried .question {
+  color: var(--ink-soft);
+}
+
+.fork-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 62ch;
+  margin: 20px 0 4px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.fork-line::after {
+  flex: 1;
+  height: 1px;
+  background: var(--rule-strong);
+  content: "";
+}
+
+.turn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 8px;
+}
+
+.turn-actions .own-words {
+  margin-bottom: 0;
+}
+
+.turn-actions:empty {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-toggle svg {
+    transition: none;
+  }
 }
 
 /* The first visit: one statement of what this is for, then the steps in order. */

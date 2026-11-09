@@ -547,6 +547,20 @@ function Desk({
     return made.message
   }
 
+  /** A new line of the conversation on show, opened at once. The original stays where it was. */
+  const forkAt = async (turn: string): Promise<void> => {
+    if (spaceId === undefined || threadId === undefined) return
+    const { session } = await api.fork(spaceId, threadId, turn)
+    setSessions((await api.sessions(spaceId)).sessions)
+    moveTo({ kind: 'thread', space: spaceId, thread: session.id })
+  }
+  const canFork =
+    spaceId !== undefined &&
+    threadId !== undefined &&
+    planId === undefined &&
+    space?.archived === false &&
+    !asking
+
   const openNode = (node: string): void => {
     if (spaceId !== undefined) moveTo({ kind: 'understanding', space: spaceId, node })
   }
@@ -637,6 +651,7 @@ function Desk({
         openPublication,
         sharing: me.sharing,
         offer: offerTurn,
+        fork: canFork ? forkAt : undefined,
       }}
     >
       <div
@@ -960,6 +975,8 @@ function Desk({
               space={space}
               hasMaterial={materials.length > 0}
               thread={threadId}
+              branchOf={branchOf(sessions, threadId)}
+              onForkPoint={(parent) => jumpTo(parent.thread, parent.turn)}
               turns={turns}
               asking={asking}
               failed={failed}
@@ -1333,20 +1350,12 @@ function Shelf(props: {
           {props.plans}
           <section>
             <h2>对话</h2>
-            <ul className="list">
-              {sessions.map((session) => (
-                <li key={session.id}>
-                  <button
-                    type="button"
-                    className="row"
-                    aria-current={session.id === props.thread}
-                    onClick={() => props.onSelectThread(session.id)}
-                  >
-                    {session.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <ThreadTree
+              sessions={sessions}
+              current={props.thread}
+              onSelect={props.onSelectThread}
+            />
+
             <button type="button" className="link" onClick={props.onNewThread}>
               开始新对话
             </button>
@@ -1358,10 +1367,130 @@ function Shelf(props: {
   )
 }
 
+/**
+ * A space's conversations as their branches make them: each branch under the line it left, oldest first. Folding a
+ * line hides its branches, not itself; opening a conversation unfolds the lines above it, so it shows where it came
+ * from. A list with no branches looks as it always did.
+ */
+function ThreadTree(props: {
+  sessions: readonly Session[]
+  current: string | undefined
+  onSelect: (id: string) => void
+}) {
+  const { sessions, current } = props
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  const byId = new Map(sessions.map((session) => [session.id, session]))
+  const below = new Map<string, Session[]>()
+  const roots: Session[] = []
+  for (const session of sessions) {
+    const parent = session.parent?.thread
+    // A branch whose line is not listed here (archived, or a plan's) stands on its own.
+    if (parent === undefined || parent === session.id || !byId.has(parent)) roots.push(session)
+    else below.set(parent, [...(below.get(parent) ?? []), session])
+  }
+  for (const branches of below.values()) branches.sort((a, b) => a.createdAt - b.createdAt)
+
+  /** The lines the conversation on show came from, nearest first. */
+  const above: string[] = []
+  for (
+    let line = byId.get(current ?? '')?.parent?.thread;
+    line !== undefined && byId.has(line) && !above.includes(line);
+    line = byId.get(line)?.parent?.thread
+  ) {
+    above.push(line)
+  }
+  const aboveKey = above.join(' ')
+  useEffect(() => {
+    if (aboveKey === '') return
+    setFolded((held) => {
+      const lines = aboveKey.split(' ')
+      if (!lines.some((line) => held.has(line))) return held
+      return new Set([...held].filter((line) => !lines.includes(line)))
+    })
+  }, [aboveKey])
+
+  const branchCount = (id: string): number =>
+    (below.get(id) ?? []).reduce((sum, branch) => sum + 1 + branchCount(branch.id), 0)
+  const branched = below.size > 0
+
+  const lines = (list: readonly Session[], nested: boolean): ReactNode => (
+    <ul className={nested ? 'thread-tree thread-branches' : 'list thread-tree'}>
+      {list.map((session) => {
+        const branches = below.get(session.id) ?? []
+        const open = branches.length > 0 && !folded.has(session.id)
+        return (
+          <li key={session.id}>
+            <div className="tree-item">
+              {branches.length > 0 ? (
+                <button
+                  type="button"
+                  className="tree-toggle"
+                  aria-expanded={open}
+                  aria-label={`${open ? '收起' : '展开'}《${session.title}》的分支`}
+                  onClick={() =>
+                    setFolded((held) => {
+                      const next = new Set(held)
+                      if (next.has(session.id)) next.delete(session.id)
+                      else next.add(session.id)
+                      return next
+                    })
+                  }
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                    <path
+                      d="M3 1.5 6.5 5 3 8.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : (
+                branched && <span className="tree-spacer" aria-hidden="true" />
+              )}
+              <button
+                type="button"
+                className="row"
+                aria-current={session.id === current}
+                data-above={above.includes(session.id) ? 'true' : undefined}
+                onClick={() => props.onSelect(session.id)}
+              >
+                <span className="tree-title">{session.title}</span>
+                {branches.length > 0 && !open && (
+                  <span className="row-note">{branchCount(session.id)} 个分支</span>
+                )}
+              </button>
+            </div>
+            {open && lines(branches, true)}
+          </li>
+        )
+      })}
+    </ul>
+  )
+  return lines(roots, false)
+}
+
+/** Where a branch left the conversation it came from, and what that conversation is called. */
+interface BranchOf {
+  readonly parent: { readonly thread: string; readonly turn: string }
+  readonly title: string
+}
+
+function branchOf(sessions: readonly Session[], thread: string | undefined): BranchOf | undefined {
+  const parent = sessions.find((session) => session.id === thread)?.parent
+  if (parent === undefined) return undefined
+  const title = sessions.find((session) => session.id === parent.thread)?.title ?? '原对话'
+  return { parent, title }
+}
+
 function Conversation(props: {
   space: Space | undefined
   hasMaterial: boolean
   thread: string | undefined
+  branchOf: BranchOf | undefined
+  onForkPoint: (parent: BranchOf['parent']) => void
   turns: readonly Turn[]
   asking: boolean
   failed: { question: string; failure: Failure } | undefined
@@ -1395,10 +1524,38 @@ function Conversation(props: {
     props.onAsk(question, false)
   }
 
+  const { branchOf } = props
+  // A conversation from before branching, or one that never branched, carries nothing over.
+  const carried = turns.filter((turn) => turn.inherited === true)
+  const own = turns.filter((turn) => turn.inherited !== true)
+  const shown = (turn: Turn) =>
+    turn.speaker === 'learner' ? (
+      <LearnerTurn key={turn.id} turn={turn} thread={props.thread} />
+    ) : (
+      <AgentTurn
+        key={turn.id}
+        turn={turn}
+        onCite={props.onCite}
+        onCandidates={props.onCandidates}
+      />
+    )
+
   return (
     <>
       <div className="page">
         <h2 className="space-title">{space.name}</h2>
+        {branchOf !== undefined && (
+          <p className="hint branch-of">
+            这是《{branchOf.title}》的一个分支，原对话不受影响。{' '}
+            <button
+              type="button"
+              className="link"
+              onClick={() => props.onForkPoint(branchOf.parent)}
+            >
+              回到分叉处
+            </button>
+          </p>
+        )}
         {turns.length === 0 && (
           <p className="hint page-hint">
             {props.hasMaterial ? (
@@ -1414,18 +1571,23 @@ function Conversation(props: {
           </p>
         )}
         {turns.length > 0 && props.extract}
-        {turns.map((turn) =>
-          turn.speaker === 'learner' ? (
-            <LearnerTurn key={turn.id} turn={turn} thread={props.thread} />
-          ) : (
-            <AgentTurn
-              key={turn.id}
-              turn={turn}
-              onCite={props.onCite}
-              onCandidates={props.onCandidates}
-            />
-          ),
+        {carried.length > 0 && (
+          <>
+            <section
+              className="carried"
+              aria-label={`继承自《${branchOf?.title ?? '原对话'}》的对话`}
+            >
+              {carried.map(shown)}
+            </section>
+            <p className="fork-line" role="separator">
+              以上继承自《{branchOf?.title ?? '原对话'}》，以下是这个分支自己的对话
+            </p>
+            {own.length === 0 && !asking && (
+              <p className="hint page-hint">在下面接着问，对话从这里继续。</p>
+            )}
+          </>
         )}
+        {own.map(shown)}
         {asking && (
           <p className="working" role="status">
             正在查材料并回答…

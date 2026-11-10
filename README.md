@@ -51,9 +51,10 @@ reads, beside the graph and never in it, and only their summaries can be shared
 the graph until the person decides on it. The graph records what the person accepted as a description of
 their understanding at that time. It does not prove they have mastered anything.
 
-## Status: v0.1.0, a developer preview
+## Status: v0.2.0, a developer preview
 
-v0.1.0, _First Real Learning Loop_, is the first version whose whole loop is built and tested end to end:
+v0.2.0 adds the learning workbench, a desktop app with one-line installers, branching conversations and optional
+semantic recall. v0.1.0, _First Real Learning Loop_, was the first version whose whole loop is built and tested end to end:
 
 ```text
 Agent A submits candidate understanding, quoting the words it rests on
@@ -64,15 +65,15 @@ Agent A submits candidate understanding, quoting the words it rests on
 ```
 
 It is a **developer preview**, not a stable release for general users. Automated tests prove the loop with
-scripted MCP clients. It has **not yet been tried with a real Claude Code host and a real learner**, and
-several protections are still missing; see [Limitations](#limitations-in-v010). The release notes say exactly
-what is proven and what is not: [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md).
+scripted MCP clients. Real hosts (Claude Code headless, Codex `exec`) have run it with synthetic content; **no real learner has
+used it yet**, and several protections are still missing; see [Limitations](#limitations-in-v020). The release
+notes say exactly what is proven and what is not: [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md).
 
 **`pnpm serve`** starts the Episteme service and a local interface where a learner asks a question in their
 own words, sees which of their own prior understanding was retrieved **and why**, records what they now
 understand, reviews what agents suggested, and watches what is recalled next change because of it. Agents
 reach the same graph over MCP: they can recall, propose and submit readings of material, and MCP gives them no
-way to confirm anything (the REST review API is not yet protected; see [Limitations](#limitations-in-v010)).
+way to confirm anything (the REST review API is not yet protected; see [Limitations](#limitations-in-v020)).
 Everything is written to one SQLite file per graph and survives closing the process.
 
 ![The Learn surface](docs/images/learn-surface.png)
@@ -145,7 +146,7 @@ Streamable HTTP can be pointed at it; there is no stdio shim yet. An agent gets 
 None of them confirms anything: MCP offers no confirm tool, and the learner decides in the Workspace the
 service serves at `/`. That is a property of the MCP surface only. The REST review API behind the Workspace is
 not authenticated, so an agent with shell access could still call it and confirm its own proposal (see
-[Limitations](#limitations-in-v010)). For Claude
+[Limitations](#limitations-in-v020)). For Claude
 Code, the command would be the one below, but **it has not been verified against a real Claude Code host yet**:
 
 ```bash
@@ -285,21 +286,22 @@ opt-in.
 - [Vision](docs/planning/vision.md) · [Decision log](docs/planning/decision-log.md) ·
   [Discussions](docs/discussions/index.md)
 - [MindLink product spec](docs/planning/mindlink-spec.md) (the current plan)
-- [v0.1.0 release notes](docs/releases/v0.1.0.md) · [Changelog](CHANGELOG.md)
+- [v0.2.0 release notes](docs/releases/v0.2.0.md) · [v0.1.0 release notes](docs/releases/v0.1.0.md) · [Changelog](CHANGELOG.md)
 
-## Limitations in v0.1.0
+## Limitations in v0.2.0
 
-- **No real host yet.** Host-assisted distillation works with scripted MCP clients in tests. No real Claude
-  Code session and no real learner have used it, and compatibility with any particular agent host is not
-  verified.
+- **No real learner yet.** Claude Code (headless) and Codex (`codex exec`) have recalled and proposed against
+  a real service with synthetic content. Claude Code's interactive confirmation form has not been tried by a
+  person, and no real learner has used the loop.
 - **Deciding needs the person's token, but a same-user agent can read it.** An agent's token cannot decide,
   and a decision without the person's token is refused. An agent that runs as you, with a shell, can still use
   your token: run such agents with a host policy that forbids calling the decision routes
   ([ADR 0012](docs/decisions/0012-human-review-security.md)).
 - **The Workspace does not show a suggestion's basis or speaker** yet. The data is in the API
   ([#26](https://github.com/SAIR-club/Episteme/issues/26)).
-- **Retrieval uses a deterministic embedding adapter.** A question phrased very differently from what was
-  recorded may not reach it.
+- **Retrieval is lexical unless you configure embeddings.** Semantic recall is opt-in
+  (`EPISTEME_EMBEDDINGS_URL`, `EPISTEME_EMBEDDINGS_MODEL`) and has only been tested against a stub, not a real
+  embedding model. Without it, a question phrased very differently from what was recorded may not reach it.
 - **`not_pending` in a retry receipt is not "dismissed".** Dismissals leave no record
   ([#25](https://github.com/SAIR-club/Episteme/issues/25)).
 - **Unencrypted local storage.** A graph, with its drafts and sources, is a SQLite file on disk, with no

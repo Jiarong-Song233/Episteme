@@ -70,7 +70,7 @@ curl -fsSL https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scrip
 2. 脚本输出 `installed` 和 `started Episteme` 就是成功。出现 `checksum mismatch` 时停下并告诉用户，不要换一种方式绕过。出现 `no published release` 说明还没有发布版本，告诉用户即可。
 3. 把自己接入 Episteme（地址固定是 `http://127.0.0.1:4322/mcp`，只在本机可用）：
    - Claude Code：`claude mcp add --transport http --scope user episteme http://127.0.0.1:4322/mcp`
-   - Codex：`codex mcp add episteme --url http://127.0.0.1:4322/mcp`
+   - Codex：`codex mcp add episteme --url http://127.0.0.1:4322/mcp`。非交互的 `codex exec` 不会弹审批，提出候选（`propose`）会直接失败；需要时在那次运行加 `-c 'mcp_servers.episteme.default_tools_approval_mode="approve"'`。这只放开 Codex 这边的审批，候选仍然要用户本人确认。
    - 其他客户端：在它的 MCP 配置里加 `{"mcpServers":{"episteme":{"type":"http","url":"http://127.0.0.1:4322/mcp"}}}`
 4. 提醒用户：接入后你只能读取用户确认过的理解、提出候选理解；候选要用户本人在工作台的“待确认”里确认才算数。你不能替用户确认。
 5. 告诉用户在工作台左栏底部的“模型”页里填模型和密钥。不要向用户索要密钥，也不要替用户填写。
@@ -85,6 +85,20 @@ curl -fsSL https://raw.githubusercontent.com/Jiarong-Song233/Episteme/main/scrip
 - 每次启动后最多调用 100 次、20 万 token，超出后回答会失败，重启程序即可重置。
 - 如果启动时设置了环境变量 `EPISTEME_MODEL_BASE_URL` 和 `EPISTEME_MODEL_NAME`，以环境变量为准，页面上只显示、不能修改。
 - 多人使用（`--shared`）时，所有人共用一个模型，页面上不能设置，任何登录的人和 Agent 都不能修改或清除。由运行服务的人在启动前用上面的环境变量配置，或者在图谱旁边放好 `model.json`。页面上只显示模型名。
+
+## 语义检索（可选）
+
+默认只按关键词召回。想让换个说法的问题也能找到你的理解，可以在启动服务前设置一个嵌入（embedding）服务：
+
+| 环境变量 | 说明 |
+| --- | --- |
+| `EPISTEME_EMBEDDINGS_URL` | 服务的根地址，不带路径：例如 `http://127.0.0.1:11434`（Ollama）。`openai` 协议会请求 `<地址>/v1/embeddings`，所以不要在末尾写 `/v1` |
+| `EPISTEME_EMBEDDINGS_MODEL` | 嵌入模型名 |
+| `EPISTEME_EMBEDDINGS_PROTOCOL` | `openai`（默认）、`ollama` 或 `tei` |
+| `EPISTEME_EMBEDDINGS_API_KEY` | 需要时填，不会显示也不会交给 Agent |
+| `EPISTEME_EMBEDDINGS_TIMEOUT_MS` | 超时，默认 10000 |
+
+地址和模型名要一起设置，只设一个时服务拒绝启动并说明原因。启动时会显示正在用哪个模型。嵌入服务出错时，那一次召回退回关键词检索，并在回答里说明。向量只缓存在内存里，不写进图谱。这一项还没有用真实的嵌入模型验证过。
 
 ## 卸载
 

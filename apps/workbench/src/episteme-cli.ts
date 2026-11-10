@@ -99,7 +99,7 @@ async function main(): Promise<void> {
   await send('initialize', {
     protocolVersion: '2025-06-18',
     capabilities: {},
-    clientInfo: { name: 'episteme-cli', version: '0.1.0' },
+    clientInfo: { name: 'episteme-cli', version: '0.2.0' },
   })
   await send('notifications/initialized', {}, true)
   if (command === 'tools') {

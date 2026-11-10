@@ -387,6 +387,80 @@ describe('candidates', () => {
     expect(pending.every((item) => item.similar === undefined)).toBe(true)
   })
 
+  it('does not offer again what the person turned down, unless they say it themselves', async () => {
+    const model = new ScriptedModel()
+    await start(model)
+    const space = await spaceWithNotes()
+    const asked = await ask(space, '我觉得位置编码可有可无，它只是一个辅助手段')
+    const pick = (label: string) =>
+      JSON.stringify({ items: [{ ref: 'a', role: 'claim', label, quote: '位置编码可有可无' }] })
+    const distill = (thread = asked.thread, where = space) =>
+      call<Submitted>(`${scene}/candidates/thread`, { space: where.id, thread })
+
+    model.thread = pick('位置编码可有可无，它只是一个辅助手段')
+    const first = await distill()
+    expect(first.body.suggestions).toHaveLength(1)
+    await call('/suggestions/decide', { id: first.body.suggestions[0]?.id, action: 'dismiss' })
+
+    // Read again, in other words of nearly the same: not offered.
+    model.thread = pick('位置编码可有可无，只是一个辅助手段')
+    const again = await distill()
+    expect(again.body.suggestions).toEqual([])
+    expect((await held(space)).pending).toEqual([])
+
+    // The opposite view is a different thought, and is offered.
+    model.thread = pick('位置编码不是可有可无的辅助手段')
+    expect((await distill()).body.suggestions).toHaveLength(1)
+
+    // The person's own words are always theirs to offer.
+    const own = await call<Submitted>(`${scene}/candidates/turn`, {
+      space: space.id,
+      thread: asked.thread,
+      turn: asked.turn,
+    })
+    expect(own.body.suggestions).toHaveLength(1)
+
+    // A dismissal is about this space: another space is asked afresh.
+    const other = await spaceWithNotes('另一门课')
+    const there = await ask(other, '我觉得位置编码可有可无，它只是一个辅助手段')
+    model.thread = pick('位置编码可有可无，它只是一个辅助手段')
+    expect((await distill(there.thread, other)).body.suggestions).toHaveLength(1)
+  })
+
+  it('still offers an answer sentence the person asks for, even one turned down before', async () => {
+    const model = new ScriptedModel()
+    await start(model)
+    const space = await spaceWithNotes()
+    const asked = await ask(space, '位置编码的作用是什么')
+    const made = await call<Submitted>(`${scene}/candidates`, {
+      space: space.id,
+      thread: asked.thread,
+      reply: asked.reply,
+    })
+    await call('/suggestions/decide', { id: made.body.suggestions[0]?.id, action: 'dismiss' })
+
+    const next = await ask(space, '再说一遍位置编码的作用', asked.thread)
+    const repeated = await call<Submitted>(`${scene}/candidates`, {
+      space: space.id,
+      thread: asked.thread,
+      reply: next.reply,
+    })
+    // Asking for this reply's sentences is the person's own request, not a model's pick.
+    expect(repeated.body.suggestions).toHaveLength(1)
+  })
+
+  it('keeps the words it remembers out of what an origin shows', async () => {
+    const model = new ScriptedModel()
+    await start(model)
+    const space = await spaceWithNotes()
+    const asked = await ask(space, '位置编码的作用是什么')
+    await call(`${scene}/candidates`, { space: space.id, thread: asked.thread, reply: asked.reply })
+    await accept((await held(space)).pending[0]?.id ?? '')
+    const [node] = (await held(space)).nodes
+    expect(node?.origin).not.toHaveProperty('label')
+    expect(node?.origin).not.toHaveProperty('space')
+  })
+
   it('reports a model failure as retryable, and a simulated model as not able to', async () => {
     const model = new ScriptedModel()
     await start(model)

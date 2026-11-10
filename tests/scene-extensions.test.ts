@@ -299,6 +299,7 @@ describe('what an extension is handed', () => {
         'recall',
         'recordableDimensions',
         'records',
+        'reviews',
         'sceneName',
         'submittedRefs',
         'threadView',

@@ -28,6 +28,11 @@ export interface SceneView {
   vocabulary(): ReturnType<CognitiveSession['vocabulary']>
   pendingSuggestions(): ReturnType<CognitiveSession['pendingSuggestions']>
   /**
+   * The caller's own decisions on drafts, dismissals included, oldest first: what was already put to them and how
+   * it went. Reading them decides nothing.
+   */
+  reviews(): ReturnType<CognitiveSession['reviews']>
+  /**
    * The candidate refs of a keyed submission the caller already made under this id, by `by`, that `distill` would
    * answer again rather than read afresh; `undefined` when there is none. Only the caller's own.
    */
@@ -82,6 +87,7 @@ export function sceneViewOf(session: CognitiveSession): SceneView {
     expand: (...args: Parameters<CognitiveSession['expand']>) => session.expand(...args),
     vocabulary: () => session.vocabulary(),
     pendingSuggestions: () => session.pendingSuggestions(),
+    reviews: () => session.reviews(),
     submittedRefs: (by: string, submissionId: string) => session.submittedRefs(by, submissionId),
     threads: (scope?: string) => session.threads(scope),
     threadView: (threadId: string) => session.threadView(threadId),

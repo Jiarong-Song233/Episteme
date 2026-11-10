@@ -69,6 +69,12 @@ export interface Origin {
   readonly turn?: string
   /** Why the person changed their mind, for a revision. */
   readonly reason?: string
+  /**
+   * The words the candidate was offered in, and the space it was offered to, so that a candidate the person turned
+   * down is not offered to them again. Origins kept before these were written have neither.
+   */
+  readonly label?: string
+  readonly space?: string
 }
 
 /**
@@ -86,7 +92,9 @@ export interface ShownOrigin extends Origin {
  * same way, because the turn says which conversation it belongs to. A turn that cannot be found any more leaves the
  * origin as it was kept.
  */
-export function shownOrigin(view: SceneView, origin: Origin): ShownOrigin {
+export function shownOrigin(view: SceneView, kept: Origin): ShownOrigin {
+  // The words and space are kept for telling a repeat apart; the page already has both.
+  const { label: _label, space: _space, ...origin } = kept
   if (origin.thread === undefined || origin.turn === undefined) return origin
   const said = view.threadView(origin.thread)?.turns.find((turn) => turn.id === origin.turn)?.thread
   if (said === undefined || said === origin.thread) return origin
@@ -265,6 +273,18 @@ const NEGATION = /[不没无非未否]/gu
 function sameThought(left: string, right: string): boolean {
   if (left.match(NEGATION)?.length !== right.match(NEGATION)?.length) return false
   return coverage(left, right) >= NEAR_THE_SAME && coverage(right, left) >= NEAR_THE_SAME
+}
+
+/**
+ * The words of the candidates the person turned down in this space. Only candidates whose origin kept their words
+ * are known: those dismissed before origins carried them are not, and may still be offered once more.
+ */
+function dismissedIn(view: SceneView, space: string): readonly string[] {
+  return view.reviews().flatMap((review) => {
+    if (review.outcome !== 'dismissed') return []
+    const origin = originOf(view, review.suggestionId)
+    return origin?.label !== undefined && origin.space === space ? [origin.label] : []
+  })
 }
 
 /** A question is something the person wants to know, which is not yet something they understand. */
@@ -635,7 +655,12 @@ export async function submit(
   if (!outcome.ok) refuse(outcome.refusal.code, outcome.refusal.message)
   for (const suggestion of outcome.suggestions) {
     if (suggestion.proposal.kind !== 'node') continue
-    await view.records.put(`${ORIGIN_PREFIX}${suggestion.id}`, originFor(suggestion.proposal.label))
+    const { label } = suggestion.proposal
+    await view.records.put(`${ORIGIN_PREFIX}${suggestion.id}`, {
+      ...originFor(label),
+      label,
+      space,
+    })
   }
   return outcome
 }
@@ -864,7 +889,8 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
     const origins = new Map<string, Origin>()
     const rawItems = Array.isArray(parsed?.['items']) ? (parsed['items'] as unknown[]) : []
     const { held: heldWordings, waiting } = wordingsIn(view, space.id)
-    const taken = [...heldWordings, ...waiting]
+    // What the person turned down here is not a new pick, however the model words it this time.
+    const taken = [...heldWordings, ...waiting, ...dismissedIn(view, space.id)]
     for (const raw of rawItems.slice(0, MAX_THREAD_ITEMS)) {
       const item = raw as Record<string, unknown>
       const quote = typeof item['quote'] === 'string' ? item['quote'].trim() : ''

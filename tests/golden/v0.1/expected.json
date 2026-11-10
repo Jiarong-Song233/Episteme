@@ -88,7 +88,7 @@
       {
         "nodeId": "q_order",
         "label": "Why does a transformer need to be told the order?",
-        "settled": true,
+        "settled": false,
         "openConflicts": [],
         "dimensions": [
           {
@@ -104,7 +104,7 @@
       {
         "nodeId": "k_invariant",
         "label": "Attention alone is permutation invariant",
-        "settled": true,
+        "settled": false,
         "openConflicts": ["suspected"],
         "dimensions": [
           {

@@ -12,6 +12,7 @@ import {
   type DomainPack,
   type ActorId,
   type DimensionId,
+  type DimensionIndex,
   type EdgeId,
   type EdgeTypeId,
   type MutationRefusal,
@@ -916,6 +917,7 @@ export class CognitiveSession {
       actorId: this.#actor,
       depth: 1,
       limit,
+      isSettled: isSettledState,
     })
   }
 
@@ -1249,19 +1251,12 @@ export class CognitiveSession {
       const dimensions = [...state]
         .map(([id, value]) => ({ id, level: value.level ?? String(value.scalar ?? '?') }))
         .sort((left, right) => (left.id < right.id ? -1 : 1))
-      const levelOf = (id: string): string | undefined =>
-        dimensions.find((entry) => entry.id === id)?.level
-
       const openConflicts = dimensions
         .filter((entry) => entry.id === DIMENSION.conflict && isOpenConflict(entry.level))
         .map((entry) => entry.level)
 
-      // Same predicate as `retrieveWith`: a dimension in its settled band makes the item buildable.
-      const settled =
-        (['medium', 'high'] as const).includes(
-          levelOf(DIMENSION.confidence) as 'medium' | 'high',
-        ) &&
-        (['medium', 'high'] as const).includes(levelOf(DIMENSION.articulation) as 'medium' | 'high')
+      // The predicate recall hands to retrieval as well, so both say the same about this node.
+      const settled = isSettledState(state)
 
       items.push({
         nodeId: node.nodeId,
@@ -3555,6 +3550,21 @@ function attentionFor(
   }
 
   return settled ? 'settled' : 'shaky'
+}
+
+/**
+ * Whether the person's state on a node is firm enough to build on: confident in it and able to explain it.
+ *
+ * Recall and progress both read this one predicate, so a node is never buildable to an agent and shaky on the
+ * person's own progress page. Either one alone is not enough: believing without being able to say it is
+ * `unexplained`, and saying it without believing it is not ground either.
+ */
+function isSettledState(state: DimensionIndex): boolean {
+  const firm = (dimension: DimensionId): boolean => {
+    const level = state.get(dimension)?.level
+    return level === 'medium' || level === 'high'
+  }
+  return firm(DIMENSION.confidence) && firm(DIMENSION.articulation)
 }
 
 /** One readable line, so every surface does not compose the same sentence differently. */

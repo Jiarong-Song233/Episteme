@@ -240,7 +240,10 @@ export interface UnderstandingView {
 export interface RecallResult {
   readonly question: string
   readonly retriever: string
+  /** One line on what the person has recorded about the retrieved items, in English. */
   readonly summary: string
+  /** The same line in Simplified Chinese, for a surface that shows Chinese. */
+  readonly summaryZh: string
   readonly known: readonly UnderstandingView[]
   readonly ranked: readonly RankedView[]
   readonly rules: readonly RankRule[]
@@ -314,8 +317,10 @@ export interface ProgressSummary {
   readonly totalNodes: number
   /** Most in need of attention first. */
   readonly items: readonly ProgressItem[]
-  /** One readable line, so a surface does not have to compose the numbers itself. */
+  /** One readable line in English, so a surface does not have to compose the numbers itself. */
   readonly summary: string
+  /** The same line in Simplified Chinese. */
+  readonly summaryZh: string
 }
 
 /** How a thread's speakers are written when its turns become material to distil. */
@@ -924,15 +929,22 @@ export class CognitiveSession {
       context,
       (nodeId) => this.#seen.getNode(nodeId)?.actorId === this.#actor,
     )
+    // Decided here so every surface reads the same and no view invents its own wording for "nothing recorded".
+    // A scene may be English or Chinese, so both are given; when something is recorded, both carry Core's line.
+    const kept = ranked.some((entry) => entry.kept)
     return {
       question,
       retriever: context.retriever,
-      // The Chinese display form, decided here so every surface reads the same and no view invents its own
-      // wording for "nothing recorded". `contextSummary` is the English one, used by the English demos.
       summary:
         context.summary !== ''
           ? context.summary
-          : ranked.some((entry) => entry.kept)
+          : kept
+            ? 'you kept related items but have recorded no level of understanding for them yet'
+            : 'nothing is recorded about this yet',
+      summaryZh:
+        context.summary !== ''
+          ? context.summary
+          : kept
             ? '你保存过相关内容，但还没有标记理解程度'
             : '关于这个，你还没有记录过任何东西',
       known: context.known.map((entry) => ({
@@ -1293,6 +1305,7 @@ export class CognitiveSession {
       totalNodes: this.listNodes().length,
       items,
       summary: progressLine(items.length, settledCount),
+      summaryZh: progressLineZh(items.length, settledCount),
     }
   }
 
@@ -3559,6 +3572,11 @@ function attentionFor(
 
 /** One readable line, so every surface does not compose the same sentence differently. */
 function progressLine(touched: number, settled: number): string {
+  if (touched === 0) return 'you have recorded no understanding yet'
+  return `you have recorded understanding of ${touched} ${touched === 1 ? 'node' : 'nodes'}; ${settled} can be built on`
+}
+
+function progressLineZh(touched: number, settled: number): string {
   if (touched === 0) return '你还没有记录过任何理解'
   return `你为 ${touched} 个节点记录过理解，其中 ${settled} 个已经可以往下建`
 }

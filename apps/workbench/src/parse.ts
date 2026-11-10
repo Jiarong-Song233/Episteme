@@ -74,12 +74,32 @@ async function readPdf(bytes: Uint8Array): Promise<ParsedMaterial> {
     text += '\n\n'
   }
   if (text.replace(/\s/g, '').length < MIN_CHARACTERS_PER_PAGE * Math.max(pageTexts.length, 1)) {
+    if (usesPredefinedCjkCMap(bytes)) {
+      throw new MaterialRefusal(
+        'pdf_cjk_encoding',
+        '这个 PDF 的中日韩文字用了未嵌入的字体编码，目前还读不出来；它不是扫描件。可以在 PDF 阅读器里复制文字，存成 .txt 再上传。',
+      )
+    }
     throw new MaterialRefusal(
       'pdf_no_text',
       '这个 PDF 里几乎没有可提取的文字，可能是扫描件。目前只支持文本 PDF，请先做 OCR。',
     )
   }
   return { kind: 'pdf', text: text.trimEnd(), pages }
+}
+
+/**
+ * Whether a font in the file is encoded with one of Adobe's predefined CJK CMaps (`UniGB-UCS2-H`, `GBK-EUC-H`, …).
+ *
+ * Text in such a font can be read only with the CMap's data, which the extractor does not have, so it comes back
+ * empty and would otherwise be called a scan. Read from the raw bytes, so a font dictionary inside a compressed
+ * object stream is missed and that file keeps the general refusal.
+ */
+function usesPredefinedCjkCMap(bytes: Uint8Array): boolean {
+  const raw = new TextDecoder('latin1').decode(bytes)
+  return /\/Encoding\s*\/(?:Uni(?:GB|CNS|JIS|KS)|GBK|GBpc|GBT|GB-EUC|B5|ETen|HKscs|CNS\d|90ms|90pv|83pv|KSC)[\w-]*-[HV]\b/.test(
+    raw,
+  )
 }
 
 /** Reads an uploaded file into text with its page spans, or refuses it with a reason. */

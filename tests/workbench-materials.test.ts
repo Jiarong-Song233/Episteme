@@ -44,6 +44,56 @@ function pdfOf(pages: readonly string[]): Uint8Array {
   return bytes(body)
 }
 
+/**
+ * A PDF whose Chinese is set in a CID font, the way Chinese PDFs are. `identity` writes it as modern tools do:
+ * `Identity-H` with a ToUnicode map, which an extractor can read. `predefined` writes it as older tools do: a
+ * non-embedded Adobe font under the `UniGB-UCS2-H` CMap, readable only with that CMap's data.
+ */
+function chinesePdfOf(pages: readonly string[], style: 'identity' | 'predefined'): Uint8Array {
+  const hex = (text: string): string =>
+    [...text].map((char) => char.charCodeAt(0).toString(16).padStart(4, '0')).join('')
+  const objects: string[] = []
+  const add = (body: string): number => objects.push(body)
+  const catalog = add('')
+  const pageTree = add('')
+  const descriptor = add(
+    '<< /Type /FontDescriptor /FontName /STSong-Light /Flags 6 /FontBBox [-25 -254 1000 880] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 880 /StemV 93 >>',
+  )
+  const cidFont = add(
+    `<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light /CIDSystemInfo << /Registry (Adobe) /Ordering (${style === 'identity' ? 'Identity' : 'GB1'}) /Supplement 0 >> /FontDescriptor ${descriptor} 0 R /DW 1000 >>`,
+  )
+  let toUnicode = ''
+  if (style === 'identity') {
+    const map =
+      '/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /U def 1 begincodespacerange <0000> <FFFF> endcodespacerange 1 beginbfrange <0000> <FFFF> <0000> endbfrange endcmap CMapName currentdict /CMap defineresource pop end end'
+    toUnicode = ` /ToUnicode ${add(`<< /Length ${map.length} >>\nstream\n${map}\nendstream`)} 0 R`
+  }
+  const font = add(
+    `<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light /Encoding /${style === 'identity' ? 'Identity-H' : 'UniGB-UCS2-H'} /DescendantFonts [${cidFont} 0 R]${toUnicode} >>`,
+  )
+  const kids = pages.map((text) => {
+    const stream = `BT /F1 18 Tf 50 750 Td <${hex(text)}> Tj ET`
+    const content = add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`)
+    return add(
+      `<< /Type /Page /Parent ${pageTree} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${content} 0 R >>`,
+    )
+  })
+  objects[catalog - 1] = `<< /Type /Catalog /Pages ${pageTree} 0 R >>`
+  objects[pageTree - 1] =
+    `<< /Type /Pages /Kids [${kids.map((kid) => `${kid} 0 R`).join(' ')}] /Count ${kids.length} >>`
+  let body = '%PDF-1.4\n'
+  const offsets = objects.map((object, index) => {
+    const offset = body.length
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`
+    return offset
+  })
+  const xref = body.length
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (const offset of offsets) body += `${String(offset).padStart(10, '0')} 00000 n \n`
+  body += `trailer\n<< /Size ${objects.length + 1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  return new Uint8Array([...body].map((char) => char.charCodeAt(0)))
+}
+
 async function refusalOf(work: Promise<unknown>): Promise<string> {
   const error = await work.then(
     () => undefined,
@@ -141,6 +191,40 @@ describe('parsing', () => {
     expect(parsed.text.slice(second.start, second.end)).toContain('Positional encoding')
     const chunk = chunkText(parsed.text, parsed.pages)[0]
     expect(chunk?.page).toBe(1)
+  })
+
+  it('reads a Chinese PDF set the way current tools set it, page by page', async () => {
+    const parsed = await parseMaterial(
+      '注意力.pdf',
+      chinesePdfOf(
+        [
+          '自注意力本身不区分词的顺序，因此需要位置编码。',
+          '旋转位置编码把相对位置写进注意力分数。',
+        ],
+        'identity',
+      ),
+    )
+    expect(parsed.pages?.map((page) => page.page)).toEqual([1, 2])
+    const [first, second] = parsed.pages!
+    expect(parsed.text.slice(first!.start, first!.end)).toBe(
+      '自注意力本身不区分词的顺序，因此需要位置编码。',
+    )
+    expect(parsed.text.slice(second!.start, second!.end)).toBe(
+      '旋转位置编码把相对位置写进注意力分数。',
+    )
+  })
+
+  it('does not call a Chinese PDF in an older encoding a scan', async () => {
+    const refused = await parseMaterial(
+      '旧.pdf',
+      chinesePdfOf(['自注意力本身不区分词的顺序，因此需要位置编码。'], 'predefined'),
+    ).then(
+      () => undefined,
+      (error: unknown) => error as MaterialRefusal,
+    )
+    expect(refused?.code).toBe('pdf_cjk_encoding')
+    expect(refused?.message).toContain('不是扫描件')
+    expect(refused?.message).toContain('.txt')
   })
 
   it('refuses what it cannot read, each with its own reason', async () => {

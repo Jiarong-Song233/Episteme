@@ -1,6 +1,6 @@
 {
   "name": "@episteme/storage-sqlite",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Durable storage for Episteme: one SQLite file per graph (WAL, held exclusively), holding its history and the stores kept with it.",

@@ -363,7 +363,7 @@ export function createEpistemeMcpServer(
 ): McpServer {
   // Every echoed `requestState` is verified before a handler runs. A forged or expired one never reaches it.
   const server = new McpServer(
-    { name: 'episteme', version: '0.1.0' },
+    { name: 'episteme', version: '0.2.0' },
     { requestState: { verify: (state, context) => codec.verify(state, context) } },
   )
 

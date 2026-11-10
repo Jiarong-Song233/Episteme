@@ -37,7 +37,30 @@
 
 ### Codex
 
-**未测试。** 不能据此对 Codex 下结论。
+**未测试。** 见下面 2026-11-09 的记录。
+
+## 2026-11-09：Codex CLI 0.165.0
+
+**环境。** Windows 11，分支 `test/cjk-pdf`（基于 main `39c731c`）。服务跑在仓库外临时目录里的一张空图上，端口 4399；先用本人令牌通过 REST 放进一个节点 `claim_1`，标为把握程度和表达能力都在中等以上。内容是合成的。
+
+**宿主配置。** `codex exec --skip-git-repo-check --sandbox read-only`，MCP 地址用每次运行的 `-c mcp_servers.episteme.url=...` 传入，**没有**用 `codex mcp add`，所以没改 Codex 的配置。模型 `gpt-6.1-sol`（provider `openai`），工具选择和措辞来自这个模型。
+
+**结果。**
+
+| 问题 | 结果 |
+| ---- | ---- |
+| 能连上并调用 `recall` 吗 | 能，取回 `claim_1`，标为已站稳 |
+| 能 `propose` 吗 | 能，但要放开审批，见下。生成一条待确认候选 |
+| 提议者身份 | `actor_agent_unidentified`：Codex 走无状态通道，不带客户端名 |
+| 代理能替人决定吗 | 不能。Codex 自己报告没有可以确认候选的工具，候选留在待确认 |
+
+**审批。** `codex exec` 是非交互的，审批策略固定为 `never`；Episteme 的写入类工具（如 `propose`）在 Codex 里默认要审批，于是直接失败，报“MCP tool call requires approval, but approval policy is never”。这次每次运行加 `-c 'mcp_servers.episteme.default_tools_approval_mode="approve"'` 才走通。交互式的 `codex` 会弹出审批，不需要这一项。
+
+**没有验证：** 交互式 `codex` 里的审批和使用体验；长对话里是否会在合适的时候调用 `recall`。
+
+## 仍未验证
+
+Claude Code 交互模式下的 elicitation：需要真人在终端里看到表单并接受，自动化跑不了。
 
 ### 真实宿主发现的缺陷
 

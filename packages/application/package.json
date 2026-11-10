@@ -1,6 +1,6 @@
 {
   "name": "@episteme/application",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Generic cognitive session layer: proposals, human decisions, single-owner locking, and graph queries.",

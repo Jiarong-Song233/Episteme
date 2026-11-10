@@ -20,7 +20,7 @@ import { workbenchProfile } from './profile.js'
 
 /** Starts the workbench: the service, its routes, and the page, on one graph file. */
 
-const BUILD = '@episteme/workbench 0.1.0'
+const BUILD = '@episteme/workbench 0.2.0'
 
 const { values, positionals } = parseArgs({
   options: {

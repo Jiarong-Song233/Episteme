@@ -106,8 +106,10 @@ export function UnfiledPage(props: {
   spaces: readonly Space[]
   guard: (work: () => Promise<unknown>) => void
   onChanged: (count: number) => void
+  /** After a decision: what was confirmed may now sit in the space the rest of the page holds. */
+  onDecided: () => Promise<void>
 }) {
-  const { onChanged } = props
+  const { onChanged, onDecided } = props
   const [pending, setPending] = useState<readonly UnfiledCandidate[]>()
   const [problem, setProblem] = useState<string>()
 
@@ -152,7 +154,10 @@ export function UnfiledPage(props: {
                 nameOf={props.nameOf}
                 spaces={props.spaces}
                 guard={props.guard}
-                onDecided={load}
+                onDecided={async () => {
+                  await load()
+                  await onDecided()
+                }}
               />
             ))}
           </ul>

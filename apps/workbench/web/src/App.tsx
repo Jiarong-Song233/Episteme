@@ -870,7 +870,13 @@ function Desk({
               }}
             />
           ) : place.kind === 'unfiled' ? (
-            <UnfiledPage nameOf={nameOf} spaces={spaces} guard={guard} onChanged={setUnfiled} />
+            <UnfiledPage
+              nameOf={nameOf}
+              spaces={spaces}
+              guard={guard}
+              onChanged={setUnfiled}
+              onDecided={decided}
+            />
           ) : place.kind === 'agent-sessions' ? (
             <AgentSessionsPage
               agent={place.agent}

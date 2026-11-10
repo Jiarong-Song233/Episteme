@@ -178,7 +178,11 @@ function asObject(value: unknown, field: string): Record<string, unknown> {
  */
 function decisionFrom(body: Record<string, unknown>): Decision {
   const action = body['action']
-  if (action === 'accept' || action === 'dismiss') return { action }
+  if (action === 'dismiss') return { action }
+  // A space named for a candidate proposed without one. It is the person's choice, made here; the application
+  // refuses it for a candidate that already has a space and never fills one in on its own.
+  const placed = body['scope'] === undefined ? {} : { scope: asString(body['scope'], 'scope') }
+  if (action === 'accept') return { action, ...placed }
   if (action !== 'modify') {
     throw new RequestError('"action" must be one of accept, modify, dismiss')
   }
@@ -189,6 +193,7 @@ function decisionFrom(body: Record<string, unknown>): Decision {
       const properties = fields['properties']
       return {
         action,
+        ...placed,
         proposal: {
           kind: 'node',
           nodeType: text('nodeType'),
@@ -209,6 +214,7 @@ function decisionFrom(body: Record<string, unknown>): Decision {
       }
       return {
         action,
+        ...placed,
         proposal: {
           kind: 'claim',
           label: text('label'),
@@ -219,11 +225,13 @@ function decisionFrom(body: Record<string, unknown>): Decision {
     case 'link':
       return {
         action,
+        ...placed,
         proposal: { kind: 'link', from: text('from'), to: text('to'), relation: text('relation') },
       }
     case 'state':
       return {
         action,
+        ...placed,
         proposal: {
           kind: 'state',
           target: text('target'),
@@ -476,9 +484,20 @@ export async function handleApi(
       const body = await readJson(request)
       const id = asString(body['id'], 'id')
       const userAgent = request.headers['user-agent']
+      const decision = decisionFrom(body)
+      // A space the scene owns must be one this person can open, or the node would land where no page shows it.
+      const filing = decision.action === 'dismiss' ? undefined : decision.scope
+      if (filing !== undefined && profile.checkFiling !== undefined) {
+        const check = profile.checkFiling
+        const checked = await refusing(response, () => {
+          check(sceneViewOf(session), filing)
+          return Promise.resolve(true)
+        })
+        if (checked === undefined) return
+      }
       const result = await session.decide(
         id,
-        decisionFrom(body),
+        decision,
         'learn-review',
         caller === undefined
           ? undefined

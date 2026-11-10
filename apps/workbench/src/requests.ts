@@ -43,6 +43,17 @@ export function spaceOf(view: SceneView, id: string): Space {
   return record.value as Space
 }
 
+/**
+ * A workbench space named for a candidate made outside any scope must be one of the person's own open spaces: a node
+ * filed anywhere else lands where no page of theirs shows it. Scopes outside the workbench are the engine's to judge.
+ */
+export function checkFiling(view: SceneView, scope: string): void {
+  // The engine trims a scope before it files one, so the same is checked here.
+  const named = scope.trim()
+  if (!named.startsWith(scopeOf(''))) return
+  openSpaceOf(view, named.slice(scopeOf('').length))
+}
+
 export function openSpaceOf(view: SceneView, id: string): Space {
   const space = spaceOf(view, id)
   if (space.archived) refuse('space_archived', '这个空间已归档。请先恢复它。')

@@ -97,6 +97,12 @@ export interface SceneProfile {
    * graph, such as their agents' settings and conversation records. Every other `GET` reads like the rest of the API.
    */
   readonly privateRoutes?: readonly string[]
+  /**
+   * Checks a scope a person names when filing a candidate that was made outside any scope, before anything is
+   * decided. A scene answers only for the scopes it owns, such as the workbench for `workbench:<space>`, and throws a
+   * refusal for one that names nothing this person can reach. Any other scope it leaves to the engine.
+   */
+  readonly checkFiling?: (view: SceneView, scope: string) => void
 }
 
 /** What a scene's route receives: a view of the session that cannot decide or write, and the request. */

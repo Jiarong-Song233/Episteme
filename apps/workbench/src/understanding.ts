@@ -1146,6 +1146,39 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
         dimensions: view.recordableDimensions,
       }
     }),
+    // What still waits for the person but was proposed outside any space, such as by a host that named none. It
+    // belongs to no space until the person, deciding it, names one; nothing here files it anywhere. Only the
+    // person's own candidates are listed, as everywhere else.
+    route('GET', '/understanding/unfiled', ({ view }) => {
+      const heldLabels = new Set(view.listNodes().map((node) => node.label))
+      return {
+        pending: view
+          .pendingSuggestions()
+          .filter((suggestion) => suggestion.scope === undefined)
+          .map((suggestion) => {
+            const origin = originOf(view, suggestion.id)
+            const wordsBy =
+              origin !== undefined
+                ? wordsByOrigin(view, origin)
+                : suggestion.basis !== 'stated'
+                  ? undefined
+                  : suggestion.proposedBy.startsWith('actor_agent_')
+                    ? 'agent'
+                    : 'unrecorded'
+            return {
+              ...suggestion,
+              // Only a node or a claim can be filed in a space; the others are decided where they stand.
+              fileable: suggestion.proposal.kind === 'node' || suggestion.proposal.kind === 'claim',
+              // Said, not prevented: the person may still want it here as well.
+              ...('label' in suggestion.proposal && heldLabels.has(suggestion.proposal.label)
+                ? { held: true }
+                : {}),
+              ...(origin === undefined ? {} : { speaker: origin.speaker }),
+              ...(wordsBy === undefined ? {} : { wordsBy }),
+            }
+          }),
+      }
+    }),
     route('GET', '/understanding/trail', ({ view, query }) => {
       const space = spaceOf(view, required(query, 'space'))
       const nodes = heldNodes(view, space.id)

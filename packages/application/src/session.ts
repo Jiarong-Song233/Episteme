@@ -2165,6 +2165,34 @@ export class CognitiveSession {
     const proposal = resolved
     const refusal = this.#contentRefusalOf(proposal)
     if (refusal !== undefined) return { ok: false, refusal }
+    // A draft made outside any scope may be filed in one by the person who decides it, and only by them, only
+    // now, and only into a scope they name: it is never put anywhere on its own, and a draft that has a scope
+    // keeps it.
+    const placed = decision.scope
+    if (placed !== undefined) {
+      const problem = scopeProblem(placed)
+      if (problem !== undefined) {
+        return { ok: false, refusal: { code: 'invalid_scope', message: problem } }
+      }
+      if (suggestion.scope !== undefined) {
+        return {
+          ok: false,
+          refusal: {
+            code: 'scope_fixed',
+            message: `suggestion "${suggestion.id}" was made in scope "${suggestion.scope}" and stays there`,
+          },
+        }
+      }
+      if (proposal.kind !== 'node' && proposal.kind !== 'claim') {
+        return {
+          ok: false,
+          refusal: {
+            code: 'invalid_scope',
+            message: `a ${proposal.kind} suggestion is not filed in a scope; only a node or a claim is`,
+          },
+        }
+      }
+    }
 
     // Recorded before anything is committed, with the ids it will create, so a crash at any point after this
     // leaves enough behind to tell whether the decision landed.
@@ -2176,6 +2204,7 @@ export class CognitiveSession {
       proposal,
       planned: this.#plan(proposal, operationId),
       channel,
+      ...(placed === undefined ? {} : { scope: placed.trim() }),
       owner: this.#actor,
       ...(reviewer === undefined ? {} : { reviewer }),
     }
@@ -2294,6 +2323,8 @@ export class CognitiveSession {
   #commitDecided(resolution: Resolution, suggestion: Suggestion): Committed | MutationRefusal {
     const { proposal, planned } = resolution
     const confirmed = resolution.outcome === 'accepted'
+    // Where it is filed: the scope it was made in, or, for a draft made in none, the one the person chose.
+    const filed = suggestion.scope ?? resolution.scope
     // A distilled suggestion's basis goes with it, so an agent's reading is never recorded as the learner's words.
     const source = `suggestion ${suggestion.id} from ${suggestion.proposedBy}, ${resolution.outcome} via ${resolution.channel} (${resolution.operationId})${suggestion.basis === undefined ? '' : `, basis ${suggestion.basis}`}`
     switch (proposal.kind) {
@@ -2334,7 +2365,7 @@ export class CognitiveSession {
           tier: this.#tierOf(proposal.nodeType),
           source,
           // The scope the suggestion was made in, kept whoever decides it and however it is worded then.
-          ...(suggestion.scope === undefined ? {} : { scope: suggestion.scope }),
+          ...(filed === undefined ? {} : { scope: filed }),
           // The text follows the label as decided, so a learner who puts it in their own words is not left
           // with the distiller's wording underneath.
           properties: {
@@ -2352,7 +2383,7 @@ export class CognitiveSession {
           type: NODE.claim,
           tier: 'thought',
           source,
-          ...(suggestion.scope === undefined ? {} : { scope: suggestion.scope }),
+          ...(filed === undefined ? {} : { scope: filed }),
           properties: provenanceOf(suggestion),
         })
         // An edge can only be checked once the claim exists. If one is refused, the claim is revoked, which
@@ -3089,8 +3120,8 @@ export type DecisionChannel = 'learn-review' | 'mcp-elicitation' | 'delegation'
 
 /** What a human decided about a pending suggestion. */
 export type Decision =
-  | { readonly action: 'accept' }
-  | { readonly action: 'modify'; readonly proposal: Proposal }
+  | { readonly action: 'accept'; readonly scope?: string }
+  | { readonly action: 'modify'; readonly proposal: Proposal; readonly scope?: string }
   | { readonly action: 'dismiss' }
 
 /** What a decision committed: one state event, one edge, or one claim node. */

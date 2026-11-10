@@ -62,6 +62,9 @@ importers:
       '@episteme/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@episteme/embeddings-http':
+        specifier: workspace:*
+        version: link:../../packages/embeddings-http
       '@episteme/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp

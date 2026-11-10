@@ -26,7 +26,9 @@ import {
   type Tag,
 } from '@episteme/core'
 import {
+  EmbeddingError,
   HybridRetriever,
+  type RankSignal,
   retrieveWith,
   visibleTo,
   type GraphReadView,
@@ -248,7 +250,21 @@ export interface RecallResult {
   readonly known: readonly UnderstandingView[]
   readonly ranked: readonly RankedView[]
   readonly rules: readonly RankRule[]
+  /**
+   * Present only when the embedding provider failed for this recall: why. The ranking then rests on words, links,
+   * the person's understanding and recency, without closeness in meaning.
+   */
+  readonly semanticUnavailable?: string
 }
+
+/** One retrieval, and whether it had to go without the embedding provider. */
+interface Retrieved {
+  readonly context: RelevantContext
+  readonly semanticUnavailable?: string
+}
+
+/** Every ranking signal but closeness in meaning, for when the embedding provider fails. */
+const WITHOUT_MEANING: readonly RankSignal[] = ['lexical', 'graph', 'cognitive', 'recency']
 
 export interface AskResult extends RecallResult {
   readonly answer: string
@@ -460,6 +476,8 @@ export interface RecallSummary {
   /** How many retrieved items the budget left out. */
   readonly truncated: number
   readonly budget: number
+  /** As in `RecallResult`: present only when this recall went without the embedding provider. */
+  readonly semanticUnavailable?: string
 }
 
 export interface ExpandedNode {
@@ -796,10 +814,13 @@ export class CognitiveSession {
    * two cannot disagree.
    */
   async ask(question: string): Promise<AskResult> {
-    const context = await this.#retrieve(question)
-    const response = await this.#agent.respond({ text: question }, toAgentContext(context))
+    const retrieved = await this.#retrieve(question)
+    const response = await this.#agent.respond(
+      { text: question },
+      toAgentContext(retrieved.context),
+    )
     return {
-      ...this.#recallView(question, context),
+      ...this.#recallView(question, retrieved),
       answer: response.text,
       usedContext: response.usedContext,
     }
@@ -866,6 +887,9 @@ export class CognitiveSession {
       entries,
       truncated: full.ranked.length - entries.length,
       budget,
+      ...(full.semanticUnavailable === undefined
+        ? {}
+        : { semanticUnavailable: full.semanticUnavailable }),
     }
   }
 
@@ -917,16 +941,41 @@ export class CognitiveSession {
     )
   }
 
-  #retrieve(question: string, limit = RECALL_LIMIT): Promise<RelevantContext> {
-    return retrieveWith(this.#retriever, this.#seen, this.#episteme.log, question, {
-      actorId: this.#actor,
-      depth: 1,
-      limit,
-      isSettled: isSettledState,
-    })
+  /**
+   * Retrieves with every signal, or, when the embedding provider fails, with every signal but meaning.
+   *
+   * A recall that failed outright because a configured provider is down would lose the person's own words too, and
+   * one that quietly dropped meaning would read as "nothing close in meaning". So it falls back, and says so.
+   */
+  async #retrieve(question: string, limit = RECALL_LIMIT): Promise<Retrieved> {
+    const options = { actorId: this.#actor, depth: 1, limit, isSettled: isSettledState }
+    try {
+      return {
+        context: await retrieveWith(
+          this.#retriever,
+          this.#seen,
+          this.#episteme.log,
+          question,
+          options,
+        ),
+      }
+    } catch (error) {
+      if (!(error instanceof EmbeddingError)) throw error
+      const context = await retrieveWith(
+        this.#retriever,
+        this.#seen,
+        this.#episteme.log,
+        question,
+        {
+          ...options,
+          signals: WITHOUT_MEANING,
+        },
+      )
+      return { context, semanticUnavailable: `${error.kind}: ${error.message}` }
+    }
   }
 
-  #recallView(question: string, context: RelevantContext): RecallResult {
+  #recallView(question: string, { context, semanticUnavailable }: Retrieved): RecallResult {
     const ranked = toRankedView(
       context,
       (nodeId) => this.#seen.getNode(nodeId)?.actorId === this.#actor,
@@ -963,6 +1012,7 @@ export class CognitiveSession {
       })),
       ranked,
       rules: this.rules,
+      ...(semanticUnavailable === undefined ? {} : { semanticUnavailable }),
     }
   }
 

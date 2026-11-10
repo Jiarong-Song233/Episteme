@@ -11,7 +11,13 @@ import {
   exportGraph,
   importGraph,
 } from '@episteme/application'
-import { addPerson, addToken, startService } from '@episteme/service'
+import {
+  addPerson,
+  addToken,
+  describeEmbeddings,
+  EmbeddingSettingsError,
+  startService,
+} from '@episteme/service'
 import { Agents, localAgentEnvironment } from './agents.js'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { modelFromEnvironment } from './model.js'
@@ -56,6 +62,12 @@ if (values.help === true) {
       `    EPISTEME_MODEL_REASONING_EFFORT   思考强度；本地思考型模型回答为空时设为 none\n` +
       `    EPISTEME_MODEL_MAX_CALLS   每次运行的调用上限，默认 100\n` +
       `    EPISTEME_MODEL_MAX_TOKENS  每次运行的 token 上限，默认 200000\n\n` +
+      `  语义检索（默认关闭；出错时这次检索退回关键词和图谱，并写明原因）：\n` +
+      `    EPISTEME_EMBEDDINGS_URL    嵌入服务地址，和下一项一起设置才开启\n` +
+      `    EPISTEME_EMBEDDINGS_MODEL  嵌入模型名\n` +
+      `    EPISTEME_EMBEDDINGS_PROTOCOL   openai（默认）、ollama 或 tei\n` +
+      `    EPISTEME_EMBEDDINGS_API_KEY    密钥，本地服务不需要\n` +
+      `    EPISTEME_EMBEDDINGS_TIMEOUT_MS 单次超时，默认 10000\n\n` +
       `  学习方式：\n` +
       `    EPISTEME_WORKFLOWS         JSON 文件，增加学习活动（blocks）和工作流（workflows）\n\n`,
   )
@@ -180,6 +192,7 @@ try {
   process.stdout.write(
     `\nEPISTEME · 学习工作台\n\n  打开：${service.workspaceUrl ?? service.url}\n  图谱：${service.graph}\n` +
       `  模型：${model.simulated ? '模拟模型（只摘录材料，不会真正回答）' : model.name}\n` +
+      `  ${describeEmbeddings(service.embeddings)}\n` +
       `  分享：${values.sharing === true ? '已开启，发布前都会让你确认' : '关闭'}\n\n  按 Ctrl+C 停止。\n\n`,
   )
   let stopping = false
@@ -206,6 +219,10 @@ try {
     process.stderr.write(
       `这个版本打不开这个文件，文件没有被改动：\n  ${error.message}\n如果它是旧版图谱，可以转换成一个新文件：\n  pnpm serve graph convert <旧图谱> <新图谱>\n`,
     )
+    process.exit(1)
+  }
+  if (error instanceof EmbeddingSettingsError) {
+    process.stderr.write(`语义检索的设置有误，服务没有启动：\n  ${error.message}\n`)
     process.exit(1)
   }
   if (!(error instanceof GraphLockedError)) throw error

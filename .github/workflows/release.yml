@@ -90,9 +90,18 @@ jobs:
           path: packages
           merge-multiple: true
 
+      # An artifact with several paths keeps their folders (nsis/, msi/, deb/, appimage/), and the release takes
+      # files side by side. Two packages with one name would overwrite each other, so that stops the job instead.
       - name: Checksums
         working-directory: packages
         run: |
+          find . -mindepth 2 -type f -exec mv -n -t . {} +
+          find . -mindepth 1 -type d -empty -delete
+          if [ -n "$(find . -mindepth 1 -type d)" ]; then
+            echo "two packages share a name:" >&2
+            find . -mindepth 2 -type f >&2
+            exit 1
+          fi
           ls -la
           sha256sum * > SHA256SUMS
           cat SHA256SUMS

@@ -251,7 +251,7 @@ describe('shared mode', () => {
       {
         suggestionId: draft?.id,
         outcome: 'dismissed',
-        channel: 'learn-review',
+        channel: 'review',
         reviewer: { actorId, label: 'workspace' },
       },
     ])

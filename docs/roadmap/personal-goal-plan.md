@@ -68,8 +68,9 @@ flowchart TD
 | 通道名与团队仓对齐，旧值读兼容 | Review | G5 审计 | 新写入 `review`/`session`；旧记录不改写；`?channel=` 新旧名都能查到 | `refactor/channel-names` |
 | 去掉静默的场景回退 | Done，核对后不改代码 | 通道名 | 服务、工作台、假设场景都显式传场景（2026-11-13 核对）。剩下的默认值只在 SDK 和 `convertGraph` 的打开校验里用；用工作台场景写入 `stance` 的图，不传场景也能原样读出，所以不是缺陷。把 `scene` 改成必填会破坏 SDK 公开接口，需所有者批准，暂不做 | |
 | 学习证据作为待确认提议 | Review | 通道名 | 答错后出现一条“冲突：疑似”待确认；确认前理解不变；委托不代决；不重复提。只覆盖 Agent 记录的答题，页面练习未覆盖。需要真人看审阅负担。决策 [0007](../research/reuse-decisions/0007-evidence-as-proposals.md) | `feat/evidence-proposals` |
-| 页面练习连到本人的理解 | Review | 学习证据作为待确认提议 | 本人在概览里把一条理解关联到学习目标后，页面上答错也提出同样的待确认；关联不改理解；只有本人的凭据能关联。目标要答过一次才出现，关联后不能取消。决策 [0008](../research/reuse-decisions/0008-practice-to-understanding.md) | `feat/practice-doubt` |
+| 页面练习连到本人的理解 | Review | 学习证据作为待确认提议 | 本人在概览里把一条理解关联到学习目标后，页面上答错也提出同样的待确认；关联不改理解；只有本人的凭据能关联。关联后不能取消。决策 [0008](../research/reuse-decisions/0008-practice-to-understanding.md) | `feat/practice-doubt` |
 | 被怀疑的理解回到学习计划 | Review | 页面练习连到本人的理解 | 本人记下“冲突：疑似/未解决”的理解，新计划不再跳过对应重点；解决后照常跳过；等待确认的怀疑不影响计划。已经生成的计划不改。决策 [0009](../research/reuse-decisions/0009-doubt-brings-focus-back.md) | `feat/doubt-replans` |
+| 答题前就能关联理解 | Review | 被怀疑的理解回到学习计划 | 页面计划生成后、还没答题时，计划要练习的重点就出现在概览的目标里（显示“还没有答题记录”），可以先关联一条理解，第一次答错就会问到它；关联记在计划练习这个重点的计划下；只有计划没有答题的会话不出现在会话列表。决策 [0010](../research/reuse-decisions/0010-planned-objectives.md) | `feat/planned-objectives` |
 | 旧式中文 PDF（CMap） | Blocked | 所有者批准新依赖 | 预定义 CMap 的中文 PDF 能读出 | |
 
 ## 能力差距（2026-11-02 盘点）

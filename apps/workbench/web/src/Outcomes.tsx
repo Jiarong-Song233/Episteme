@@ -107,6 +107,7 @@ function Event(props: { event: SessionEvent; blocks: readonly BlockInfo[] }) {
   }
   if (event.kind === 'statement') return <>{STATEMENT[event.wordsBy ?? 'unrecorded']}</>
   if (event.kind === 'feedback') return <>反馈：{assessment?.reason}</>
+  if (event.kind === 'unlink') return <>你取消了关联：{candidate?.label}</>
   if (move !== undefined) {
     const title = blocks.find((block) => block.id === move.activity)?.title ?? move.activity
     return (
@@ -172,6 +173,47 @@ function TieUnderstanding(props: {
       <button type="button" className="link" disabled={choice === ''} onClick={tie}>
         关联
       </button>
+      {failure !== undefined && (
+        <span className="hint" role="alert">
+          {failure}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** The understandings the person tied to an objective, each of which they can take back. */
+function Ties(props: { space: string; objective: ObjectiveReading; onChanged: () => void }) {
+  const { objective } = props
+  const [failure, setFailure] = useState<string>()
+  const mine = objective.candidates.filter(
+    (each) => each.tiedByPerson === true && each.node !== undefined,
+  )
+  if (mine.length === 0) return null
+  const untie = (node: string): void => {
+    api
+      .unlinkObjective(props.space, objective.id, node)
+      .then(() => {
+        setFailure(undefined)
+        props.onChanged()
+      })
+      .catch((error: unknown) => setFailure(messageOf(error)))
+  }
+  return (
+    <span className="ties">
+      {mine.map((each) => (
+        <span key={each.suggestion} className="hint">
+          关联了“{each.label}”{' '}
+          <button
+            type="button"
+            className="link"
+            aria-label={`取消“${each.label}”和“${objective.label}”的关联`}
+            onClick={() => untie(each.node ?? '')}
+          >
+            取消关联
+          </button>
+        </span>
+      ))}
       {failure !== undefined && (
         <span className="hint" role="alert">
           {failure}
@@ -321,6 +363,11 @@ export function Outcomes(props: {
               <strong>{objective.label}</strong>
               <span>{evidenceWords(objective)}</span>
               <span className="hint">{CONFIRMATION[objective.confirmation]}</span>
+              <Ties
+                space={space}
+                objective={objective}
+                onChanged={() => setLinked((count) => count + 1)}
+              />
               <TieUnderstanding
                 space={space}
                 objective={objective}

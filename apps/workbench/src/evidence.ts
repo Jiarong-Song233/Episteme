@@ -44,7 +44,8 @@ export interface LearningEvidence {
   readonly plan: string
   readonly step?: string
   readonly objective: string
-  readonly kind: 'attempt' | 'statement' | 'feedback' | 'move' | 'candidate'
+  /** `unlink`: the person took back a tie they made. The tie stays on record; reading skips it from then on. */
+  readonly kind: 'attempt' | 'statement' | 'feedback' | 'move' | 'candidate' | 'unlink'
   /** Where the words are. They stay in the thread, so deleting a turn leaves no copy here. */
   readonly source?: EvidenceSource
   readonly assessment?: {
@@ -85,6 +86,8 @@ export interface ObjectiveReading {
     readonly status: 'pending' | 'person' | 'delegated' | 'dropped'
     /** The node it is now, after any revisions, while the person holds it. */
     readonly node?: string
+    /** The person tied it themselves, so they can take the tie back. */
+    readonly tiedByPerson?: true
   }[]
   readonly moves: readonly {
     readonly activity: string
@@ -322,8 +325,14 @@ export function sessionsOf(
 ): readonly SessionOutcome[] {
   const evidence = evidenceOf(view, space)
   const objectives = objectivesOf(view, space, { planned: library })
+  // A tie taken back is no longer among an objective's candidates, but its events still name what was tied.
   const candidate = (suggestion: string | undefined) =>
-    objectives.flatMap((each) => each.candidates).find((each) => each.suggestion === suggestion)
+    suggestion === undefined
+      ? undefined
+      : (objectives
+          .flatMap((each) => each.candidates)
+          .find((each) => each.suggestion === suggestion) ??
+        candidatesOf(view, space, [suggestion])[0])
   return view.records
     .list('plan/')
     .map((record) => record.value as Plan)
@@ -374,6 +383,24 @@ export function sessionsOf(
         },
       ]
     })
+}
+
+/**
+ * The suggestions one objective's evidence ties to it, in the order they were tied, each with whether the person tied
+ * it themselves. A tie the person took back is left out until it is made again.
+ */
+function tiesOf(own: readonly LearningEvidence[]): ReadonlyMap<string, boolean> {
+  const ties = new Map<string, boolean>()
+  for (const each of inOrder(own)) {
+    if (each.suggestion === undefined) continue
+    if (each.kind === 'unlink') {
+      ties.delete(each.suggestion)
+      continue
+    }
+    const byPerson = each.kind === 'candidate' && each.recordedBy === 'person'
+    ties.set(each.suggestion, (ties.get(each.suggestion) ?? false) || byPerson)
+  }
+  return ties
 }
 
 /** The plans of a space laid out on the page, newest first. A host agent's plans name their objectives themselves. */
@@ -434,8 +461,10 @@ export function objectivesOf(
   return [...named].map(([id, label]) => {
     const own = evidence.filter((each) => each.objective === id)
     const gap = gapOf(own)
-    const suggestions = [...new Set(own.flatMap((each) => each.suggestion ?? []))]
-    const candidates = candidatesOf(view, space, suggestions)
+    const ties = tiesOf(own)
+    const candidates = candidatesOf(view, space, [...ties.keys()]).map((each) =>
+      ties.get(each.suggestion) === true ? { ...each, tiedByPerson: true as const } : each,
+    )
     const best = candidates.reduce<ObjectiveReading['candidates'][number]['status']>(
       (top, each) => (STATUS_RANK[each.status] > STATUS_RANK[top] ? each.status : top),
       'dropped',

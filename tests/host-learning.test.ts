@@ -384,6 +384,25 @@ describe('confirmation stays the person’s', () => {
     expect(objective?.confirmation).toBe('delegated')
   })
 
+  it('keeps a tie the agent recorded out of the person’s undo', async () => {
+    const at = await started()
+    const id = await candidate(at, await enter(at.plan))
+    await rest('/suggestions/decide', { id, action: 'accept' })
+    const tie = (await reading(at.space, at.objective)) as unknown as {
+      candidates: readonly { node?: string; tiedByPerson?: true }[]
+    }
+    const [tied] = tie.candidates
+    expect(tied?.node).toBeDefined()
+    expect(tied?.tiedByPerson).toBeUndefined()
+    const undone = await rest<{ code?: string }>('/scene/workbench/objectives/unlink', {
+      space: at.space,
+      objective: at.objective,
+      node: tied?.node,
+    })
+    expect([undone.status, undone.body.code]).toEqual([422, 'not_yours'])
+    expect((await reading(at.space, at.objective))?.confirmation).toBe('person')
+  })
+
   it('goes back to none when the person dismisses it', async () => {
     const at = await started()
     const id = await candidate(at, await enter(at.plan))

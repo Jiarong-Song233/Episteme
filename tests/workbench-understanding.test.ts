@@ -427,6 +427,38 @@ describe('candidates', () => {
     expect((await distill(there.thread, other)).body.suggestions).toHaveLength(1)
   })
 
+  it('knows a turned-down pick again when the model words it quite differently', async () => {
+    const model = new ScriptedModel()
+    await start(model)
+    const space = await spaceWithNotes()
+    const asked = await ask(
+      space,
+      '我觉得位置编码可有可无，它只是一个辅助手段。注意力头会各自分工。',
+    )
+    const pick = (label: string, quote: string) =>
+      JSON.stringify({ items: [{ ref: 'a', role: 'claim', label, quote }] })
+    const distill = () =>
+      call<Submitted>(`${scene}/candidates/thread`, { space: space.id, thread: asked.thread })
+
+    model.thread = pick(
+      '位置编码可有可无，它只是一个辅助手段',
+      '位置编码可有可无，它只是一个辅助手段',
+    )
+    const first = await distill()
+    await call('/suggestions/decide', { id: first.body.suggestions[0]?.id, action: 'dismiss' })
+
+    // Few words in common with what was turned down, but drawn from the same words of the same turn.
+    model.thread = pick(
+      'Transformer 不依赖顺序信息也能工作',
+      '位置编码可有可无，它只是一个辅助手段',
+    )
+    expect((await distill()).body.suggestions).toEqual([])
+
+    // Another part of the same turn is another pick.
+    model.thread = pick('不同的注意力头承担不同的分工', '注意力头会各自分工')
+    expect((await distill()).body.suggestions).toHaveLength(1)
+  })
+
   it('still offers an answer sentence the person asks for, even one turned down before', async () => {
     const model = new ScriptedModel()
     await start(model)

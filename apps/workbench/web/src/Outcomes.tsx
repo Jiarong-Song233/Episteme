@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   api,
   type BlockInfo,
+  type HeldNode,
   type ObjectiveReading,
   type PendingCandidate,
   type SessionEvent,
@@ -121,6 +122,65 @@ function Event(props: { event: SessionEvent; blocks: readonly BlockInfo[] }) {
   )
 }
 
+/**
+ * The person says which of their understandings an objective is about. Only then can what practice shows on it ask
+ * them about that understanding; nothing they hold changes here.
+ */
+function TieUnderstanding(props: {
+  space: string
+  objective: ObjectiveReading
+  held: readonly HeldNode[]
+  onLinked: () => void
+}) {
+  const { objective } = props
+  const [choice, setChoice] = useState('')
+  const [failure, setFailure] = useState<string>()
+  const tied = new Set(objective.candidates.flatMap((each) => each.node ?? []))
+  const open = props.held.filter(
+    (node) =>
+      node.revisedTo === undefined &&
+      !node.withdrawn &&
+      node.adoptedFrom === undefined &&
+      node.fromSuggestion !== undefined &&
+      !tied.has(node.nodeId),
+  )
+  if (open.length === 0) return null
+  const tie = (): void => {
+    api
+      .linkObjective(props.space, objective.id, choice)
+      .then(() => {
+        setChoice('')
+        setFailure(undefined)
+        props.onLinked()
+      })
+      .catch((error: unknown) => setFailure(messageOf(error)))
+  }
+  return (
+    <span className="tie">
+      <select
+        aria-label={`把一条理解关联到“${objective.label}”`}
+        value={choice}
+        onChange={(event) => setChoice(event.target.value)}
+      >
+        <option value="">关联我的一条理解…</option>
+        {open.map((node) => (
+          <option key={node.nodeId} value={node.nodeId}>
+            {node.label}
+          </option>
+        ))}
+      </select>
+      <button type="button" className="link" disabled={choice === ''} onClick={tie}>
+        关联
+      </button>
+      {failure !== undefined && (
+        <span className="hint" role="alert">
+          {failure}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function Session(props: {
   session: SessionOutcome
   focused: boolean
@@ -169,6 +229,8 @@ export function Outcomes(props: {
   version: number
   blocks: readonly BlockInfo[]
   pending: readonly PendingCandidate[]
+  /** What the person holds in this space, so they can say which objective one of them is about. */
+  held: readonly HeldNode[]
   /** Where the person left off, when there is somewhere to go back to. */
   resume: { readonly label: string; readonly open: () => void } | undefined
   onNewThread: () => void
@@ -178,6 +240,7 @@ export function Outcomes(props: {
   const { space, version, pending, focus, resume } = props
   const [outcomes, setOutcomes] = useState<Awaited<ReturnType<typeof api.outcomes>>>()
   const [failure, setFailure] = useState<string>()
+  const [linked, setLinked] = useState(0)
 
   useEffect(() => {
     let current = true
@@ -195,7 +258,7 @@ export function Outcomes(props: {
     return () => {
       current = false
     }
-  }, [space, version])
+  }, [space, version, linked])
 
   if (failure !== undefined) {
     return (
@@ -258,6 +321,12 @@ export function Outcomes(props: {
               <strong>{objective.label}</strong>
               <span>{evidenceWords(objective)}</span>
               <span className="hint">{CONFIRMATION[objective.confirmation]}</span>
+              <TieUnderstanding
+                space={space}
+                objective={objective}
+                held={props.held}
+                onLinked={() => setLinked((count) => count + 1)}
+              />
             </div>
           ))}
           {unlinked > 0 && (

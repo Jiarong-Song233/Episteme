@@ -146,7 +146,11 @@ export function gapOf(evidence: readonly LearningEvidence[]): Gap | undefined {
 }
 
 /** An answer on a page plan, read as evidence: a check of a choice, or the service's model on a free answer. */
-function fromPractice(attempt: Attempt, space: string, seq: number): LearningEvidence | undefined {
+export function fromPractice(
+  attempt: Attempt,
+  space: string,
+  seq: number,
+): LearningEvidence | undefined {
   if (attempt.answeredAt === undefined) return undefined
   const base = {
     id: attempt.id,

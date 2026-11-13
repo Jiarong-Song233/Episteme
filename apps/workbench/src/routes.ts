@@ -4,14 +4,21 @@ import type { SceneRoute, SceneRouteContext } from '@episteme/service'
 import { answerFrom, answerText, relevant, type Answer } from './answer.js'
 import { BUILT_IN_LIBRARY, libraryProblems, type Library } from './blocks.js'
 import { conversationRoutes, shownThread } from './conversations.js'
-import { objectivesOf, sessionsOf, unlinkedIn } from './evidence.js'
+import {
+  EVIDENCE_PREFIX,
+  evidenceOf,
+  objectivesOf,
+  sessionsOf,
+  unlinkedIn,
+  type LearningEvidence,
+} from './evidence.js'
 import { learningRoutes } from './learning.js'
 import { MaterialStore } from './materials.js'
 import { ModelFailure, type ModelClient, type ModelMessage } from './model.js'
 import type { ModelSettings } from './model-settings.js'
 import { MAX_MATERIAL_BYTES, MaterialRefusal, parseMaterial } from './parse.js'
 import { sharingRoutes } from './sharing.js'
-import { recalledFor, understandingRoutes } from './understanding.js'
+import { heldNodes, recalledFor, understandingRoutes } from './understanding.js'
 import {
   ANSWER_PREFIX,
   openSpaceOf,
@@ -228,6 +235,49 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
         objectives: objectivesOf(view, space.id),
         unlinked: unlinkedIn(view, space.id).length,
         sessions: sessionsOf(view, space.id),
+      }
+    }),
+    // The person says which learning objective one of their understandings is about, so what practice shows on that
+    // objective can ask about it. Not named in route-access.ts: an agent ties its own suggestions with learn_observe,
+    // never what the person already holds. It records evidence, and changes nothing the person holds.
+    route('POST', '/objectives/link', async ({ view, body }) => {
+      const space = openSpaceOf(view, text(body, 'space'))
+      const objective = objectivesOf(view, space.id).find(
+        (each) => each.id === text(body, 'objective'),
+      )
+      if (objective === undefined) refuse('unknown_objective', '这个空间里没有这个学习目标。')
+      const node = heldNodes(view, space.id).find(
+        (each) =>
+          each.nodeId === text(body, 'node') &&
+          !each.withdrawn &&
+          // Someone else's published item, held by citing it: its words are not the person's to tie.
+          each.adoptedFrom === undefined,
+      )
+      if (node === undefined) {
+        refuse('unknown_node', '这条理解不在这个空间里，已经撤回，或是引用的别人的成果。')
+      }
+      if (node.fromSuggestion === undefined) {
+        refuse('no_origin', '这条理解没有记录它从哪条候选来，没法关联到学习目标。')
+      }
+      if (objective.candidates.some((each) => each.node === node.nodeId)) {
+        return { linked: false, objective }
+      }
+      const earlier = evidenceOf(view, space.id).filter((each) => each.objective === objective.id)
+      const evidence: LearningEvidence = {
+        id: `ev_${randomUUID()}`,
+        seq: view.records.list(EVIDENCE_PREFIX).length + 1,
+        at: Date.now(),
+        recordedBy: 'person',
+        space: space.id,
+        plan: earlier.at(-1)?.plan ?? '',
+        objective: objective.id,
+        kind: 'candidate',
+        suggestion: node.fromSuggestion,
+      }
+      await view.records.put(`${EVIDENCE_PREFIX}${evidence.id}`, evidence)
+      return {
+        linked: true,
+        objective: objectivesOf(view, space.id).find((each) => each.id === objective.id),
       }
     }),
 

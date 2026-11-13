@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { SceneView } from '@episteme/application'
 import type { SceneTool, SceneToolAnswer, SceneToolContext } from '@episteme/service'
 import type { Library } from './blocks.js'
+import { proposeDoubt } from './doubt.js'
 import {
   digestOf,
   EVIDENCE_PREFIX,
@@ -122,54 +123,6 @@ function noticingUnlinked(
     text: `${answer.text} ${unlinked.length} suggestion(s) in this space are tied to no objective; if one is about an objective, link it with learn_observe kind "candidate", or the person's confirmation will not reach that objective.`,
     structured: { ...answer.structured, unlinked },
   }
-}
-
-/** The state an attempt that fell short puts to the person: something they hold may not stand. */
-const DOUBT = { dimension: 'conflict', level: 'suspected' } as const
-/** Already under doubt, or already worked through: a new proposal would only ask again. */
-const DOUBT_SETTLED = new Set(['suspected', 'open'])
-
-/**
- * Puts an attempt that fell short to the person, on what they hold about its objective: one pending state change per
- * held node, that a conflict is suspected (a negotiated learner model: the evidence proposes, the person decides).
- *
- * Nothing changes until they decide, and a node already doubted, or with the same draft waiting, gets none. A
- * delegation never decides it: a conflict is a side the person picks (ADR 0016). Returns the drafts made.
- */
-async function proposeDoubt(
-  view: SceneView,
-  evidence: LearningEvidence,
-  proposedBy: string,
-): Promise<readonly string[]> {
-  const verdict = evidence.assessment?.verdict
-  if (evidence.kind !== 'attempt' || (verdict !== 'partial' && verdict !== 'contradicts')) return []
-  const reading = objectivesOf(view, evidence.space).find((each) => each.id === evidence.objective)
-  const held = (reading?.candidates ?? []).flatMap((candidate) =>
-    candidate.node !== undefined &&
-    (candidate.status === 'person' || candidate.status === 'delegated')
-      ? [candidate.node]
-      : [],
-  )
-  const waiting = view
-    .pendingSuggestions()
-    .flatMap(({ proposal }) =>
-      proposal.kind === 'state' && proposal.dimension === DOUBT.dimension ? [proposal.target] : [],
-    )
-  const made: string[] = []
-  for (const node of new Set(held)) {
-    const level = view.understandingOf(node).find((each) => each.id === DOUBT.dimension)?.level
-    if ((level !== undefined && DOUBT_SETTLED.has(level)) || waiting.includes(node)) continue
-    const proposed = await view.propose(
-      { kind: 'state', target: node, dimension: DOUBT.dimension, level: DOUBT.level },
-      {
-        proposedBy,
-        rationale: `练习里${verdict === 'partial' ? '只答对了一部分' : '没答对'}：${evidence.assessment?.reason ?? ''}。确认之前，你的理解不变。`,
-        scope: scopeOf(evidence.space),
-      },
-    )
-    if (proposed.ok) made.push(proposed.suggestion.id)
-  }
-  return made
 }
 
 export function hostLearningTools(options: {

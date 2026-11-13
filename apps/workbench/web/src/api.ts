@@ -648,6 +648,9 @@ export const api = {
       unlinked: number
       sessions: readonly SessionOutcome[]
     }>,
+  /** The person ties one of their understandings to a learning objective. It changes nothing they hold. */
+  linkObjective: (space: string, objective: string, node: string) =>
+    scene('/objectives/link', { space, objective, node }) as Promise<{ linked: boolean }>,
   understanding: (space: string) =>
     scene(`/understanding?space=${encoded(space)}`) as Promise<Understanding>,
   unfiled: () =>

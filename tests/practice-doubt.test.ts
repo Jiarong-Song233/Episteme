@@ -405,6 +405,56 @@ describe('a later plan', () => {
     expect(await checks(at.space)).toEqual(['skipped'])
   })
 
+  it('says on the step that a doubt brought the focus back, and nothing once it is resolved', async () => {
+    const at = await aSpace(LIKE_FOCUS)
+    const notes = async (): Promise<readonly (string | undefined)[]> => {
+      const { plan } = (
+        await rest<Reply>(`${SCENE}/plans`, {
+          space: at.space,
+          topic: '位置编码',
+          minutes: 15,
+          workflow: 'speedrun',
+        })
+      ).body
+      return plan.steps
+        .filter((step) => step.block === 'explain' || step.block === 'check')
+        .map((step) => step.note)
+    }
+    await record(at, 'suspected')
+    const back = `你对“${LIKE_FOCUS}”记下了怀疑，所以这次不跳过。`
+    expect(await notes()).toEqual([back, back])
+    await record(at, 'resolved')
+    expect(await notes()).toEqual([
+      '你已确认过相关的理解，所以跳过。',
+      '你已确认过相关的理解，所以跳过。',
+    ])
+  })
+
+  it('drops the note once the person rewords the focus', async () => {
+    const at = await aSpace(LIKE_FOCUS)
+    await record(at, 'suspected')
+    const { plan } = (
+      await rest<Reply>(`${SCENE}/plans`, {
+        space: at.space,
+        topic: '位置编码',
+        minutes: 15,
+        workflow: 'speedrun',
+      })
+    ).body
+    const updated = await rest<Reply>(`${SCENE}/plans/update`, {
+      plan: plan.id,
+      steps: plan.steps.map((step) =>
+        step.block === 'check' ? { ...step, focus: '自注意力' } : step,
+      ),
+    })
+    expect(updated.status).toBe(200)
+    const [explain, check] = updated.body.plan.steps.filter(
+      (step) => step.block === 'explain' || step.block === 'check',
+    )
+    expect(explain?.note).toContain('记下了怀疑')
+    expect(check?.note).toBeUndefined()
+  })
+
   it('still skips while a doubt only waits for the person', async () => {
     const at = await aSpace(LIKE_FOCUS)
     await ok('propose', {

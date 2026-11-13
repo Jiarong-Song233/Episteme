@@ -50,6 +50,7 @@ flowchart TD
 | G3.2 图谱与时间线 | Review | G3.1 | 单一图谱多视图 | `feat/workbench-understanding` |
 | G3.3 新会话复用理解 | Review | G3.2 | 新对话能引用已确认理解，并标明来源 | `feat/workbench-understanding` |
 | G4 发布、引用、分叉 | Review | G3 | A 发布，B 引用并分叉，可追溯，A 不被覆盖 | `feat/workbench-sharing` |
+| G3 被拒绝的候选按原话认出 | Review | G3.1 | 同一轮同一段原话换说法不再提出，相反观点照常提出 | `feat/dismissed-rewording` |
 | G5 边界审计与导出恢复 | Review | G4 | 非教学场景不改 Core；导出、导入、恢复有测试；SAIR 贡献候选清单 | `feat/boundary-and-recovery` |
 | G5 真实主机 e2e | Review | G5 审计 | 真实 Claude Code 连接 MCP（SAIR #32）。无头模式已跑通；交互模式和 Codex 未验证 | `feat/boundary-and-recovery` |
 | G6 可复现评估：同模型基线 | Review | G5 | 固定材料和任务，方法、结果、局限和下一轮依据见[第一轮报告](../research/evaluation/round-1.md) | `feat/evaluation` |

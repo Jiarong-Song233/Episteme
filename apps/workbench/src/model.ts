@@ -100,35 +100,55 @@ export function remoteModel(options: RemoteModelOptions): ModelClient {
     name: options.model,
     simulated: false,
     async complete(messages) {
-      let completion: OpenAI.Chat.Completions.ChatCompletion
-      try {
-        completion = await client.chat.completions.create({
-          model: options.model,
-          messages: messages.map(({ role, content }) => ({ role, content })),
-          max_tokens: options.maxOutputTokens ?? DEFAULT_OUTPUT_TOKENS,
-          temperature: 0.2,
-          ...(options.reasoningEffort === undefined
-            ? {}
-            : {
-                // Whatever the configured service accepts: providers differ on these values.
-                reasoning_effort: options.reasoningEffort as OpenAI.ReasoningEffort & string,
-              }),
-        })
-      } catch (error) {
-        throw failureOf(error)
+      const once = async (): Promise<{
+        readonly text: string
+        readonly tokens: number | undefined
+        readonly cutOff: boolean
+      }> => {
+        let completion: OpenAI.Chat.Completions.ChatCompletion
+        try {
+          completion = await client.chat.completions.create({
+            model: options.model,
+            messages: messages.map(({ role, content }) => ({ role, content })),
+            max_tokens: options.maxOutputTokens ?? DEFAULT_OUTPUT_TOKENS,
+            temperature: 0.2,
+            ...(options.reasoningEffort === undefined
+              ? {}
+              : {
+                  // Whatever the configured service accepts: providers differ on these values.
+                  reasoning_effort: options.reasoningEffort as OpenAI.ReasoningEffort & string,
+                }),
+          })
+        } catch (error) {
+          throw failureOf(error)
+        }
+        const choice = completion.choices[0]
+        return {
+          text: (choice?.message.content ?? '').replace(THINKING, '').trim(),
+          tokens: completion.usage?.total_tokens,
+          cutOff: choice?.finish_reason === 'length',
+        }
       }
-      const choice = completion.choices[0]
-      const text = (choice?.message.content ?? '').replace(THINKING, '').trim()
-      if (text === '') {
+      let reply = await once()
+      let spent = reply.tokens
+      // A blank reply that was not cut off happens now and then on the same prompt (evaluation round 2): ask once
+      // more, as the client already does for a failed request. One cut off would be cut off again.
+      if (reply.text === '' && !reply.cutOff) {
+        reply = await once()
+        spent =
+          spent === undefined && reply.tokens === undefined
+            ? undefined
+            : (spent ?? 0) + (reply.tokens ?? 0)
+      }
+      if (reply.text === '') {
         throw new ModelFailure(
           'empty_reply',
-          choice?.finish_reason === 'length'
+          reply.cutOff
             ? '模型把输出额度用完了，还没写出回答，多半是都花在思考上了。请调高 EPISTEME_MODEL_MAX_OUTPUT_TOKENS，或把 EPISTEME_MODEL_REASONING_EFFORT 设为 none。'
-            : '模型没有返回内容。',
+            : '模型连续两次没有返回内容。可以重试。',
         )
       }
-      const tokens = completion.usage?.total_tokens
-      return tokens === undefined ? { text } : { text, tokens }
+      return spent === undefined ? { text: reply.text } : { text: reply.text, tokens: spent }
     },
   }
 }

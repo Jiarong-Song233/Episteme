@@ -191,9 +191,9 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
     const scope = scopeOf(space.id)
     // What was revised away or withdrawn is not something the person holds, so a plan does not skip it. Nor does it
     // skip what they hold but have put under doubt: that is the focus they most need to come back to.
-    const understood = stillHeld(heldNodes(view, space.id))
-      .filter((node) => !isDoubted(node))
-      .map((node) => node.label)
+    const held = stillHeld(heldNodes(view, space.id))
+    const understood = held.filter((node) => !isDoubted(node)).map((node) => node.label)
+    const doubted = held.filter(isDoubted).map((node) => node.label)
     const thread = await writes.openThread({ title: `学习：${topic}`.slice(0, 80), scope })
     const plan: Plan = {
       id: `pl_${randomUUID()}`,
@@ -205,7 +205,7 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
       origin,
       status: 'active',
       version: 1,
-      steps: layOut(library, workflow, { topic, focuses, minutes, understood }),
+      steps: layOut(library, workflow, { topic, focuses, minutes, understood, doubted }),
       createdAt: now(),
       updatedAt: now(),
     }

@@ -82,6 +82,8 @@ export interface ObjectiveReading {
     readonly suggestion: string
     readonly label: string
     readonly status: 'pending' | 'person' | 'delegated' | 'dropped'
+    /** The node it is now, after any revisions, while the person holds it. */
+    readonly node?: string
   }[]
   readonly moves: readonly {
     readonly activity: string
@@ -239,6 +241,7 @@ function candidatesOf(
           : delegated && current === node
             ? 'delegated'
             : 'person',
+        ...(current.withdrawn ? {} : { node: current.nodeId }),
       }
     }
     const waiting = pending.find((candidate) => candidate.id === suggestion)

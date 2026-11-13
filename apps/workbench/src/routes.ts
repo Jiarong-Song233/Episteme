@@ -290,6 +290,46 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
       }
     }),
 
+    // The person takes back a tie they made. Only their own: a tie an agent recorded goes with the candidate it named,
+    // which the person can turn down. The tie stays on record, so the sessions still show it was made and taken back.
+    route('POST', '/objectives/unlink', async ({ view, body }) => {
+      const space = openSpaceOf(view, text(body, 'space'))
+      const objective = objectivesOf(view, space.id, { planned: library }).find(
+        (each) => each.id === text(body, 'objective'),
+      )
+      if (objective === undefined) refuse('unknown_objective', '这个空间里没有这个学习目标。')
+      const tie = objective.candidates.find((each) => each.node === text(body, 'node'))
+      if (tie === undefined) return { unlinked: false, objective }
+      if (tie.tiedByPerson !== true) {
+        refuse(
+          'not_yours',
+          '这条关联是 Agent 记下的，不能在这里取消。可以在确认页拒绝它提出的候选。',
+        )
+      }
+      const earlier = evidenceOf(view, space.id).filter((each) => each.objective === objective.id)
+      const evidence: LearningEvidence = {
+        id: `ev_${randomUUID()}`,
+        seq: view.records.list(EVIDENCE_PREFIX).length + 1,
+        at: Date.now(),
+        recordedBy: 'person',
+        space: space.id,
+        plan:
+          earlier.findLast((each) => each.suggestion === tie.suggestion)?.plan ??
+          earlier.at(-1)?.plan ??
+          '',
+        objective: objective.id,
+        kind: 'unlink',
+        suggestion: tie.suggestion,
+      }
+      await view.records.put(`${EVIDENCE_PREFIX}${evidence.id}`, evidence)
+      return {
+        unlinked: true,
+        objective: objectivesOf(view, space.id, { planned: library }).find(
+          (each) => each.id === objective.id,
+        ),
+      }
+    }),
+
     route('GET', '/spaces', ({ view }) => ({
       spaces: view.records
         .list(SPACE_PREFIX)

@@ -244,6 +244,65 @@ describe('tying an understanding to an objective', () => {
   })
 })
 
+describe('taking a tie back', () => {
+  const unlink = (space: string, objective: string, node: string) =>
+    rest<{ unlinked: boolean; objective?: Objective }>(`${SCENE}/objectives/unlink`, {
+      space,
+      objective,
+      node,
+    })
+
+  it('stops a wrong answer from asking, keeps the record, and can be tied again', async () => {
+    const { space, node } = await aSpace()
+    await practise(space, '0')
+    const [objective] = await objectives(space)
+    const id = objective?.id ?? ''
+    expect((await link(space, id, node)).body.objective?.candidates).toMatchObject([
+      { node, tiedByPerson: true },
+    ])
+
+    const before = await understanding(space)
+    const undone = await unlink(space, id, node)
+    expect(undone.status).toBe(200)
+    expect(undone.body.unlinked).toBe(true)
+    expect(undone.body.objective?.candidates).toEqual([])
+    // Taking a tie back changes nothing the person holds either.
+    const after = await understanding(space)
+    expect([after.nodes, after.pending]).toEqual([before.nodes, before.pending])
+
+    await practise(space, '1')
+    expect((await understanding(space)).pending).toEqual([])
+
+    // The session still shows the tie was made and taken back, by name.
+    const { sessions } = (
+      await rest<{
+        sessions: readonly {
+          objectives: readonly {
+            events: readonly { kind: string; candidate?: { label: string } }[]
+          }[]
+        }[]
+      }>(`${SCENE}/outcomes?space=${space}`)
+    ).body
+    const events = sessions.flatMap((each) => each.objectives.flatMap((one) => one.events))
+    expect(events.filter((each) => each.kind !== 'attempt')).toMatchObject([
+      { kind: 'candidate', candidate: { label: HELD } },
+      { kind: 'unlink', candidate: { label: HELD } },
+    ])
+
+    expect((await link(space, id, node)).body.linked).toBe(true)
+    await practise(space, '1')
+    expect((await understanding(space)).pending).toHaveLength(1)
+  })
+
+  it('does nothing for an understanding that is not tied', async () => {
+    const { space, node } = await aSpace()
+    await practise(space, '0')
+    const [objective] = await objectives(space)
+    const undone = await unlink(space, objective?.id ?? '', node)
+    expect([undone.status, undone.body.unlinked]).toEqual([200, false])
+  })
+})
+
 describe('before the first answer', () => {
   const plan = async (space: string): Promise<Plan> => {
     const proposed = await rest<Reply>(`${SCENE}/plans`, {

@@ -71,6 +71,7 @@ flowchart TD
 | 页面练习连到本人的理解 | Review | 学习证据作为待确认提议 | 本人在概览里把一条理解关联到学习目标后，页面上答错也提出同样的待确认；关联不改理解；只有本人的凭据能关联。关联后不能取消。决策 [0008](../research/reuse-decisions/0008-practice-to-understanding.md) | `feat/practice-doubt` |
 | 被怀疑的理解回到学习计划 | Review | 页面练习连到本人的理解 | 本人记下“冲突：疑似/未解决”的理解，新计划不再跳过对应重点；解决后照常跳过；等待确认的怀疑不影响计划。已经生成的计划不改。决策 [0009](../research/reuse-decisions/0009-doubt-brings-focus-back.md) | `feat/doubt-replans` |
 | 答题前就能关联理解 | Review | 被怀疑的理解回到学习计划 | 页面计划生成后、还没答题时，计划要练习的重点就出现在概览的目标里（显示“还没有答题记录”），可以先关联一条理解，第一次答错就会问到它；关联记在计划练习这个重点的计划下；只有计划没有答题的会话不出现在会话列表。决策 [0010](../research/reuse-decisions/0010-planned-objectives.md) | `feat/planned-objectives` |
+| 取消关联 | Review | 答题前就能关联理解 | 本人能取消自己做的关联，取消后答错不再问到这条理解，原记录不删，会话里列出“你取消了关联”；可以再关联；Agent 记下的关联不能在这里取消。已提出的怀疑不撤回。决策 [0011](../research/reuse-decisions/0011-unlink-objective.md) | `feat/unlink-objective` |
 | 旧式中文 PDF（CMap） | Blocked | 所有者批准新依赖 | 预定义 CMap 的中文 PDF 能读出 | |
 
 ## 能力差距（2026-11-02 盘点）

@@ -75,6 +75,11 @@ export interface Origin {
    */
   readonly label?: string
   readonly space?: string
+  /**
+   * The words of the turn the candidate was drawn from, so that a pick the person turned down is known again when a
+   * model rewords it. Origins kept before this was written have none.
+   */
+  readonly quote?: string
 }
 
 /**
@@ -93,8 +98,8 @@ export interface ShownOrigin extends Origin {
  * origin as it was kept.
  */
 export function shownOrigin(view: SceneView, kept: Origin): ShownOrigin {
-  // The words and space are kept for telling a repeat apart; the page already has both.
-  const { label: _label, space: _space, ...origin } = kept
+  // The words, quote and space are kept for telling a repeat apart; the page already has them.
+  const { label: _label, space: _space, quote: _quote, ...origin } = kept
   if (origin.thread === undefined || origin.turn === undefined) return origin
   const said = view.threadView(origin.thread)?.turns.find((turn) => turn.id === origin.turn)?.thread
   if (said === undefined || said === origin.thread) return origin
@@ -279,12 +284,30 @@ function sameThought(left: string, right: string): boolean {
  * The words of the candidates the person turned down in this space. Only candidates whose origin kept their words
  * are known: those dismissed before origins carried them are not, and may still be offered once more.
  */
-function dismissedIn(view: SceneView, space: string): readonly string[] {
+function dismissedIn(
+  view: SceneView,
+  space: string,
+): readonly (Origin & { readonly label: string })[] {
   return view.reviews().flatMap((review) => {
     if (review.outcome !== 'dismissed') return []
     const origin = originOf(view, review.suggestionId)
-    return origin?.label !== undefined && origin.space === space ? [origin.label] : []
+    return origin?.label !== undefined && origin.space === space
+      ? [{ ...origin, label: origin.label }]
+      : []
   })
+}
+
+/**
+ * Whether a model's pick is one the person turned down, drawn again from the same words of the same turn however
+ * it is labelled now. A label with a different count of negations is still the opposite view, and is offered.
+ */
+function pickedAgain(
+  dismissed: Origin & { readonly label: string },
+  pick: { readonly turn: string; readonly quote: string; readonly label: string },
+): boolean {
+  if (dismissed.turn !== pick.turn || dismissed.quote === undefined) return false
+  if (dismissed.label.match(NEGATION)?.length !== pick.label.match(NEGATION)?.length) return false
+  return sameThought(dismissed.quote, pick.quote)
 }
 
 /** A question is something the person wants to know, which is not yet something they understand. */
@@ -890,7 +913,8 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
     const rawItems = Array.isArray(parsed?.['items']) ? (parsed['items'] as unknown[]) : []
     const { held: heldWordings, waiting } = wordingsIn(view, space.id)
     // What the person turned down here is not a new pick, however the model words it this time.
-    const taken = [...heldWordings, ...waiting, ...dismissedIn(view, space.id)]
+    const dismissed = dismissedIn(view, space.id)
+    const taken = [...heldWordings, ...waiting, ...dismissed.map((origin) => origin.label)]
     for (const raw of rawItems.slice(0, MAX_THREAD_ITEMS)) {
       const item = raw as Record<string, unknown>
       const quote = typeof item['quote'] === 'string' ? item['quote'].trim() : ''
@@ -900,6 +924,8 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
       if (quote === '' || label === '' || ref === '' || held === undefined) continue
       if (isQuestion(label) || item['role'] === 'question') continue
       if (taken.some((other) => sameThought(label, other))) continue
+      const pick = { turn: held.turn.id, quote, label }
+      if (dismissed.some((origin) => pickedAgain(origin, pick))) continue
       taken.push(label)
       const mine = held.turn.speaker === 'learner'
       items.push({
@@ -920,6 +946,7 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
         basis: mine ? 'stated' : 'inferred',
         thread: threadId,
         turn: held.turn.id,
+        quote,
       })
     }
     const refs = new Set(items.map((item) => item.ref))

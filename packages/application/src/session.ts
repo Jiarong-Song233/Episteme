@@ -1514,7 +1514,20 @@ export class CognitiveSession {
   browsePublications(
     query: { readonly author?: string; readonly scope?: string; readonly q?: string } = {},
   ): readonly PublicationSummary[] {
-    const text = query.q?.trim().toLowerCase()
+    // Every word has to appear somewhere in it: its root, a member or the author's note. Width and case do not count.
+    const folded = (words: string): string => words.normalize('NFKC').toLowerCase()
+    const terms = folded(query.q ?? '')
+      .split(/\s+/u)
+      .filter((term) => term !== '')
+    const matches = (publication: Publication, root: GraphNode | undefined): boolean => {
+      if (terms.length === 0) return true
+      const texts = [
+        root?.label ?? '',
+        publication.note ?? '',
+        ...publication.members.map((id) => this.#episteme.graph.getNode(id)?.label ?? ''),
+      ].map(folded)
+      return terms.every((term) => texts.some((each) => each.includes(term)))
+    }
     return this.publications()
       .filter((publication) => query.author === undefined || publication.actorId === query.author)
       .map((publication) => ({ publication, root: this.#episteme.graph.getNode(publication.root) }))
@@ -1522,15 +1535,7 @@ export class CognitiveSession {
         ({ root }) =>
           query.scope === undefined || root?.tags.includes(`scope:${query.scope}`) === true,
       )
-      .filter(
-        ({ publication, root }) =>
-          text === undefined ||
-          text === '' ||
-          (root?.label.toLowerCase().includes(text) ?? false) ||
-          publication.members.some((id) =>
-            this.#episteme.graph.getNode(id)?.label.toLowerCase().includes(text),
-          ),
-      )
+      .filter(({ publication, root }) => matches(publication, root))
       .map(({ publication, root }) => ({
         id: publication.id,
         author: publication.actorId,

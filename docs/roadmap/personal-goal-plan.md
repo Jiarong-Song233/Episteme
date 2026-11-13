@@ -50,6 +50,11 @@ flowchart TD
 | G3.2 图谱与时间线 | Review | G3.1 | 单一图谱多视图 | `feat/workbench-understanding` |
 | G3.3 新会话复用理解 | Review | G3.2 | 新对话能引用已确认理解，并标明来源 | `feat/workbench-understanding` |
 | G4 发布、引用、分叉 | Review | G3 | A 发布，B 引用并分叉，可追溯，A 不被覆盖 | `feat/workbench-sharing` |
+| G4 发布搜索按词匹配 | Review | G4 | 多个词都命中即可，范围含成员和说明，全角和大小写不计 | `feat/publication-search` |
+| G2 空回复自动再问一次 | Review | G2 | 非截断的空回复重试一次，两次 token 都计入，截断的不重试 | `feat/model-empty-retry` |
+| G4 撤回后保留引用者看到的作者名 | Review | G4 | 引用过的人在作者撤回后仍看到名字，没有引用的人不变 | `feat/cited-author-names` |
+| G4 HTTPS 部署的 Cookie 带 Secure | Review | G4 | 对外地址为 https 时 Cookie 带 Secure，本机模式不变，浏览器测试照常 | `feat/secure-cookie` |
+| G3 被拒绝的候选按原话认出 | Review | G3.1 | 同一轮同一段原话换说法不再提出，相反观点照常提出 | `feat/dismissed-rewording` |
 | G5 边界审计与导出恢复 | Review | G4 | 非教学场景不改 Core；导出、导入、恢复有测试；SAIR 贡献候选清单 | `feat/boundary-and-recovery` |
 | G5 真实主机 e2e | Review | G5 审计 | 真实 Claude Code 连接 MCP（SAIR #32）。无头模式已跑通；交互模式和 Codex 未验证 | `feat/boundary-and-recovery` |
 | G6 可复现评估：同模型基线 | Review | G5 | 固定材料和任务，方法、结果、局限和下一轮依据见[第一轮报告](../research/evaluation/round-1.md) | `feat/evaluation` |

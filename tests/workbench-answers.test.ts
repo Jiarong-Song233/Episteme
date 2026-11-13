@@ -389,12 +389,31 @@ describe('the model client', () => {
     expect((failure as ModelFailure).code).toBe('timeout')
   }, 20_000)
 
+  it('asks once more after a blank reply, and counts both', async () => {
+    let calls = 0
+    const baseUrl = await serviceAnswering(() => {
+      calls += 1
+      return { status: 200, body: completion(calls === 1 ? '  ' : '答案[1]') }
+    })
+    const reply = await remoteModel({ baseUrl, model: 'm' }).complete([
+      { role: 'user', content: 'q' },
+    ])
+    expect(reply).toEqual({ text: '答案[1]', tokens: 6 })
+    expect(calls).toBe(2)
+  })
+
   it('reports an empty reply and an unreachable service', async () => {
-    const baseUrl = await serviceAnswering(() => ({ status: 200, body: completion('  ') }))
+    let calls = 0
+    const baseUrl = await serviceAnswering(() => {
+      calls += 1
+      return { status: 200, body: completion('  ') }
+    })
     const empty = await remoteModel({ baseUrl, model: 'm' })
       .complete([{ role: 'user', content: 'q' }])
       .catch((error: unknown) => error)
     expect((empty as ModelFailure).code).toBe('empty_reply')
+    // One more try, never a loop.
+    expect(calls).toBe(2)
     const gone = await remoteModel({ baseUrl: 'http://127.0.0.1:9/v1', model: 'm' })
       .complete([{ role: 'user', content: 'q' }])
       .catch((error: unknown) => error)
@@ -433,6 +452,8 @@ describe('the model client', () => {
     expect((failure as ModelFailure).code).toBe('empty_reply')
     expect((failure as ModelFailure).message).toContain('EPISTEME_MODEL_REASONING_EFFORT')
     expect(seen[0]).toMatchObject({ max_tokens: 200, reasoning_effort: 'none' })
+    // Asking again would spend the allowance the same way.
+    expect(seen).toHaveLength(1)
   })
 
   it('stops calling once the budget is spent', async () => {

@@ -291,6 +291,17 @@ describe('working with what someone else published', () => {
     expect(after.body.names).toEqual({ [wei.id]: '魏', [lin.id]: '林' })
   })
 
+  it('keeps the name of an author whose withdrawn work was cited', async () => {
+    const original = await linPublishes()
+    await weiCites(original.publication, original.node.nodeId)
+    expect((await call(`/publications/${original.publication}/withdraw`, lin, {})).status).toBe(200)
+    expect(
+      (await call<{ publications: unknown[] }>('/publications', wei)).body.publications,
+    ).toEqual([])
+    const cited = await call<{ names: Record<string, string> }>('/me', wei)
+    expect(cited.body.names).toEqual({ [wei.id]: '魏', [lin.id]: '林' })
+  })
+
   it('makes public only what was published', async () => {
     await holdOwnWords(lin, PRIVATE_WORDS)
     const original = await linPublishes()

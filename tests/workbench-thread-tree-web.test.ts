@@ -262,6 +262,34 @@ describe.skipIf(browser === undefined)('branching a conversation in a browser', 
       .waitFor()
   }, 120_000)
 
+  it('shows no other conversation while one opens', async () => {
+    await newSpace('机器学习')
+    await upload('编码笔记.md')
+    await ask('位置编码有什么用')
+    const original = threadOf(page.url())
+    await forkFrom('位置编码有什么用')
+    await ask('顺序为什么重要')
+
+    // A slow read: the branch's turns must not stay on screen under the original's address.
+    await page.route(/\/session\?thread=/, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      await route.continue()
+    })
+    await shelf().getByRole('button', { name: '位置编码有什么用', exact: true }).click()
+    await page.waitForURL(new RegExp(`/threads/${original}$`))
+    await main().getByRole('status').filter({ hasText: '正在打开…' }).waitFor()
+    expect(await main().innerText()).not.toContain('顺序为什么重要')
+    expect(
+      await main()
+        .getByRole('button', { name: /^从这里分叉/ })
+        .count(),
+    ).toBe(0)
+
+    await main().getByText('位置编码有什么用').first().waitFor()
+    expect(await main().innerText()).not.toContain('顺序为什么重要')
+    expect(await main().getByRole('separator').count()).toBe(0)
+  }, 120_000)
+
   it('offers no branching in an archived space, and none in another space', async () => {
     await newSpace('机器学习')
     await upload('编码笔记.md')

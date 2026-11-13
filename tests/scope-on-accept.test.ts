@@ -32,7 +32,7 @@ afterEach(async () => {
 const tagsOf = (nodeId: string): readonly string[] => session.graph.getNode(nodeId)?.tags ?? []
 
 async function nodeOf(suggestion: Suggestion, decision: Parameters<typeof session.decide>[1]) {
-  const decided = await session.decide(suggestion.id, decision, 'learn-review')
+  const decided = await session.decide(suggestion.id, decision, 'review')
   if (!decided.ok || decided.outcome === 'dismissed') throw new Error('not decided')
   if (decided.committed.kind !== 'node') throw new Error('not a node')
   return decided.committed.id
@@ -160,7 +160,7 @@ describe('filing a draft made outside any scope', () => {
     const decided = await session.decide(
       proposed.suggestion.id,
       { action: 'accept', scope: 'stats-101' },
-      'learn-review',
+      'review',
     )
     expect(decided).toMatchObject({ ok: false, refusal: { code: 'scope_fixed' } })
     expect(session.pendingSuggestions().map((each) => each.id)).toContain(proposed.suggestion.id)
@@ -169,11 +169,7 @@ describe('filing a draft made outside any scope', () => {
   it('refuses a bad scope, deciding nothing', async () => {
     const suggestion = await unscoped()
     for (const scope of ['', '*', 'a\nb']) {
-      const decided = await session.decide(
-        suggestion.id,
-        { action: 'accept', scope },
-        'learn-review',
-      )
+      const decided = await session.decide(suggestion.id, { action: 'accept', scope }, 'review')
       expect(decided).toMatchObject({ ok: false, refusal: { code: 'invalid_scope' } })
     }
     expect(session.pendingSuggestions().map((each) => each.id)).toContain(suggestion.id)
@@ -190,7 +186,7 @@ describe('filing a draft made outside any scope', () => {
     const decided = await session.decide(
       proposed.suggestion.id,
       { action: 'accept', scope: 'ml-2026' },
-      'learn-review',
+      'review',
     )
     expect(decided).toMatchObject({ ok: false, refusal: { code: 'invalid_scope' } })
   })
@@ -219,7 +215,7 @@ describe('distill with a scope', () => {
     let nodes = 0
     for (const suggestion of outcome.suggestions) {
       if (suggestion.proposal.kind !== 'node' && suggestion.proposal.kind !== 'claim') continue
-      const decided = await session.decide(suggestion.id, { action: 'accept' }, 'learn-review')
+      const decided = await session.decide(suggestion.id, { action: 'accept' }, 'review')
       if (!decided.ok || decided.outcome === 'dismissed' || decided.committed.kind !== 'node')
         continue
       expect(tagsOf(decided.committed.id)).toContain('scope:ml-2026')

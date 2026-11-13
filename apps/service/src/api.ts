@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
+  currentChannel,
   isRefusal,
   sceneViewOf,
   sceneWritesOf,
@@ -365,7 +366,9 @@ export async function handleApi(
 
     // Every decision, dismissals included, with its channel and credential: for finding one after the fact.
     if (path === `${API_PREFIX}/reviews` && method === 'GET') {
-      const channel = new URL(request.url ?? '/', 'http://localhost').searchParams.get('channel')
+      const asked = new URL(request.url ?? '/', 'http://localhost').searchParams.get('channel')
+      // An earlier name asks for the same channel: `learn-review` finds what `review` finds, and the reverse.
+      const channel = asked === null ? null : currentChannel(asked)
       sendJson(response, 200, {
         ...at(session),
         reviews: session
@@ -498,7 +501,7 @@ export async function handleApi(
       const result = await session.decide(
         id,
         decision,
-        'learn-review',
+        'review',
         caller === undefined
           ? undefined
           : {

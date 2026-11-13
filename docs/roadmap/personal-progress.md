@@ -65,7 +65,7 @@
 - 自动化：`tests/graph-export.test.ts`（材料、对话、理解、来源轨迹、发布内容往返，以及命令行）、`tests/hypothesis-scene.test.ts`（REST、MCP、SDK 读到同样的节点和状态，重启和导入后历史相同）。
 - 真实宿主（2026-11-02）：Claude Code 2.1.316，模型路由到 `auto/deepseek-v4.1-flash`，默认场景和假设场景各跑通，见[记录](../testing/host-e2e-log.md)。elicitation：声明支持，`-p` 模式自动取消，草稿留在队列。交互模式没有验证。Codex 0.165.0（2026-11-09）：召回和提议走通，见同一份记录。
 - 真实宿主发现、mock 测不出的缺陷，已修复：已接受的主张被说成“没有记录过”，新会话的模型拒绝据此回答。
-- 审计：[边界审计](../architecture/boundary-audit.md)。MCP 工具说明里的 learner 已改；已持久化的 `learn-surface`、`learn-review` 没改，因为需要迁移。PRD 提到的 `EvaluationPolicy` 在代码里不存在。
+- 审计：[边界审计](../architecture/boundary-audit.md)。MCP 工具说明里的 learner 已改；决定通道和事件来源的新写入已改为 `review`、`session`，旧记录不改写，读取时按别名兼容。PRD 提到的 `EvaluationPolicy` 在代码里不存在。
 - SAIR：[候选贡献清单](sair-contribution-candidates.md)，只是提议，没有动团队仓。
 - 决策：[0005](../research/reuse-decisions/0005-export-and-boundary.md)。
 
@@ -79,7 +79,7 @@
 
 - 仓库根目录没有 LICENSE，公开仓库缺许可证声明。要由仓库所有者决定。
 - ADR 0018 仍为 proposed。
-- `learn-scene.ts`、`LearnSession` 别名、`learnProfile` 和决定通道 `learn-review` 仍在代码里，工作台暂时依赖 `learnScene`。
+- `learn-scene.ts`、`LearnSession` 别名和 `learnProfile` 仍在代码里，工作台暂时依赖 `learnScene`。旧图里的 `learn-review`、`learn-surface` 保持原样，读取时按 `review`、`session` 处理。
 - `docs/planning/mindlink-spec.md` 仍在仓库中，作为历史规划保留。
 - 语义检索（v0.2.0）是可选的，默认关闭，只用桩服务测过，没有用真实的嵌入模型验证，也没有和关键词检索对比过效果。
 - 中文 PDF：现在的工具（包括浏览器打印）生成的能读；中文字体未嵌入、用预定义 CMap（如 UniGB-UCS2-H）的旧式文件读不出，会说明原因并建议转成 .txt。要读出它需要 pdf.js 的 CMap 数据，是新依赖，待决定。
@@ -107,4 +107,4 @@ G6 跑了[三轮](../research/evaluation/round-3.md)。第三轮经用户授权�
 - **理解：** 候选由回答句子直接生成，没有合并；相似度只是词覆盖率；被拒绝的候选换个说法仍可能再次出现；复用只在同一空间内发生；G3 之前的节点没有来源信息。
 - **导出：** 明文，整体放在内存里，没有跨版本迁移。
 - **主机：** Claude Code 只验证了无头模式，交互模式下的 elicitation 要真人在终端里走一遍；Codex 0.165.0 用 `codex exec` 验证过召回和提议。
-- **耦合：** `learnScene`、`LearnSession`、`learn-review`、`learn-surface` 及其持久化值还在；`session.ts` 有静默回退到 `learnScene` 的逻辑；种子节点算作 `kept`；`EvaluationPolicy` 不存在（“已站稳”的规则目前由 session 传给检索）；`packages/domain-forum` 只是占位。
+- **耦合：** `learnScene`、`LearnSession` 还在（`learn-review`、`learn-surface` 只剩旧记录里的值）；`session.ts` 有静默回退到 `learnScene` 的逻辑；种子节点算作 `kept`；`EvaluationPolicy` 不存在（“已站稳”的规则目前由 session 传给检索）；`packages/domain-forum` 只是占位。

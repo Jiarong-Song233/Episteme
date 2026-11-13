@@ -1604,16 +1604,8 @@ export class CognitiveSession {
    * changed between the two. Nothing changes for them until they decide.
    */
   updates(): readonly PublicationUpdate[] {
-    const adopted = new Set<string>()
-    for (const node of this.#seen.listNodes()) {
-      for (const event of this.#episteme.log.history({ target: node.id, actorId: this.#actor })) {
-        if (event.source?.startsWith('publication:') === true) {
-          adopted.add(event.source.slice('publication:'.length))
-        }
-      }
-    }
     const updates: PublicationUpdate[] = []
-    for (const id of adopted) {
+    for (const id of this.#adopted()) {
       const versions = this.#versionsOf(id)
       const newest = versions[versions.length - 1]
       if (newest === undefined || newest === id || !this.#episteme.log.publications.isLive(newest))
@@ -1628,6 +1620,32 @@ export class CognitiveSession {
       })
     }
     return updates
+  }
+
+  /**
+   * The people whose publications this person cited, including ones since withdrawn: they read the author's name
+   * when they cited it, and what they cited still says whose it was.
+   */
+  citedAuthors(): readonly string[] {
+    const authors = new Set<string>()
+    for (const id of this.#adopted()) {
+      const author = this.#episteme.log.publications.get(id)?.actorId
+      if (author !== undefined) authors.add(author)
+    }
+    return [...authors]
+  }
+
+  /** The publications this person adopted from, live or not. */
+  #adopted(): ReadonlySet<string> {
+    const adopted = new Set<string>()
+    for (const node of this.#seen.listNodes()) {
+      for (const event of this.#episteme.log.history({ target: node.id, actorId: this.#actor })) {
+        if (event.source?.startsWith('publication:') === true) {
+          adopted.add(event.source.slice('publication:'.length))
+        }
+      }
+    }
+    return adopted
   }
 
   /** A publication's version chain, oldest first: what it supersedes, back to the first, then what supersedes it. */

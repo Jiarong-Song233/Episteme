@@ -91,6 +91,8 @@ export interface PendingCandidate {
   /** Another wording, held or waiting, that says nearly the same. */
   readonly similar?: string
   readonly link?: { readonly fromLabel: string; readonly toLabel: string; readonly ready: boolean }
+  /** A pending change to a held understanding: which one, which dimension, to which level, all in words. */
+  readonly state?: { readonly label: string; readonly dimension: string; readonly level: string }
 }
 
 /** A candidate proposed outside any space: who proposed it, for whom, and from where. */

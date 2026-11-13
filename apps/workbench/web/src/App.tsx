@@ -1015,6 +1015,7 @@ function Desk({
                 version={learned}
                 blocks={library.blocks}
                 pending={understanding.pending}
+                held={understanding.nodes}
                 resume={
                   resume === undefined
                     ? undefined
@@ -1061,6 +1062,7 @@ function Desk({
               version={learned}
               blocks={library.blocks}
               pending={understanding.pending}
+              held={understanding.nodes}
               resume={undefined}
               onNewThread={() => moveTo({ kind: 'new', space: spaceId })}
               onReview={() => moveTo({ kind: 'review', space: spaceId })}

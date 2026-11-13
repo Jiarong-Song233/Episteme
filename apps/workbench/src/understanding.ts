@@ -1123,6 +1123,25 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
     return { challenge: settled }
   }
 
+  /** A pending change to what a held node says about it, in the words the person reads: which one, what, to what. */
+  const stateInWords = (
+    view: SceneView,
+    proposal: Extract<Proposal, { kind: 'state' }>,
+    nodes: readonly HeldNode[],
+  ): { readonly label: string; readonly dimension: string; readonly level: string } => {
+    const dimension = view.recordableDimensions.find((each) => each.id === proposal.dimension)
+    return {
+      label:
+        nodes.find((node) => node.nodeId === proposal.target)?.label ??
+        view.listNodes().find((node) => node.nodeId === proposal.target)?.label ??
+        proposal.target,
+      dimension: dimension?.labelZh ?? proposal.dimension,
+      level:
+        dimension?.levelLabelsZh.find((each) => each.level === proposal.level)?.label ??
+        proposal.level,
+    }
+  }
+
   const route = (
     method: SceneRoute['method'],
     path: string,
@@ -1166,6 +1185,7 @@ export function understandingRoutes(options: UnderstandingOptions): readonly Sce
             ...(suggestion.proposal.kind === 'link'
               ? { link: linkEnds(suggestion.proposal, nodes, pending) }
               : {}),
+            ...(proposal.kind === 'state' ? { state: stateInWords(view, proposal, nodes) } : {}),
           }
         }),
         challenges: challengesOf(view).filter((challenge) => challenge.space === space.id),

@@ -230,9 +230,11 @@ export function Outcomes(props: {
             <ul>
               {pending.slice(0, PENDING_SHOWN).map((candidate) => (
                 <li key={candidate.id}>
-                  {candidate.link === undefined
-                    ? (candidate.proposal.label ?? candidate.rationale)
-                    : `${candidate.link.fromLabel} 和 ${candidate.link.toLabel} 的关系`}
+                  {candidate.link !== undefined
+                    ? `${candidate.link.fromLabel} 和 ${candidate.link.toLabel} 的关系`
+                    : candidate.state !== undefined
+                      ? `${candidate.state.label}：${candidate.state.dimension}记为${candidate.state.level}`
+                      : (candidate.proposal.label ?? candidate.rationale)}
                 </li>
               ))}
             </ul>

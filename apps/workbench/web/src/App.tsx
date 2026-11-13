@@ -1929,12 +1929,36 @@ function PendingItem(props: {
   const { candidate, guard, onDecided } = props
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(candidate.proposal.label ?? '')
-  const { link } = candidate
+  const { link, state } = candidate
   const decide = (work: () => Promise<unknown>): void => {
     guard(async () => {
       await work()
       await onDecided()
     })
+  }
+  if (state !== undefined) {
+    return (
+      <li>
+        <p className="candidate">{state.label}</p>
+        <p className="candidate">
+          <span className="hint">把{state.dimension}记为：</span>
+          {state.level}
+        </p>
+        <p className="hint">{candidate.rationale}</p>
+        <p className="decisions">
+          <button type="button" onClick={() => decide(() => api.accept(candidate.id))}>
+            同意，记下来
+          </button>
+          <button
+            type="button"
+            className="link"
+            onClick={() => decide(() => api.dismiss(candidate.id))}
+          >
+            不同意
+          </button>
+        </p>
+      </li>
+    )
   }
   if (link !== undefined) {
     const relation =

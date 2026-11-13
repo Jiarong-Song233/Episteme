@@ -257,6 +257,8 @@ function Desk({
   const [materials, setMaterials] = useState<readonly MaterialSummary[]>([])
   const [sessions, setSessions] = useState<readonly Session[]>([])
   const [turns, setTurns] = useState<readonly Turn[]>([])
+  /** The conversation `turns` were read for: until it is the one on show, its turns are still on their way. */
+  const [turnsOf, setTurnsOf] = useState<string>()
   /** A conversation whose turns are already in hand because asking just started it. */
   const threadInHand = useRef<string | undefined>(undefined)
   const [understanding, setUnderstanding] = useState<Understanding>(NO_UNDERSTANDING)
@@ -455,12 +457,16 @@ function Desk({
     setFailed(undefined)
     if (threadId === undefined) {
       setTurns([])
+      setTurnsOf(undefined)
       return undefined
     }
     let current = true
     guard(async () => {
       const found = await api.session(threadId)
-      if (current) setTurns(found.turns)
+      if (current) {
+        setTurns(found.turns)
+        setTurnsOf(threadId)
+      }
     })
     return () => {
       current = false
@@ -506,6 +512,7 @@ function Desk({
       try {
         const asked = await api.ask(spaceId, question, threadId, retry)
         setTurns((await api.session(asked.thread)).turns)
+        setTurnsOf(asked.thread)
         setSessions((await api.sessions(spaceId)).sessions)
         if (asked.thread !== threadId) {
           threadInHand.current = asked.thread
@@ -1003,7 +1010,7 @@ function Desk({
               thread={threadId}
               branchOf={branchOf(sessions, threadId)}
               onForkPoint={(parent) => jumpTo(parent.thread, parent.turn)}
-              turns={turns}
+              turns={turnsOf === threadId ? turns : undefined}
               asking={asking}
               failed={failed}
               onAsk={ask}
@@ -1517,7 +1524,8 @@ function Conversation(props: {
   thread: string | undefined
   branchOf: BranchOf | undefined
   onForkPoint: (parent: BranchOf['parent']) => void
-  turns: readonly Turn[]
+  /** Undefined while the conversation's turns are being read, so another conversation's never show under its name. */
+  turns: readonly Turn[] | undefined
   asking: boolean
   failed: { question: string; failure: Failure } | undefined
   onAsk: (question: string, retry: boolean) => void
@@ -1526,7 +1534,9 @@ function Conversation(props: {
   onMaterials: () => void
   extract: ReactNode
 }) {
-  const { space, turns, asking, failed } = props
+  const { space, asking, failed } = props
+  const loading = props.turns === undefined
+  const turns = props.turns ?? []
   const [draft, setDraft] = useState('')
   const end = useRef<HTMLDivElement>(null)
 
@@ -1582,7 +1592,12 @@ function Conversation(props: {
             </button>
           </p>
         )}
-        {turns.length === 0 && (
+        {loading && (
+          <p className="working" role="status">
+            正在打开…
+          </p>
+        )}
+        {!loading && turns.length === 0 && (
           <p className="hint page-hint">
             {props.hasMaterial ? (
               '就材料提一个问题。回答里的每句话都会标明它从哪来。'

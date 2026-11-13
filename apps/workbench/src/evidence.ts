@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { SceneView } from '@episteme/application'
+import { BUILT_IN_LIBRARY, type Library } from './blocks.js'
 import type { Plan } from './plans.js'
 import type { Attempt } from './practice.js'
 import { scopeOf } from './requests.js'
@@ -314,9 +315,13 @@ export interface SessionOutcome {
 }
 
 /** Each plan of a space that has anything to show, oldest first, so it reads as what changed. */
-export function sessionsOf(view: SceneView, space: string): readonly SessionOutcome[] {
+export function sessionsOf(
+  view: SceneView,
+  space: string,
+  library: Library = BUILT_IN_LIBRARY,
+): readonly SessionOutcome[] {
   const evidence = evidenceOf(view, space)
-  const objectives = objectivesOf(view, space)
+  const objectives = objectivesOf(view, space, { planned: library })
   const candidate = (suggestion: string | undefined) =>
     objectives.flatMap((each) => each.candidates).find((each) => each.suggestion === suggestion)
   return view.records
@@ -362,6 +367,8 @@ export function sessionsOf(view: SceneView, space: string): readonly SessionOutc
                     : { wordsBy: wordsByTurn(view, each.source.thread, each.source.turn) }),
                 }
               })
+            // A page plan shows what happened on it; a focus it only planned is listed in the objectives instead.
+            if (events.length === 0 && plan.origin !== 'host') return []
             return [{ id, label, events }]
           }),
         },
@@ -369,11 +376,40 @@ export function sessionsOf(view: SceneView, space: string): readonly SessionOutc
     })
 }
 
+/** The plans of a space laid out on the page, newest first. A host agent's plans name their objectives themselves. */
+export function pagePlansOf(view: SceneView, space: string): readonly Plan[] {
+  return view.records
+    .list('plan/')
+    .map((record) => record.value as Plan)
+    .filter((plan) => plan.space === space && plan.origin !== 'host')
+    .sort((left, right) => right.createdAt - left.createdAt)
+}
+
+/** The focuses a plan sets out to practise: only a practice step can put an answer on one. */
+export function plannedFocuses(
+  plan: Plan,
+  library: Library,
+): readonly { readonly id: string; readonly focus: string }[] {
+  const practice = new Set(
+    library.blocks.filter((block) => block.interaction === 'practice').map((block) => block.id),
+  )
+  return plan.steps
+    .filter((step) => practice.has(step.block))
+    .map((step) => ({
+      id: step.objective ?? objectiveIdOf(plan.space, step.focus),
+      focus: step.focus,
+    }))
+}
+
 /** Every objective of a space as it reads now. The words stay out unless they are asked for. */
 export function objectivesOf(
   view: SceneView,
   space: string,
-  options: { readonly withWords?: boolean } = {},
+  options: {
+    readonly withWords?: boolean
+    /** Also the focuses the page's plans set out to practise, before any answer on them. */
+    readonly planned?: Library
+  } = {},
 ): readonly ObjectiveReading[] {
   const evidence = evidenceOf(view, space)
   const named = new Map<string, string>()
@@ -386,6 +422,13 @@ export function objectivesOf(
     const id = objectiveIdOf(space, attempt.focus)
     if (!named.has(id) && evidence.some((each) => each.objective === id)) {
       named.set(id, attempt.focus)
+    }
+  }
+  if (options.planned !== undefined) {
+    for (const plan of pagePlansOf(view, space)) {
+      for (const { id, focus } of plannedFocuses(plan, options.planned)) {
+        if (!named.has(id)) named.set(id, focus)
+      }
     }
   }
   return [...named].map(([id, label]) => {

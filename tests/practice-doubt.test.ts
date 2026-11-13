@@ -244,6 +244,65 @@ describe('tying an understanding to an objective', () => {
   })
 })
 
+describe('before the first answer', () => {
+  const plan = async (space: string): Promise<Plan> => {
+    const proposed = await rest<Reply>(`${SCENE}/plans`, {
+      space,
+      topic: '位置编码',
+      minutes: 15,
+      workflow: 'speedrun',
+    })
+    expect(proposed.status).toBe(200)
+    return proposed.body.plan
+  }
+
+  it('lists the focus a plan will practise, with no answer on it yet', async () => {
+    const { space } = await aSpace()
+    expect(await objectives(space)).toEqual([])
+    await plan(space)
+    const listed = await objectives(space)
+    expect(listed).toMatchObject([
+      { label: '位置编码', attempts: 0, confirmation: 'none', candidates: [] },
+    ])
+  })
+
+  it('lets the person tie an understanding first, so the first wrong answer already asks', async () => {
+    const { space, node } = await aSpace()
+    const planned = await plan(space)
+    const [objective] = await objectives(space)
+    const linked = await link(space, objective?.id ?? '', node)
+    expect(linked.status).toBe(200)
+    expect(linked.body.objective).toMatchObject({ attempts: 0, candidates: [{ node }] })
+
+    // The tie shows on the plan that set out to practise the focus.
+    const { sessions } = (
+      await rest<{
+        sessions: readonly {
+          plan: string
+          objectives: readonly { label: string; events: readonly { kind: string }[] }[]
+        }[]
+      }>(`${SCENE}/outcomes?space=${space}`)
+    ).body
+    expect(sessions.find((each) => each.plan === planned.id)?.objectives).toMatchObject([
+      { label: '位置编码', events: [{ kind: 'candidate' }] },
+    ])
+
+    await practise(space, '1')
+    const after = await understanding(space)
+    expect(after.pending).toHaveLength(1)
+    expect(after.pending[0]?.state).toEqual({ label: HELD, dimension: '冲突', level: '疑似' })
+  })
+
+  it('does not list a plan session with nothing on it', async () => {
+    const { space } = await aSpace()
+    await plan(space)
+    const { sessions } = (
+      await rest<{ sessions: readonly unknown[] }>(`${SCENE}/outcomes?space=${space}`)
+    ).body
+    expect(sessions).toEqual([])
+  })
+})
+
 describe('a later plan', () => {
   /** Worded like the focus, so a plan counts the focus as already understood. */
   const LIKE_FOCUS = '位置编码把词的顺序告诉模型'

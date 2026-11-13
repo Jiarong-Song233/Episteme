@@ -8,6 +8,8 @@ import {
   EVIDENCE_PREFIX,
   evidenceOf,
   objectivesOf,
+  pagePlansOf,
+  plannedFocuses,
   sessionsOf,
   unlinkedIn,
   type LearningEvidence,
@@ -232,9 +234,10 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     route('GET', '/outcomes', ({ view, query }) => {
       const space = spaceOf(view, required(query, 'space'))
       return {
-        objectives: objectivesOf(view, space.id),
+        // Planned focuses are listed before any answer, so the person can say what one is about before practising it.
+        objectives: objectivesOf(view, space.id, { planned: library }),
         unlinked: unlinkedIn(view, space.id).length,
-        sessions: sessionsOf(view, space.id),
+        sessions: sessionsOf(view, space.id, library),
       }
     }),
     // The person says which learning objective one of their understandings is about, so what practice shows on that
@@ -242,7 +245,7 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     // never what the person already holds. It records evidence, and changes nothing the person holds.
     route('POST', '/objectives/link', async ({ view, body }) => {
       const space = openSpaceOf(view, text(body, 'space'))
-      const objective = objectivesOf(view, space.id).find(
+      const objective = objectivesOf(view, space.id, { planned: library }).find(
         (each) => each.id === text(body, 'objective'),
       )
       if (objective === undefined) refuse('unknown_objective', '这个空间里没有这个学习目标。')
@@ -263,13 +266,17 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
         return { linked: false, objective }
       }
       const earlier = evidenceOf(view, space.id).filter((each) => each.objective === objective.id)
+      // Before any answer, the tie belongs to the newest plan that set out to cover the focus.
+      const planning = pagePlansOf(view, space.id).find((plan) =>
+        plannedFocuses(plan, library).some((each) => each.id === objective.id),
+      )
       const evidence: LearningEvidence = {
         id: `ev_${randomUUID()}`,
         seq: view.records.list(EVIDENCE_PREFIX).length + 1,
         at: Date.now(),
         recordedBy: 'person',
         space: space.id,
-        plan: earlier.at(-1)?.plan ?? '',
+        plan: earlier.at(-1)?.plan ?? planning?.id ?? '',
         objective: objective.id,
         kind: 'candidate',
         suggestion: node.fromSuggestion,
@@ -277,7 +284,9 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
       await view.records.put(`${EVIDENCE_PREFIX}${evidence.id}`, evidence)
       return {
         linked: true,
-        objective: objectivesOf(view, space.id).find((each) => each.id === objective.id),
+        objective: objectivesOf(view, space.id, { planned: library }).find(
+          (each) => each.id === objective.id,
+        ),
       }
     }),
 

@@ -26,7 +26,9 @@ import {
   type Attempt,
 } from './practice.js'
 import { ANSWER_PREFIX, openSpaceOf, refuse, required, scopeOf, spaceOf, text } from './requests.js'
-import { heldNodes, stillHeld } from './understanding.js'
+import { heldNodes, REQUESTED_BY, stillHeld } from './understanding.js'
+import { proposeDoubt } from './doubt.js'
+import { fromPractice } from './evidence.js'
 import { coverage } from './tokens.js'
 
 /**
@@ -442,6 +444,9 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
       ...(estimate === undefined ? {} : { estimate }),
     }
     await view.records.put(`${ATTEMPT_PREFIX}${attempt.id}`, answered)
+    // Read as the evidence it is, so a wrong answer asks about what the person holds, as an agent's would.
+    const evidence = fromPractice(answered, plan.space, 0)
+    if (evidence !== undefined) await proposeDoubt(view, evidence, REQUESTED_BY)
     return save(view, { ...plan, updatedAt: now() })
   }
 

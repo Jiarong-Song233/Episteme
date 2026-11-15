@@ -259,7 +259,7 @@ export function PlanView(props: {
                   <span className="hint">
                     {candidate.status === 'skipped'
                       ? (candidate.note ?? '跳过')
-                      : `${candidate.minutes} 分钟`}
+                      : `${candidate.minutes} 分钟${candidate.note === undefined ? '' : `。${candidate.note}`}`}
                   </span>
                 </li>
               ))}

@@ -44,12 +44,18 @@ export interface Plan {
   readonly updatedAt: number
 }
 
-const newStep = (block: string, focus: string, minutes: number, note?: string): Step => ({
+const newStep = (
+  block: string,
+  focus: string,
+  minutes: number,
+  note?: string,
+  status: StepStatus = note === undefined ? 'pending' : 'skipped',
+): Step => ({
   id: `st_${randomUUID()}`,
   block,
   focus,
   minutes,
-  status: note === undefined ? 'pending' : 'skipped',
+  status,
   rounds: 0,
   entered: false,
   ...(note === undefined ? {} : { note }),
@@ -72,19 +78,42 @@ export function layOut(
     readonly focuses: readonly string[]
     readonly minutes: number
     readonly understood: readonly string[]
+    /** What the person holds but has put under doubt: a focus it would have skipped comes back, saying why. */
+    readonly doubted?: readonly string[]
   },
 ): readonly Step[] {
   const weightOf = (id: string): number =>
     library.blocks.find((block) => block.id === id)?.weight ?? 1
-  const known = (focus: string): boolean =>
-    workflow.skipsUnderstood &&
-    input.understood.some((label) => coverage(focus, label) >= UNDERSTOOD)
+  const covering = (focus: string, labels: readonly string[] = []): string | undefined =>
+    workflow.skipsUnderstood
+      ? labels.find((label) => coverage(focus, label) >= UNDERSTOOD)
+      : undefined
+  const known = (focus: string): boolean => covering(focus, input.understood) !== undefined
+  const cameBack = (focus: string): string | undefined => {
+    const doubted = covering(focus, input.doubted)
+    return doubted === undefined ? undefined : `你对“${doubted}”记下了怀疑，所以这次不跳过。`
+  }
   const planned = [
-    ...workflow.opening.map((block) => ({ block, focus: input.topic, skip: false })),
+    ...workflow.opening.map((block) => ({
+      block,
+      focus: input.topic,
+      skip: false,
+      back: undefined,
+    })),
     ...input.focuses.flatMap((focus) =>
-      workflow.perFocus.map((block) => ({ block, focus, skip: known(focus) })),
+      workflow.perFocus.map((block) => ({
+        block,
+        focus,
+        skip: known(focus),
+        back: known(focus) ? undefined : cameBack(focus),
+      })),
     ),
-    ...workflow.closing.map((block) => ({ block, focus: input.topic, skip: false })),
+    ...workflow.closing.map((block) => ({
+      block,
+      focus: input.topic,
+      skip: false,
+      back: undefined,
+    })),
   ]
   const counted = planned.filter((step) => !step.skip)
   const total = counted.reduce((sum, step) => sum + weightOf(step.block), 0)
@@ -96,7 +125,9 @@ export function layOut(
       ? Math.max(1, input.minutes - assigned)
       : Math.max(1, Math.round((input.minutes * weightOf(step.block)) / total))
     assigned += minutes
-    return newStep(step.block, step.focus, minutes)
+    return step.back === undefined
+      ? newStep(step.block, step.focus, minutes)
+      : newStep(step.block, step.focus, minutes, step.back, 'pending')
   })
 }
 
@@ -136,8 +167,10 @@ export function editedSteps(
     }
     const { note: _note, ...rest } = kept
     const restored = kept.status === 'skipped' && restore === true
+    // A note says why this step is laid out as it is; it no longer holds once the focus is reworded.
+    const reworded = focus.trim() !== kept.focus
     return {
-      ...(restored ? rest : kept),
+      ...(restored || reworded ? rest : kept),
       block,
       focus: focus.trim(),
       minutes,

@@ -1343,6 +1343,8 @@ interface FlowStep {
   readonly label: string
   readonly status: Step['status']
   readonly minutes: number
+  /** Why this focus came back, when a doubt brought it here (kept from the plan step). */
+  readonly note?: string
 }
 
 function LearningFlowPage(props: {
@@ -1374,6 +1376,7 @@ function LearningFlowPage(props: {
           label: `${step.focus} · ${props.blocks.find((block) => block.id === step.block)?.title ?? step.block}`,
           status: step.status,
           minutes: step.minutes,
+          ...(step.note === undefined ? {} : { note: step.note }),
         }))
   const done = steps.filter((step) => step.status === 'done').length
   const progress = steps.length === 0 ? 0 : Math.round((done / steps.length) * 100)
@@ -1412,6 +1415,7 @@ function LearningFlowPage(props: {
                   <span className="step-number">{index + 1}</span>
                   <strong>{step.label}</strong>
                   <span>{step.minutes > 0 ? `${step.minutes} 分钟` : statusWord(step.status)}</span>
+                  {step.note !== undefined && <span className="hint">{step.note}</span>}
                 </li>
               ))
             )}

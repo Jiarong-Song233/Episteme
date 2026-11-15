@@ -8,6 +8,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
+      // Linked worktrees carry their own tsconfigs and build output; the main checkout does not own them.
+      '**/.claude/worktrees/**',
       '**/*.tsbuildinfo',
       // The desktop program's Rust build output and the bundle it carries.
       'apps/desktop/src-tauri/target/**',

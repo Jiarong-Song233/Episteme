@@ -91,6 +91,10 @@ const candidateLabel = (candidate: PendingCandidate): string => {
   if (candidate.link !== undefined) {
     return `${candidate.link.fromLabel} → ${candidate.link.toLabel}`
   }
+  // A state change is about one understanding the person already holds: name it, the axis, and the level.
+  if (candidate.state !== undefined) {
+    return `${candidate.state.label}：把${candidate.state.dimension}记为${candidate.state.level}`
+  }
   return candidate.proposal.label ?? candidate.rationale
 }
 
@@ -1119,6 +1123,9 @@ function ReviewCenterPage(props: {
           )
           .slice(0, 4)
 
+  // A state proposal changes the state of a held understanding; it is never a new or rewritten node.
+  const isState = selected?.candidate.state !== undefined
+
   return (
     <div className="review-layout">
       <section className="vision-card review-queue">
@@ -1159,7 +1166,11 @@ function ReviewCenterPage(props: {
         ) : (
           <>
             <h3>{candidateLabel(selected.candidate)}</h3>
-            <p className="vision-rule">AI 只提出候选；只有你接受或修改后，它才会成为理解。</p>
+            <p className="vision-rule">
+              {isState
+                ? 'AI 只提出候选；只有你同意后，这条已有理解的状态才会改变，它的文字不变。'
+                : 'AI 只提出候选；只有你接受或修改后，它才会成为理解。'}
+            </p>
             <dl className="vision-facts">
               <dt>所属空间</dt>
               <dd>{selected.reading.space.name}</dd>
@@ -1180,7 +1191,7 @@ function ReviewCenterPage(props: {
                 <p className="hint">证据来自对话中的原话：{selected.candidate.origin.turn}</p>
               )}
             </section>
-            {editing && (
+            {!isState && editing && (
               <div className="vision-form">
                 <label>
                   修改后的理解
@@ -1201,7 +1212,7 @@ function ReviewCenterPage(props: {
                 </button>
               </div>
             )}
-            {merging && (
+            {!isState && merging && (
               <div className="vision-form">
                 <label>
                   合并到
@@ -1236,32 +1247,36 @@ function ReviewCenterPage(props: {
                 disabled={props.busy || selected.candidate.link?.ready === false}
                 onClick={accept}
               >
-                接受
+                {isState ? '同意' : '接受'}
               </button>
-              <button
-                type="button"
-                className="vision-button secondary"
-                disabled={props.busy || selected.candidate.link !== undefined}
-                onClick={() => setEditing((open) => !open)}
-              >
-                需要修改
-              </button>
+              {!isState && (
+                <button
+                  type="button"
+                  className="vision-button secondary"
+                  disabled={props.busy || selected.candidate.link !== undefined}
+                  onClick={() => setEditing((open) => !open)}
+                >
+                  需要修改
+                </button>
+              )}
               <button
                 type="button"
                 className="vision-button secondary"
                 disabled={props.busy}
                 onClick={dismiss}
               >
-                暂不纳入
+                {isState ? '不同意' : '暂不纳入'}
               </button>
-              <button
-                type="button"
-                className="vision-button secondary"
-                disabled={props.busy || targets.length === 0}
-                onClick={() => setMerging((open) => !open)}
-              >
-                合并到已有节点
-              </button>
+              {!isState && (
+                <button
+                  type="button"
+                  className="vision-button secondary"
+                  disabled={props.busy || targets.length === 0}
+                  onClick={() => setMerging((open) => !open)}
+                >
+                  合并到已有节点
+                </button>
+              )}
             </div>
           </>
         )}
@@ -1274,31 +1289,47 @@ function ReviewCenterPage(props: {
         ) : (
           <>
             <p>
-              接受后会把“{candidateLabel(selected.candidate)}”写入 {selected.reading.space.name}
-              的理解网络。
+              {isState
+                ? `接受后会改变「${selected.candidate.state?.label ?? ''}」这条已有理解的状态：${selected.candidate.state?.dimension ?? ''}记为${selected.candidate.state?.level ?? ''}。它的文字不变，也不会新增节点。`
+                : `接受后会把“${candidateLabel(selected.candidate)}”写入 ${selected.reading.space.name} 的理解网络。`}
             </p>
-            <div className="impact-map">
-              <span className="impact-center">{candidateLabel(selected.candidate)}</span>
-              {related.map((node) => (
-                <span key={node.nodeId} className="impact-node">
-                  {node.label}
-                </span>
-              ))}
-            </div>
+            {!isState && (
+              <div className="impact-map">
+                <span className="impact-center">{candidateLabel(selected.candidate)}</span>
+                {related.map((node) => (
+                  <span key={node.nodeId} className="impact-node">
+                    {node.label}
+                  </span>
+                ))}
+              </div>
+            )}
             <h3>可能带来的价值</h3>
             <ul className="vision-plain-list">
-              <li>保留候选的原话、理由和来源证据。</li>
-              <li>让后续学习流程可以复用这条已确认理解。</li>
+              {isState ? (
+                <>
+                  <li>把证据支持的怀疑记到你已经确认过的理解上。</li>
+                  <li>由你决定前，这条理解保持原样。</li>
+                </>
+              ) : (
+                <>
+                  <li>保留候选的原话、理由和来源证据。</li>
+                  <li>让后续学习流程可以复用这条已确认理解。</li>
+                </>
+              )}
             </ul>
-            <h3>相关现有节点（可合并）</h3>
-            {targets.length === 0 ? (
-              <p className="hint">当前空间还没有可合并的已确认节点。</p>
-            ) : (
-              <ul className="vision-plain-list">
-                {targets.slice(0, 4).map((node) => (
-                  <li key={node.nodeId}>{node.label}</li>
-                ))}
-              </ul>
+            {!isState && (
+              <>
+                <h3>相关现有节点（可合并）</h3>
+                {targets.length === 0 ? (
+                  <p className="hint">当前空间还没有可合并的已确认节点。</p>
+                ) : (
+                  <ul className="vision-plain-list">
+                    {targets.slice(0, 4).map((node) => (
+                      <li key={node.nodeId}>{node.label}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </>
         )}

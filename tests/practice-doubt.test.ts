@@ -95,7 +95,7 @@ interface Reply {
 }
 
 /** A space with notes, and something the person holds in it that came from a candidate they accepted. */
-async function aSpace(): Promise<{ space: string; node: string }> {
+async function aSpace(label = HELD): Promise<{ space: string; scope: string; node: string }> {
   const { space } = await ok<{ space: { id: string; scope: string } }>('learn_space_open', {
     submission: `sub-${++counter}`,
     name: '机器学习',
@@ -108,7 +108,7 @@ async function aSpace(): Promise<{ space: string; node: string }> {
   expect(added.status).toBe(200)
   const { suggestion } = await ok<{ suggestion: { id: string } }>('propose', {
     kind: 'claim',
-    label: HELD,
+    label,
     rationale: '学习者自己这样说',
     scope: space.scope,
   })
@@ -116,8 +116,8 @@ async function aSpace(): Promise<{ space: string; node: string }> {
     200,
   )
   const [node] = (await understanding(space.id)).nodes
-  expect(node?.label).toBe(HELD)
-  return { space: space.id, node: node?.nodeId ?? '' }
+  expect(node?.label).toBe(label)
+  return { space: space.id, scope: space.scope, node: node?.nodeId ?? '' }
 }
 
 /** One short plan on the page, up to its question, answered with the option given. */
@@ -241,5 +241,62 @@ describe('tying an understanding to an objective', () => {
     ])
     const unknownNode = await link(space, objective?.id ?? '', 'node_nothing')
     expect([unknownNode.status, unknownNode.body.code]).toEqual([422, 'unknown_node'])
+  })
+})
+
+describe('a later plan', () => {
+  /** Worded like the focus, so a plan counts the focus as already understood. */
+  const LIKE_FOCUS = '位置编码把词的顺序告诉模型'
+
+  const checks = async (space: string): Promise<readonly string[]> => {
+    const { plan } = (
+      await rest<Reply>(`${SCENE}/plans`, {
+        space,
+        topic: '位置编码',
+        minutes: 15,
+        workflow: 'speedrun',
+      })
+    ).body
+    return plan.steps.filter((step) => step.block === 'check').map((step) => step.status)
+  }
+
+  /** The person records a conflict level on what they hold, the way accepting a doubt does. */
+  async function record(at: { scope: string; node: string }, level: string): Promise<void> {
+    const { suggestion } = await ok<{ suggestion: { id: string } }>('propose', {
+      kind: 'state',
+      target: at.node,
+      dimension: 'conflict',
+      level,
+      rationale: '练习里没答对',
+      scope: at.scope,
+    })
+    const decided = await rest('/suggestions/decide', { id: suggestion.id, action: 'accept' })
+    expect(decided.status).toBe(200)
+  }
+
+  it('comes back to a focus the person has put under doubt, and skips it again once resolved', async () => {
+    const at = await aSpace(LIKE_FOCUS)
+    expect(await checks(at.space)).toEqual(['skipped'])
+
+    await record(at, 'suspected')
+    expect(await checks(at.space)).toEqual(['pending'])
+    await record(at, 'open')
+    expect(await checks(at.space)).toEqual(['pending'])
+
+    await record(at, 'resolved')
+    expect(await checks(at.space)).toEqual(['skipped'])
+  })
+
+  it('still skips while a doubt only waits for the person', async () => {
+    const at = await aSpace(LIKE_FOCUS)
+    await ok('propose', {
+      kind: 'state',
+      target: at.node,
+      dimension: 'conflict',
+      level: 'suspected',
+      rationale: '练习里没答对',
+      scope: at.scope,
+    })
+    expect(await checks(at.space)).toEqual(['skipped'])
   })
 })

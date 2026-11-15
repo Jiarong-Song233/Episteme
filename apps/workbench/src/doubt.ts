@@ -4,8 +4,19 @@ import { scopeOf } from './requests.js'
 
 /** The state an attempt that fell short puts to the person: something they hold may not stand. */
 const DOUBT = { dimension: 'conflict', level: 'suspected' } as const
-/** Already under doubt, or already worked through: a new proposal would only ask again. */
-const DOUBT_SETTLED = new Set(['suspected', 'open'])
+/** Under doubt, as the person themself recorded: a new proposal would only ask again. */
+const DOUBT_SETTLED: ReadonlySet<string> = new Set(['suspected', 'open'])
+
+/**
+ * Whether the person has put this understanding under doubt. A doubt they worked through (`resolved`) is not one: what
+ * they hold stands again.
+ */
+export const isDoubted = (node: {
+  readonly understanding: readonly { readonly id: string; readonly level: string }[]
+}): boolean =>
+  node.understanding.some(
+    (dimension) => dimension.id === DOUBT.dimension && DOUBT_SETTLED.has(dimension.level),
+  )
 
 /** Who judged the answer, said to the person, since only the agent's judgement carries its own reason. */
 const JUDGED_BY: Readonly<Record<string, string>> = {

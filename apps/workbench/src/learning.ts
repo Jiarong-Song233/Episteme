@@ -27,7 +27,7 @@ import {
 } from './practice.js'
 import { ANSWER_PREFIX, openSpaceOf, refuse, required, scopeOf, spaceOf, text } from './requests.js'
 import { heldNodes, REQUESTED_BY, stillHeld } from './understanding.js'
-import { proposeDoubt } from './doubt.js'
+import { isDoubted, proposeDoubt } from './doubt.js'
 import { fromPractice } from './evidence.js'
 import { coverage } from './tokens.js'
 
@@ -189,8 +189,11 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
       focusCount(workflow, minutes),
     )
     const scope = scopeOf(space.id)
-    // What was revised away or withdrawn is not something the person holds, so a plan does not skip it.
-    const understood = stillHeld(heldNodes(view, space.id)).map((node) => node.label)
+    // What was revised away or withdrawn is not something the person holds, so a plan does not skip it. Nor does it
+    // skip what they hold but have put under doubt: that is the focus they most need to come back to.
+    const understood = stillHeld(heldNodes(view, space.id))
+      .filter((node) => !isDoubted(node))
+      .map((node) => node.label)
     const thread = await writes.openThread({ title: `学习：${topic}`.slice(0, 80), scope })
     const plan: Plan = {
       id: `pl_${randomUUID()}`,

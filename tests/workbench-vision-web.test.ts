@@ -262,6 +262,10 @@ describe('the published workbench in a browser', () => {
         `(kind) => document.querySelector('.vision-shell')?.getAttribute('data-page') === kind`,
         view.kind,
       )
+      await page.waitForFunction(
+        `(label) => document.querySelector('.vision-nav-link[aria-current="page"]')?.getAttribute('aria-label') === label`,
+        view.label,
+      )
       expect(
         await page.locator('.vision-nav-link[aria-current="page"]').getAttribute('aria-label'),
       ).toBe(view.label)
@@ -359,6 +363,59 @@ describe('the published workbench in a browser', () => {
     expect(seeded.pendingLabel).not.toBe('')
     expect(seeded.plan).not.toBe('')
   }, 180_000)
+
+  it('refuses an unknown addressed space without exposing another space to writes', async () => {
+    const { space } = await seed(service)
+    const before = await stateOf(service, space.id)
+    for (const kind of ['learning-flow', 'client', 'review-center']) {
+      await page.goto(`${service.workspaceUrl ?? ''}#/${kind}/missing-space`)
+      await page.getByRole('alert').filter({ hasText: '找不到这个地址里的空间' }).waitFor()
+      expect(await page.getByRole('button', { name: '保存为可复用的理解节点' }).count()).toBe(0)
+      expect(await page.getByRole('button', { name: '导入为待确认理解' }).count()).toBe(0)
+      expect(await page.getByRole('button', { name: '接受', exact: true }).count()).toBe(0)
+    }
+    expect(await stateOf(service, space.id)).toEqual(before)
+    await page.getByRole('link', { name: '返回学习空间' }).click()
+    await page.getByRole('heading', { name: '学习空间', exact: true }).first().waitFor()
+  })
+
+  it.each([180, 400])(
+    'preserves candidate words when merging into a %i-character node',
+    async (length) => {
+      const { space, pendingLabel } = await seed(service)
+      const label = '原'.repeat(length)
+      const created = await call<{ node: { nodeId: string } }>(service, '/nodes', {
+        label,
+        kind: 'claim',
+        scope: `workbench:${space.id}`,
+      })
+      const before = await stateOf(service, space.id)
+      await page.goto(`${service.workspaceUrl ?? ''}#/review-center/${space.id}`)
+      await page.getByRole('button', { name: '合并到已有节点', exact: true }).click()
+      await page.getByLabel('选择已有节点').selectOption(created.body.node.nodeId)
+      const combined = `${label}；${pendingLabel}`
+      expect(await page.getByLabel('合并后的理解').textContent()).toBe(combined)
+      if (length === 400) {
+        const refused = page.waitForResponse((response) =>
+          response.url().endsWith('/understanding/revise'),
+        )
+        await page.getByRole('button', { name: '确认合并', exact: true }).click()
+        const response = await refused
+        expect(response.ok()).toBe(false)
+        await page.getByRole('alert').waitFor()
+        expect(await stateOf(service, space.id)).toEqual(before)
+        const expected = `${response.status()} ${response.url()}`
+        expect(badResponses).toEqual([expected])
+        badResponses.splice(0, 1)
+      } else {
+        await page.getByRole('button', { name: '确认合并', exact: true }).click()
+        await page.getByText('AI 提出的候选会出现在这里，等待你的决定。').waitFor()
+        const after = await stateOf(service, space.id)
+        expect(after.nodes.some((node) => node.label === combined)).toBe(true)
+        expect(after.pending).toHaveLength(0)
+      }
+    },
+  )
 
   it('keeps local agents, transcript import and the shared graph on the client page', async () => {
     const seeded = await seed(service)

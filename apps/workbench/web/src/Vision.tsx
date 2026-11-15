@@ -263,7 +263,10 @@ export function VisionDesk(props: VisionDeskProps) {
 
   const readings = data?.readings ?? []
   const current =
-    readings.find((reading) => reading.space.id === props.spaceId) ?? readings[0] ?? undefined
+    props.spaceId === undefined
+      ? readings[0]
+      : readings.find((reading) => reading.space.id === props.spaceId)
+  const lostSpace = props.spaceId !== undefined && current === undefined
   const currentSpaceId = current?.space.id ?? props.spaceId
   const pending = readings.reduce(
     (count, reading) => count + reading.understanding.pending.length,
@@ -299,6 +302,11 @@ export function VisionDesk(props: VisionDeskProps) {
     data === undefined ? (
       <section className="vision-card vision-loading" role="status">
         正在读取真实图谱状态…
+      </section>
+    ) : lostSpace ? (
+      <section className="vision-card" role="alert">
+        <p>找不到这个地址里的空间，它可能已被删除，或者你没有权限查看。</p>
+        <a href={visionHref('learning-spaces')}>返回学习空间</a>
       </section>
     ) : (
       <>
@@ -1040,6 +1048,10 @@ function ReviewCenterPage(props: {
   const targets =
     selected === undefined ? [] : selected.reading.understanding.nodes.filter((node) => held(node))
   const target = targets.find((node) => node.nodeId === targetId) ?? targets[0]
+  const combined =
+    target === undefined || selected === undefined
+      ? ''
+      : `${target.label}；${candidateLabel(selected.candidate)}`
 
   useEffect(() => {
     if (selected !== undefined) setLabel(candidateLabel(selected.candidate))
@@ -1081,13 +1093,11 @@ function ReviewCenterPage(props: {
   const merge = (): void => {
     if (selected === undefined || target === undefined) return
     const { candidate, reading } = selected
-    const candidateWords = candidateLabel(candidate)
-    const combined = `${target.label}；${candidateWords}`.slice(0, 180)
     props.run(async () => {
       const revised = await api.revise(
         reading.space.id,
         target.nodeId,
-        combined === target.label ? `${combined}（候选合并）` : combined,
+        combined,
         `合并候选理解：${candidate.rationale}`.slice(0, 200),
       )
       for (const suggestion of revised.suggestions) await api.accept(suggestion.id)
@@ -1207,6 +1217,8 @@ function ReviewCenterPage(props: {
                     ))}
                   </select>
                 </label>
+                <p>合并后的理解：</p>
+                <blockquote aria-label="合并后的理解">{combined}</blockquote>
                 <button
                   type="button"
                   className="vision-button"

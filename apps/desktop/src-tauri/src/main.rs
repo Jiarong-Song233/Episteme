@@ -222,7 +222,9 @@ fn main() {
                 };
                 match outcome {
                     Ok(()) => {
-                        let address = Url::parse(&format!("http://127.0.0.1:{PORT}/"))
+                        // The desktop program opens the published client page; its first-level navigation
+                        // reaches the workbench, network, review and learning views.
+                        let address = Url::parse(&format!("http://127.0.0.1:{PORT}/#/client"))
                             .expect("a fixed address parses");
                         let _ = window.navigate(address);
                     }

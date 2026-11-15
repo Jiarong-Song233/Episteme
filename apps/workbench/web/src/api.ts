@@ -87,6 +87,14 @@ export interface PendingCandidate {
   readonly rationale: string
   readonly basis?: string
   readonly wordsBy?: WordsBy
+  /** Where the proposal was proposed, and the words it was distilled from. */
+  readonly proposedBy?: string
+  readonly proposedAt?: number | string
+  readonly origin?: {
+    readonly excerpt?: string
+    readonly turn?: string
+    readonly speaker?: string
+  }
   /** A pending relation in words. It can be accepted only once both its ends are confirmed. */
   /** Another wording, held or waiting, that says nearly the same. */
   readonly similar?: string
@@ -437,6 +445,9 @@ function base64Of(file: File): Promise<string> {
 
 export const api = {
   me: () => request<Me>('/me'),
+  /** An agent's own transcript becomes scoped candidate understanding, waiting for the person's review. */
+  distillTranscript: (space: string, title: string, text: string) =>
+    request<Offered>('/distill', { title, text, scope: `workbench:${space}` }),
   async signIn(token: string): Promise<void> {
     try {
       await request('/session', { token })
@@ -661,5 +672,12 @@ export const api = {
       id: candidate.id,
       action: 'modify',
       proposal: { ...candidate.proposal, label },
+    }),
+  /** A person's own reusable understanding, written through the API's person-only node route. */
+  saveUnderstanding: (space: string, label: string) =>
+    request<{ node: { readonly nodeId: string; readonly label: string } }>('/nodes', {
+      label,
+      kind: 'claim',
+      scope: `workbench:${space}`,
     }),
 }

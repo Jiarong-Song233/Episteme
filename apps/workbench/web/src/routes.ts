@@ -6,6 +6,38 @@ import { useRoute } from 'wouter'
  * address holds ids only: the words of a citation travel in the history entry instead.
  */
 
+/** The first-level destinations shown beside every page of the published workbench. */
+export type VisionKind =
+  | 'desk'
+  | 'learning-spaces'
+  | 'network'
+  | 'review-center'
+  | 'learning-flow'
+  | 'shared-outcomes'
+  | 'my-materials'
+  | 'client'
+
+export type VisionPlace =
+  | { readonly kind: 'desk'; readonly space?: string }
+  | { readonly kind: 'learning-spaces'; readonly space?: string }
+  | { readonly kind: 'network'; readonly space?: string; readonly node?: string }
+  | { readonly kind: 'review-center'; readonly space?: string }
+  | { readonly kind: 'learning-flow'; readonly space?: string; readonly plan?: string }
+  | { readonly kind: 'shared-outcomes'; readonly space?: string }
+  | { readonly kind: 'my-materials'; readonly space?: string }
+  | { readonly kind: 'client'; readonly space?: string }
+
+export const VISION_KINDS: readonly VisionKind[] = [
+  'desk',
+  'learning-spaces',
+  'network',
+  'review-center',
+  'learning-flow',
+  'shared-outcomes',
+  'my-materials',
+  'client',
+]
+
 export type Place =
   | { readonly kind: 'home' }
   | { readonly kind: 'commons'; readonly publication?: string }
@@ -30,6 +62,11 @@ export type Place =
   | { readonly kind: 'new'; readonly space: string }
   | { readonly kind: 'thread'; readonly space: string; readonly thread: string }
   | { readonly kind: 'plan'; readonly space: string; readonly plan: string }
+  | VisionPlace
+
+export function isVisionPlace(place: Place): place is VisionPlace {
+  return VISION_KINDS.some((kind) => kind === place.kind)
+}
 
 /** The page a place belongs to, for the space's own navigation. */
 export type Section = 'overview' | 'materials' | 'review' | 'understanding' | 'learning'
@@ -59,6 +96,9 @@ export interface Panel {
   readonly turn?: string
 }
 
+const optional = (value: string | undefined): string | undefined =>
+  value === undefined || value === '' ? undefined : value
+
 export function usePlace(): Place {
   const [connect] = useRoute('/connect')
   const [modelPage] = useRoute('/model')
@@ -66,6 +106,14 @@ export function usePlace(): Place {
   const [unfiled] = useRoute('/unfiled')
   const [, agentSessions] = useRoute('/agent-sessions/:agent?/:session?')
   const [, commons] = useRoute('/commons/:publication?')
+  const [, desk] = useRoute('/desk/:space?')
+  const [, learningSpaces] = useRoute('/learning-spaces/:space?')
+  const [, network] = useRoute('/network/:space?/:node?')
+  const [, reviewCenter] = useRoute('/review-center/:space?')
+  const [, learningFlow] = useRoute('/learning-flow/:space?/:plan?')
+  const [, sharedOutcomes] = useRoute('/shared-outcomes/:space?')
+  const [, myMaterials] = useRoute('/my-materials/:space?')
+  const [, client] = useRoute('/client/:space?')
   const [, thread] = useRoute('/spaces/:space/threads/:thread')
   const [, plan] = useRoute('/spaces/:space/plans/:plan')
   const [, fresh] = useRoute('/spaces/:space/new')
@@ -73,6 +121,45 @@ export function usePlace(): Place {
   const [, review] = useRoute('/spaces/:space/review')
   const [, understanding] = useRoute('/spaces/:space/understanding/:node?')
   const [, space] = useRoute('/spaces/:space')
+  if (desk !== null)
+    return { kind: 'desk', ...(optional(desk.space) === undefined ? {} : { space: desk.space }) }
+  if (learningSpaces !== null)
+    return {
+      kind: 'learning-spaces',
+      ...(optional(learningSpaces.space) === undefined ? {} : { space: learningSpaces.space }),
+    }
+  if (network !== null)
+    return {
+      kind: 'network',
+      ...(optional(network.space) === undefined ? {} : { space: network.space }),
+      ...(optional(network.node) === undefined ? {} : { node: network.node }),
+    }
+  if (reviewCenter !== null)
+    return {
+      kind: 'review-center',
+      ...(optional(reviewCenter.space) === undefined ? {} : { space: reviewCenter.space }),
+    }
+  if (learningFlow !== null)
+    return {
+      kind: 'learning-flow',
+      ...(optional(learningFlow.space) === undefined ? {} : { space: learningFlow.space }),
+      ...(optional(learningFlow.plan) === undefined ? {} : { plan: learningFlow.plan }),
+    }
+  if (sharedOutcomes !== null)
+    return {
+      kind: 'shared-outcomes',
+      ...(optional(sharedOutcomes.space) === undefined ? {} : { space: sharedOutcomes.space }),
+    }
+  if (myMaterials !== null)
+    return {
+      kind: 'my-materials',
+      ...(optional(myMaterials.space) === undefined ? {} : { space: myMaterials.space }),
+    }
+  if (client !== null)
+    return {
+      kind: 'client',
+      ...(optional(client.space) === undefined ? {} : { space: client.space }),
+    }
   if (connect) return { kind: 'connect' }
   if (modelPage) return { kind: 'model' }
   if (conversations) return { kind: 'conversations' }
@@ -102,6 +189,20 @@ export function usePlace(): Place {
   }
   if (space !== null) return { kind: 'space', space: space.space }
   return { kind: 'home' }
+}
+
+function visionPath(kind: VisionKind, space?: string, extra?: string): string {
+  const part = encodeURIComponent
+  return [
+    `/${kind}`,
+    ...(space === undefined ? [] : [`/${part(space)}`]),
+    ...(extra === undefined ? [] : [`/${part(extra)}`]),
+  ].join('')
+}
+
+/** A direct hash link for the first-level navigation, with the space it should read. */
+export function visionHref(kind: VisionKind, space?: string, extra?: string): string {
+  return `#${visionPath(kind, space, extra)}`
 }
 
 function pathOf(place: Place): string {
@@ -141,6 +242,22 @@ function pathOf(place: Place): string {
       return `/spaces/${part(place.space)}/threads/${part(place.thread)}`
     case 'plan':
       return `/spaces/${part(place.space)}/plans/${part(place.plan)}`
+    case 'desk':
+      return visionPath('desk', place.space)
+    case 'learning-spaces':
+      return visionPath('learning-spaces', place.space)
+    case 'network':
+      return visionPath('network', place.space, place.node)
+    case 'review-center':
+      return visionPath('review-center', place.space)
+    case 'learning-flow':
+      return visionPath('learning-flow', place.space, place.plan)
+    case 'shared-outcomes':
+      return visionPath('shared-outcomes', place.space)
+    case 'my-materials':
+      return visionPath('my-materials', place.space)
+    case 'client':
+      return visionPath('client', place.space)
   }
 }
 
@@ -167,13 +284,14 @@ export function panelOf(search: string): Panel {
  * still land where they meant to.
  */
 export function olderPlace(place: Place, search: string): Place | undefined {
-  if (!('space' in place)) return undefined
+  const named = 'space' in place ? place.space : undefined
+  if (typeof named !== 'string') return undefined
   const query = new URLSearchParams(search)
   const node = query.get('node')
-  if (node !== null) return { kind: 'understanding', space: place.space, node }
+  if (node !== null) return { kind: 'understanding', space: named, node }
   const side = query.get('side')
-  if (side === 'pending') return { kind: 'review', space: place.space }
-  if (side === 'understood') return { kind: 'understanding', space: place.space }
+  if (side === 'pending') return { kind: 'review', space: named }
+  if (side === 'understood') return { kind: 'understanding', space: named }
   return undefined
 }
 

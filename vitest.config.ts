@@ -10,6 +10,10 @@ export default defineConfig({
     // Tests that open a real graph take about 1.5s, but reached 6.75s on a slow Windows runner and failed main's CI at
     // the default 5s. This only moves where a hung test gets cut off.
     testTimeout: 20_000,
+    // Browser suites tear down several Edge processes under load; closing them is slower than the default
+    // ten-second hook limit on Windows. Raising the cutoff does not change any test or assertion.
+    hookTimeout: 60_000,
+    teardownTimeout: 60_000,
     poolOptions: {
       forks: {
         minForks: 1,

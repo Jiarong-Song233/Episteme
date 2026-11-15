@@ -40,7 +40,9 @@ import { PlanShelf, PlanView } from './Learning.js'
 import { MaterialsPage } from './Materials.js'
 import { Outcomes } from './Outcomes.js'
 import {
+  VISION_KINDS,
   hrefOf,
+  isVisionPlace,
   olderPlace,
   opensSide,
   panelOf,
@@ -52,6 +54,7 @@ import {
 } from './routes.js'
 import { AgentTurn, LearnerTurn, Links, messageOf } from './Turns.js'
 import { UnderstandingPanel, wordsOf } from './Understanding.js'
+import { VisionDesk } from './Vision.js'
 
 type Pane = 'shelf' | 'talk' | 'side' | 'rail'
 
@@ -96,6 +99,7 @@ function keepRail(open: boolean): void {
 
 /** Pages that are the understanding layer already, or that belong to no space, have no rail beside them. */
 const WITHOUT_RAIL: ReadonlySet<Place['kind']> = new Set([
+  ...VISION_KINDS,
   'review',
   'understanding',
   'connect',
@@ -238,7 +242,8 @@ function Desk({
 
   /** The space on show. Public results have no space of their own, so the last one stays beside them. */
   const [heldSpace, setHeldSpace] = useState<string | undefined>(remembered() ?? undefined)
-  const spaceId = 'space' in place ? place.space : heldSpace
+  const namedSpace = 'space' in place ? place.space : undefined
+  const spaceId = typeof namedSpace === 'string' ? namedSpace : heldSpace
   const threadId = place.kind === 'thread' ? place.thread : undefined
   const planId = place.kind === 'plan' ? place.plan : undefined
   const commons = place.kind === 'commons'
@@ -283,7 +288,7 @@ function Desk({
   const threadInView = planId === undefined ? threadId : planInView?.thread
   const planLoaded = loadedFor === spaceId
   /** An address can name a space that is gone, or one this person cannot see. */
-  const lostSpace = listed && 'space' in place && !spaceKnown
+  const lostSpace = listed && typeof namedSpace === 'string' && !spaceKnown
   /** Nothing here yet: the first visit, on the home address. */
   const welcoming = listed && spaces.length === 0 && place.kind === 'home'
 
@@ -351,7 +356,7 @@ function Desk({
   }, [guard])
 
   // An address without a space falls back on the last one still open, or the first.
-  const addressedSpace = 'space' in place ? place.space : undefined
+  const addressedSpace = namedSpace
   const needsSpace =
     place.kind === 'home' ||
     place.kind === 'commons' ||
@@ -359,7 +364,8 @@ function Desk({
     place.kind === 'model' ||
     place.kind === 'conversations' ||
     place.kind === 'unfiled' ||
-    place.kind === 'agent-sessions'
+    place.kind === 'agent-sessions' ||
+    isVisionPlace(place)
   useEffect(() => {
     if (addressedSpace !== undefined) {
       setHeldSpace(addressedSpace)
@@ -653,20 +659,40 @@ function Desk({
     plan: planInView?.topic,
   })
 
+  const links = {
+    nodes: understanding.nodes,
+    focused: focusedTurn,
+    openNode,
+    nameOf,
+    refreshNames,
+    openPublication,
+    sharing: me.sharing,
+    offer: offerTurn,
+    fork: canFork ? forkAt : undefined,
+  }
+  if (isVisionPlace(place)) {
+    return (
+      <Links.Provider value={links}>
+        <VisionDesk
+          me={me}
+          place={place}
+          spaces={spaces}
+          listed={listed}
+          spaceId={spaceId}
+          workflows={library.workflows}
+          blocks={library.blocks}
+          model={model}
+          notice={notice}
+          guard={guard}
+          onChanged={decided}
+          onSpaces={setSpaces}
+        />
+      </Links.Provider>
+    )
+  }
+
   return (
-    <Links.Provider
-      value={{
-        nodes: understanding.nodes,
-        focused: focusedTurn,
-        openNode,
-        nameOf,
-        refreshNames,
-        openPublication,
-        sharing: me.sharing,
-        offer: offerTurn,
-        fork: canFork ? forkAt : undefined,
-      }}
-    >
+    <Links.Provider value={links}>
       <div
         className="desk"
         data-pane={pane}
@@ -1670,6 +1696,14 @@ function Conversation(props: {
 }
 
 const PAGE_NAMES: Partial<Record<Place['kind'], string>> = {
+  desk: '工作台',
+  'learning-spaces': '学习空间',
+  network: '知识网络',
+  'review-center': '审阅中心',
+  'learning-flow': '学习流程',
+  'shared-outcomes': '共享成果',
+  'my-materials': '我的资料',
+  client: '客户端',
   space: '概览',
   materials: '材料',
   review: '待确认',

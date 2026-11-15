@@ -12,6 +12,7 @@ import {
   type Space,
 } from '@episteme/workbench'
 import { chromium, type Browser, type Page } from 'playwright-core'
+import { mcpWire } from './mcp-wire.js'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 /** The published first-level pages, driven from a seeded graph and the service's built page. */
@@ -153,6 +154,112 @@ async function seed(service: EpistemeService): Promise<Seed> {
     workflow: 'speedrun',
   })
   return { space, pendingLabel: second.label, plan: planned.body.plan.id }
+}
+
+interface DetailedNode {
+  readonly nodeId: string
+  readonly label: string
+  readonly understanding: readonly { readonly id: string; readonly level: string }[]
+}
+
+interface Plan {
+  readonly id: string
+  readonly version: number
+  readonly steps: readonly { readonly id: string; readonly objective: string }[]
+}
+
+const conflictOf = async (
+  service: EpistemeService,
+  space: string,
+  label: string,
+): Promise<string | undefined> => {
+  const state = await call<{ nodes: readonly DetailedNode[] }>(
+    service,
+    `${scene}/understanding?space=${space}`,
+  )
+  return state.body.nodes
+    .find((node) => node.label === label)
+    ?.understanding.find((entry) => entry.id === 'conflict')?.level
+}
+
+const HELD_DOUBT = '校验和不对时必须停止恢复'
+
+/** A space where the person holds a claim, then a wrong attempt leaves a pending "conflict: suspected" doubt. */
+async function seedDoubt(
+  service: EpistemeService,
+): Promise<{ space: { id: string }; held: string }> {
+  const host = mcpWire(() => service.mcpUrl, { name: 'Claude Code', version: '1' })
+  let n = 0
+  const made = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
+    const result = await host.call(name, { submission: `s-${++n}`, ...args })
+    if (result.isError === true) throw new Error(`${name}: ${JSON.stringify(result)}`)
+    return result.structuredContent as T
+  }
+  const plain = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
+    const result = await host.call(name, args)
+    if (result.isError === true) throw new Error(`${name}: ${JSON.stringify(result)}`)
+    return result.structuredContent as T
+  }
+  const { space } = await made<{ space: { id: string; scope: string } }>('learn_space_open', {
+    name: '冲突回归',
+  })
+  const { thread } = await plain<{ thread: { id: string } }>('thread_open', {
+    title: '第一天',
+    scope: space.scope,
+  })
+  const started = await made<{ plan: Plan }>('learn_plan_start', {
+    space: space.id,
+    topic: '崩溃恢复',
+    thread: thread.id,
+    steps: [{ activity: 'retell', label: '校验失败时怎么办' }],
+  })
+  const { plan } = await made<{ plan: Plan }>('learn_step', {
+    plan: started.plan.id,
+    planVersion: started.plan.version,
+    step: started.plan.steps[0]?.id,
+    action: 'enter',
+  })
+  const objective = plan.steps[0]?.objective ?? ''
+  const { suggestion } = await plain<{ suggestion: { id: string } }>('propose', {
+    kind: 'claim',
+    label: HELD_DOUBT,
+    rationale: '本人这样说',
+    scope: space.scope,
+  })
+  await made('learn_observe', {
+    plan: plan.id,
+    planVersion: plan.version,
+    objective,
+    kind: 'candidate',
+    suggestion: suggestion.id,
+  })
+  await call(service, '/suggestions/decide', { id: suggestion.id, action: 'accept' })
+  const { turn } = await plain<{ turn: { id: string } }>('thread_append', {
+    thread: thread.id,
+    speaker: 'learner',
+    text: '校验和不对时跳过这条',
+  })
+  await made('learn_observe', {
+    plan: plan.id,
+    planVersion: plan.version,
+    objective,
+    kind: 'move',
+    activity: 'retell',
+    reason: '先让他自己说',
+  })
+  await made('learn_observe', {
+    plan: plan.id,
+    planVersion: plan.version,
+    objective,
+    kind: 'attempt',
+    thread: thread.id,
+    turn: turn.id,
+    quote: '校验和不对时跳过这条',
+    verdict: 'contradicts',
+    reason: '依据协议第三节',
+    diagnosis: '把校验失败当成可跳过',
+  })
+  return { space: { id: space.id }, held: HELD_DOUBT }
 }
 
 describe('the published workbench in a browser', () => {
@@ -463,5 +570,53 @@ describe('the published workbench in a browser', () => {
     await page.getByRole('link', { name: '审阅中心', exact: true }).click()
     await page.getByRole('heading', { name: '候选理解队列' }).waitFor()
     expect(await page.locator('.vision-candidate-list button').count()).toBeGreaterThan(0)
+  }, 180_000)
+
+  it('offers only agree or disagree for a state candidate, and agreeing changes only its target state', async () => {
+    const { space, held } = await seedDoubt(service)
+    const before = await stateOf(service, space.id)
+    expect(before.pending).toHaveLength(1)
+    expect(await conflictOf(service, space.id, held)).toBeUndefined()
+
+    await page.goto(`${service.workspaceUrl ?? ''}#/review-center/${space.id}`)
+    await page.getByRole('heading', { name: '候选理解队列' }).waitFor()
+    // The full wording: which understanding, which axis, which level.
+    await page.getByText(`${held}：把冲突记为疑似`, { exact: false }).first().waitFor()
+    // Only agree / disagree: no free-text change and no merge for a state proposal.
+    await page.getByRole('button', { name: '同意', exact: true }).waitFor()
+    await page.getByRole('button', { name: '不同意', exact: true }).waitFor()
+    expect(await page.getByRole('button', { name: '需要修改', exact: true }).count()).toBe(0)
+    expect(await page.getByRole('button', { name: '合并到已有节点', exact: true }).count()).toBe(0)
+    // The impact preview says it changes an existing understanding's state, not that it adds a node.
+    await page
+      .getByText(/改变「.+」这条已有理解的状态/)
+      .first()
+      .waitFor()
+
+    await page.getByRole('button', { name: '同意', exact: true }).click()
+    await page.waitForFunction(
+      `(count) => document.querySelectorAll('.vision-candidate-list button').length < count`,
+      before.pending.length,
+    )
+    const after = await stateOf(service, space.id)
+    expect(after.nodes.length).toBe(before.nodes.length)
+    expect(after.pending).toHaveLength(0)
+    expect(await conflictOf(service, space.id, held)).toBe('suspected')
+  }, 180_000)
+
+  it('leaves the target state unchanged when a state candidate is declined', async () => {
+    const { space, held } = await seedDoubt(service)
+    const before = await stateOf(service, space.id)
+    await page.goto(`${service.workspaceUrl ?? ''}#/review-center/${space.id}`)
+    await page.getByRole('heading', { name: '候选理解队列' }).waitFor()
+    await page.getByRole('button', { name: '不同意', exact: true }).click()
+    await page.waitForFunction(
+      `(count) => document.querySelectorAll('.vision-candidate-list button').length < count`,
+      before.pending.length,
+    )
+    const after = await stateOf(service, space.id)
+    expect(after.nodes.length).toBe(before.nodes.length)
+    expect(after.pending).toHaveLength(0)
+    expect(await conflictOf(service, space.id, held)).toBeUndefined()
   }, 180_000)
 })

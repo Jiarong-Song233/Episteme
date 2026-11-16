@@ -185,8 +185,10 @@ async function cmdAdd(pos, flags) {
 
 async function cmdNote(pos, flags) {
   const text = pos.join(' ').trim()
-  if (!text) fail('用法：ep note <内容> [--why 理由] [--scope 范围] [--json]')
-  const data = await call('/api/v1/scene/dev/notes', {
+  if (!text)
+    fail('用法：ep note <内容> [--why 理由] [--scope 范围] [--scene dev|discussion] [--json]')
+  const scene = typeof flags.scene === 'string' ? flags.scene : 'dev'
+  const data = await call(`/api/v1/scene/${scene}/notes`, {
     method: 'POST',
     body: {
       text,
@@ -201,7 +203,8 @@ async function cmdNote(pos, flags) {
 }
 
 async function cmdNotes(flags) {
-  const data = await call('/api/v1/scene/dev/notes')
+  const scene = typeof flags.scene === 'string' ? flags.scene : 'dev'
+  const data = await call(`/api/v1/scene/${scene}/notes`)
   if (flags.json) return emitJson(data)
   const notes = data.notes ?? []
   if (notes.length === 0) {
@@ -241,8 +244,8 @@ async function readStdin() {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-async function proposeOne(text, why, scope, flags, results) {
-  const data = await call('/api/v1/scene/dev/notes', {
+async function proposeOne(scene, text, why, scope, flags, results) {
+  const data = await call(`/api/v1/scene/${scene}/notes`, {
     method: 'POST',
     body: {
       text,
@@ -258,6 +261,7 @@ async function proposeOne(text, why, scope, flags, results) {
 
 async function cmdDistill(pos, flags) {
   const from = flags.from
+  const scene = typeof flags.scene === 'string' ? flags.scene : 'dev'
   const results = []
 
   if (from === '-') {
@@ -284,6 +288,7 @@ async function cmdDistill(pos, flags) {
         continue
       }
       await proposeOne(
+        scene,
         item.text.trim(),
         typeof item.why === 'string' ? item.why : undefined,
         typeof item.scope === 'string' ? item.scope : undefined,
@@ -323,7 +328,7 @@ async function cmdDistill(pos, flags) {
       else process.stdout.write(`[dry-run] 会提议：${subject}  （commit ${hash} by ${author}）\n`)
       continue
     }
-    await proposeOne(subject, `commit ${hash} by ${author}`, undefined, flags, results)
+    await proposeOne(scene, subject, `commit ${hash} by ${author}`, undefined, flags, results)
   }
   if (flags.json) emitJson({ proposed: results })
   else if (!flags['dry-run'])
@@ -338,11 +343,11 @@ function usage() {
       `  ep pending [--json]\n` +
       `  ep accept <id> [--json] / ep reject <id> [--json]\n` +
       `  ep add <内容> [--kind claim|concept] [--scope 范围] [--json]\n` +
-      `  ep note <内容> [--why 理由] [--scope 范围] [--json]\n` +
-      `  ep notes [--json]\n` +
+      `  ep note <内容> [--why 理由] [--scope 范围] [--scene dev|discussion] [--json]\n` +
+      `  ep notes [--scene dev|discussion] [--json]\n` +
       `  ep record <nodeId> --set 维度=级别 [--reason 原因] [--json]\n` +
-      `  ep distill --from git [-n N] [--dry-run] [--json]\n` +
-      `  ep distill --from - [--dry-run] [--json]   # stdin：[{"text":"…","why":"…"}]，给宿主模型用\n\n` +
+      `  ep distill --from git [-n N] [--dry-run] [--json] [--scene dev|discussion]\n` +
+      `  ep distill --from - [--dry-run] [--json] [--scene dev|discussion]   # stdin：[{"text":"…","why":"…"}]\n\n` +
       `令牌：\n` +
       `  EPISTEME_AGENT_TOKEN   读取、提议（agent 用）\n` +
       `  EPISTEME_HUMAN_TOKEN   确认、记录、直接写入（本人用；EPISTEME_TOKEN 视为它的旧名）\n` +

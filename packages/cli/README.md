@@ -34,13 +34,20 @@ ep distill --from git -n 5      # turn recent commits into proposed lessons
 | `ep pending [--json]` | proposals an agent (or `ep note`) made, waiting for you |
 | `ep accept <id>` / `ep reject <id>` | the person's decision on one proposal |
 | `ep add <text> [--kind claim\|concept] [--scope s]` | a node you state yourself |
-| `ep note <text> [--why s] [--scope s]` | propose a dev lesson (scene route `POST /scene/dev/notes`) |
-| `ep notes` | list dev notes and their validity |
+| `ep note <text> [--why s] [--scope s] [--scene dev\|discussion]` | propose a lesson/position (scene route `POST /scene/<scene>/notes`) |
+| `ep notes [--scene dev\|discussion]` | list notes/positions with their state |
 | `ep record <nodeId> --set dim=level [--reason s]` | record your state on a node |
-| `ep distill --from git [-n N] [--dry-run]` | propose lessons from recent commits |
-| `ep distill --from -` | propose lessons from a JSON array on stdin, for a host model (ADR 0011) |
+| `ep distill --from git [-n N] [--dry-run] [--scene s]` | propose lessons from recent commits |
+| `ep distill --from - [--scene s]` | propose from a JSON array on stdin, for a host model (ADR 0011) |
 
 Every command accepts `--json`, which prints the service's response unchanged for an agent to consume.
+
+## Scenes
+
+`--scene dev` (the default) records engineering lessons with a **validity** axis (untested → tested → in-prod →
+deprecated). `--scene discussion` records positions with an **agreement** axis (none → partial → full). Both
+propose through `/scene/<name>/notes` and confirm through the same decision path. Raw conversation stays a
+thread (ADR 0015), recorded through the service's `/threads` routes; a position distilled from it is a claim.
 
 ## Tokens
 

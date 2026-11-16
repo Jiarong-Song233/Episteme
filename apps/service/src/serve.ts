@@ -11,6 +11,7 @@ import { describeEmbeddings, EmbeddingSettingsError } from './embeddings.js'
 import { addPerson, addToken, revokeToken, type CredentialKind } from './identity.js'
 import { BLANK_TOPIC, defaultProfile, type SeedTopic } from './profile.js'
 import { devProfile } from './profiles/dev.js'
+import { discussionProfile } from './profiles/discussion.js'
 import { DEFAULT_GRAPH, startService, type EpistemeService } from './server.js'
 
 const DEFAULT_USERS = join(homedir(), '.episteme', 'users.json')
@@ -39,7 +40,7 @@ if (argv.includes('--help') || argv.includes('-h')) {
       `    -g, --graph <路径>      指定图谱文件，一个 SQLite 数据库（默认 ${DEFAULT_GRAPH}；--file / -f 等效）\n` +
       `    -p, --port <端口>       监听端口（默认 4321）\n` +
       `    -t, --topic <路径>      首次启动时载入你自己的主题文件，而不是内置的示例主题\n` +
-      `        --blank             从空图谱开始，什么都不载入\n        --scene <name>      选择内置场景 learn|dev（默认 learn）\n` +
+      `        --blank             从空图谱开始，什么都不载入\n        --scene <name>      选择内置场景 learn|dev|discussion（默认 learn）\n` +
       `    -w, --workspace <目录>  在 / 托管一个已构建的 Workspace\n` +
       `        --mode shared       共享部署：多人、走网络，放在 HTTPS 反向代理后面（ADR 0012）\n` +
       `        --users <路径>      用户文件（共享模式必需；默认 ${DEFAULT_USERS}）\n` +
@@ -208,7 +209,12 @@ try {
   service = await startService({
     graph,
     port,
-    profile: scene === 'dev' ? devProfile(topic ?? BLANK_TOPIC) : defaultProfile(topic),
+    profile:
+      scene === 'dev'
+        ? devProfile(topic ?? BLANK_TOPIC)
+        : scene === 'discussion'
+          ? discussionProfile(topic ?? BLANK_TOPIC)
+          : defaultProfile(topic),
     ...(workspacePath === undefined ? {} : { workspace: resolve(workspacePath) }),
     ...(host === undefined ? {} : { host }),
     sharing: argv.includes('--sharing'),

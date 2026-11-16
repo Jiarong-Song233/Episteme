@@ -44,6 +44,31 @@ export interface Attempt {
   readonly answeredAt?: number
 }
 
+/**
+ * The person saying a question was wrong: its answer key, its options, or what it asked. A model wrote the key, and
+ * nobody checked it, so the person's word decides whether the attempt counts. Kept apart from the attempt, which
+ * stays as it was answered; taking it back is another record with `disputed: false`.
+ */
+export interface Dispute {
+  readonly attempt: string
+  readonly disputed: boolean
+  readonly at: number
+}
+
+export const DISPUTE_PREFIX = 'dispute/'
+
+/** The attempts the person says not to count, as their latest word on each has it. */
+export function disputedAttempts(
+  records: readonly { readonly value: unknown }[],
+): ReadonlySet<string> {
+  return new Set(
+    records
+      .map((record) => record.value as Dispute)
+      .filter((dispute) => dispute.disputed)
+      .map((dispute) => dispute.attempt),
+  )
+}
+
 const SENTENCE = /[^。！？.!?\n]+[。！？.!?]?/g
 const WORDS = new Intl.Segmenter('zh', { granularity: 'word' })
 

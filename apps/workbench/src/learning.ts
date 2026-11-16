@@ -17,6 +17,8 @@ import {
 } from './plans.js'
 import {
   checkAnswer,
+  DISPUTE_PREFIX,
+  disputedAttempts,
   estimateFrom,
   FEEDBACK_INSTRUCTION,
   makeQuestion,
@@ -24,6 +26,7 @@ import {
   publicQuestion,
   reviewSuggestions,
   type Attempt,
+  type Dispute,
 } from './practice.js'
 import { ANSWER_PREFIX, openSpaceOf, refuse, required, scopeOf, spaceOf, text } from './requests.js'
 import { heldNodes, REQUESTED_BY, stillHeld } from './understanding.js'
@@ -125,6 +128,12 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
 
   const attemptsOf = (view: SceneView): readonly Attempt[] =>
     view.records.list(ATTEMPT_PREFIX).map((record) => record.value as Attempt)
+
+  /** The answered attempts that count: not the ones the person said were wrong questions. */
+  const countedOf = (view: SceneView, attempts: readonly Attempt[]): readonly Attempt[] => {
+    const disputed = disputedAttempts(view.records.list(DISPUTE_PREFIX))
+    return attempts.filter((attempt) => !disputed.has(attempt.id))
+  }
 
   async function proposeFocuses(
     store: MaterialStore,
@@ -277,8 +286,11 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
   const reportOf = (view: SceneView, plan: Plan): string => {
     const done = plan.steps.filter((step) => step.status === 'done')
     const skipped = plan.steps.filter((step) => step.status === 'skipped')
-    const attempts = attemptsOf(view).filter(
-      (attempt) => attempt.plan === plan.id && attempt.answeredAt !== undefined,
+    const attempts = countedOf(
+      view,
+      attemptsOf(view).filter(
+        (attempt) => attempt.plan === plan.id && attempt.answeredAt !== undefined,
+      ),
     )
     const checked = attempts.filter((attempt) => attempt.correct !== undefined)
     const open = attempts.filter(
@@ -593,9 +605,20 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
     route('GET', '/plan', ({ view, query }) => {
       const plan = planOf(view, required(query, 'id'))
       const turns = view.threadView(plan.thread)?.turns ?? []
+      const disputed = disputedAttempts(view.records.list(DISPUTE_PREFIX))
       return {
         plan,
         ...showing(view, plan),
+        // How each answered question came out, and whether the person said it was a wrong question.
+        attempts: attemptsOf(view)
+          .filter((attempt) => attempt.plan === plan.id && attempt.answeredAt !== undefined)
+          .map((attempt) => ({
+            id: attempt.id,
+            step: attempt.step,
+            ...(attempt.correct === undefined ? {} : { correct: attempt.correct }),
+            ...(attempt.estimate === undefined ? {} : { estimate: attempt.estimate }),
+            disputed: disputed.has(attempt.id),
+          })),
         turns: turns.map((turn) => {
           const answer = view.records.get(`${ANSWER_PREFIX}${turn.id}`)
           return answer === undefined ? turn : { ...turn, answer: answer.value as Answer }
@@ -604,6 +627,18 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
     }),
     route('POST', '/plans', propose),
     route('POST', '/plans/update', update),
+    // The person's word on a question a model wrote: theirs alone, so an agent's credential is refused
+    // (route-access.ts lists only proposing routes).
+    route('POST', '/practice/dispute', async ({ view, body }) => {
+      const id = text(body, 'attempt')
+      const attempt = view.records.get(`${ATTEMPT_PREFIX}${id}`)?.value as Attempt | undefined
+      if (attempt === undefined) refuse('unknown_attempt', '没有这道题。')
+      if (attempt.answeredAt === undefined) refuse('not_answered', '这道题还没有作答。')
+      const disputed = body['disputed'] !== false
+      const dispute: Dispute = { attempt: id, disputed, at: now() }
+      await view.records.put(`${DISPUTE_PREFIX}${id}`, dispute)
+      return { dispute }
+    }),
     route('POST', '/plans/act', async (context) => {
       const outcome = await act(context)
       return { ...outcome, ...showing(context.view, outcome.plan) }
@@ -616,9 +651,10 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
         .map((record) => record.value as Plan)
         .filter((plan) => plan.space === space.id)
       const ids = new Set(plans.map((plan) => plan.id))
-      const attempts = attemptsOf(view).filter(
+      const answered = attemptsOf(view).filter(
         (attempt) => ids.has(attempt.plan) && attempt.answeredAt !== undefined,
       )
+      const attempts = countedOf(view, answered)
       const checked = attempts.filter((attempt) => attempt.correct !== undefined)
       const count = (estimate: Attempt['estimate']): number =>
         attempts.filter((attempt) => attempt.estimate === estimate).length
@@ -642,6 +678,8 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
             (attempt) => attempt.correct === undefined && attempt.estimate === undefined,
           ).length,
         },
+        // Said by the person to be wrong questions, and left out of every count above.
+        disputed: answered.length - attempts.length,
         confirmed: stillHeld(heldNodes(view, space.id)).length,
         review: reviewSuggestions(attempts, now()),
       }

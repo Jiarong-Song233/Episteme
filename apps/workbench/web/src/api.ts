@@ -156,6 +156,16 @@ export interface PlanDetail {
   readonly plan: Plan
   readonly turns: readonly Turn[]
   readonly question?: PublicQuestion
+  /** How each answered question came out, and whether the person said it was a wrong question. */
+  readonly attempts?: readonly AnsweredAttempt[]
+}
+
+export interface AnsweredAttempt {
+  readonly id: string
+  readonly step: string
+  readonly correct?: boolean
+  readonly estimate?: 'correct' | 'partial' | 'wrong'
+  readonly disputed: boolean
 }
 
 export interface PlanMove {
@@ -179,6 +189,8 @@ export interface Status {
     readonly wrong: number
     readonly unjudged: number
   }
+  /** Answers to questions the person said were wrong, left out of the counts above. */
+  readonly disputed?: number
   readonly confirmed: number
   readonly review: readonly {
     readonly focus: string
@@ -639,6 +651,8 @@ export const api = {
   plans: (space: string) =>
     scene(`/plans?space=${encoded(space)}`) as Promise<{ plans: readonly Plan[] }>,
   plan: (id: string) => scene(`/plan?id=${encoded(id)}`) as Promise<PlanDetail>,
+  disputeAttempt: (attempt: string, disputed: boolean) =>
+    scene('/practice/dispute', { attempt, disputed }),
   createPlan: (space: string, topic: string, minutes: number, workflow: string) =>
     scene('/plans', { space, topic, minutes, workflow }) as Promise<PlanProposal>,
   updatePlan: (

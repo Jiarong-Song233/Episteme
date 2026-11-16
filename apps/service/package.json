@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@episteme/application": "workspace:*",
+    "@episteme/core": "workspace:*",
     "@episteme/embeddings-http": "workspace:*",
     "@episteme/mcp": "workspace:*"
   }

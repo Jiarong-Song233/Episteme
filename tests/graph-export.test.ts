@@ -251,6 +251,36 @@ describe('exporting and importing a graph', () => {
     expect(again.sha256).toBe(first.sha256)
   }, 60_000)
 
+  it('writes a large graph a piece at a time, as the same file serializing it whole would give', async () => {
+    const { space } = await session()
+    // Several megabytes of material, so the file is written over many pieces.
+    const long = Array.from(
+      { length: 150_000 },
+      (_, line) => `第 ${line} 行：位置编码把序列的顺序告诉模型。`,
+    )
+    await withWorkbench(graph, (call) =>
+      call('/scene/workbench/materials', {
+        space,
+        fileName: '长笔记.md',
+        contentBase64: Buffer.from(`# 长笔记\n\n${long.join('\n')}\n`).toString('base64'),
+      }),
+    )
+    const head = await exportGraph(graph, archive, OPTIONS)
+    const text = await readFile(archive, 'utf8')
+    expect(text.length).toBeGreaterThan(3 * (1 << 20))
+    expect(text).toBe(JSON.stringify(JSON.parse(text)))
+    // What it returns is the file's own head, without carrying the graph back in memory.
+    const read = await readGraphExport(archive)
+    expect(head).toEqual({ ...read, records: undefined, companions: undefined })
+    expect(Object.keys(head)).not.toContain('records')
+
+    const restored = join(directory, 'restored.db')
+    await importGraph(archive, restored)
+    const again = join(directory, 'again.episteme.json')
+    await exportGraph(restored, again, { ...OPTIONS, now: () => new Date(head.exportedAt) })
+    expect((await readGraphExport(again)).sha256).toBe(head.sha256)
+  }, 120_000)
+
   // Windows ignores the mode, and CI's Linux runners are what check it.
   it.skipIf(process.platform === 'win32')(
     'writes a file only its owner can read, whatever the umask allows',

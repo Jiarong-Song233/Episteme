@@ -302,6 +302,21 @@ describe('working with what someone else published', () => {
     expect(cited.body.names).toEqual({ [wei.id]: '魏', [lin.id]: '林' })
   })
 
+  it('keeps the name of an author whose withdrawn work was only answered', async () => {
+    const original = await linPublishes()
+    await weiResponds(original.publication, original.node.nodeId, WEIS_WORDS, 'forks')
+    expect((await call(`/publications/${original.publication}/withdraw`, lin, {})).status).toBe(200)
+    const answered = await call<{ names: Record<string, string> }>('/me', wei)
+    expect(answered.body.names).toEqual({ [wei.id]: '魏', [lin.id]: '林' })
+  })
+
+  it('names nobody to someone who never read their work', async () => {
+    const original = await linPublishes()
+    expect((await call(`/publications/${original.publication}/withdraw`, lin, {})).status).toBe(200)
+    const after = await call<{ names: Record<string, string> }>('/me', wei)
+    expect(after.body.names).toEqual({ [wei.id]: '魏' })
+  })
+
   it('makes public only what was published', async () => {
     await holdOwnWords(lin, PRIVATE_WORDS)
     const original = await linPublishes()

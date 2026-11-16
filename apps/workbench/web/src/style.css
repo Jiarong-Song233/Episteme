@@ -1294,6 +1294,19 @@ li[data-status="skipped"] > span:first-child {
   display: block;
   width: 100%;
   height: auto;
+  cursor: grab;
+}
+
+.map svg:active {
+  cursor: grabbing;
+}
+
+.map-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 0 4px 4px;
+  font-size: 12px;
 }
 
 .map-edge {

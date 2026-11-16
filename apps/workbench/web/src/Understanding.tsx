@@ -4,10 +4,14 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
+  forceX,
+  forceY,
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from 'd3-force'
-import { useContext, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { select } from 'd3-selection'
+import { zoom, zoomIdentity, type ZoomBehavior, type ZoomTransform } from 'd3-zoom'
+import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   api,
   type Challenge,
@@ -134,12 +138,18 @@ interface Point extends SimulationNodeDatum {
 const MAP_WIDTH = 320
 const MAP_HEIGHT = 220
 const SHORT_LABEL = 8
+/** Room around the outermost items for their labels. */
+const MAP_MARGIN = 28
+const MOST_ZOOM = 4
 
 /**
  * The same items as the list below it, placed by what connects them.
  *
  * Laid out once, not animated: it shows structure, and something that moves is hard to point at. It is hidden from
  * assistive technology because the list says all of it, with its relations on each item's page.
+ *
+ * It opens showing everything, however many items there are, and can be looked at closer (d3-zoom): drag to move,
+ * Ctrl and the wheel or a pinch to zoom, or the buttons. A plain wheel still scrolls the page.
  */
 function UnderstandingMap({
   nodes,
@@ -166,16 +176,77 @@ function UnderstandingMap({
       )
       .force('center', forceCenter(MAP_WIDTH / 2, MAP_HEIGHT / 2))
       .force('collide', forceCollide(26))
+      // Items with nothing between them would only push apart; a light pull keeps the whole map near one size.
+      .force('x', forceX(MAP_WIDTH / 2).strength(0.06))
+      .force('y', forceY(MAP_HEIGHT / 2).strength(0.09))
       .stop()
       .tick(200)
     return { points: placed, edges: links }
   }, [nodes])
-  if (nodes.length < 2) return null
-  const inside = (value: number | undefined, max: number): number =>
-    Math.min(max - 14, Math.max(14, value ?? max / 2))
+  // Everything in view: the layout's bounds, scaled down to fit but never up.
+  const fit = useMemo(() => {
+    const xs = points.map((point) => point.x ?? 0)
+    const ys = points.map((point) => point.y ?? 0)
+    const [left, right] = [Math.min(...xs) - MAP_MARGIN, Math.max(...xs) + MAP_MARGIN]
+    const [top, bottom] = [Math.min(...ys) - MAP_MARGIN, Math.max(...ys) + MAP_MARGIN]
+    const scale = Math.min(1, MAP_WIDTH / (right - left), MAP_HEIGHT / (bottom - top))
+    return zoomIdentity
+      .translate(MAP_WIDTH / 2, MAP_HEIGHT / 2)
+      .scale(scale)
+      .translate(-(left + right) / 2, -(top + bottom) / 2)
+  }, [points])
+  const svg = useRef<SVGSVGElement>(null)
+  const behaviour = useRef<ZoomBehavior<SVGSVGElement, unknown>>(undefined)
+  const [view, setView] = useState<ZoomTransform>(fit)
+  const shown = nodes.length >= 2
+  useEffect(() => {
+    const element = svg.current
+    if (!shown || element === null) return
+    const zooming = zoom<SVGSVGElement, unknown>()
+      .scaleExtent([Math.min(fit.k, 1) / 2, MOST_ZOOM])
+      // The wheel zooms only with Ctrl (a trackpad pinch sends that too), so the page still scrolls past the map.
+      .filter((event: Event) => {
+        if (event.type === 'wheel') {
+          return (event as WheelEvent).ctrlKey || (event as WheelEvent).metaKey
+        }
+        return !(event as MouseEvent).button
+      })
+      .on('zoom', (event: { transform: ZoomTransform }) => setView(event.transform))
+    behaviour.current = zooming
+    const selected = select(element)
+    selected.call(zooming)
+    zooming.transform(selected, fit)
+    return () => {
+      selected.on('.zoom', null)
+    }
+  }, [shown, fit])
+  if (!shown) return null
+  const by = (factor: number) => (): void => {
+    const element = svg.current
+    if (element !== null && behaviour.current !== undefined) {
+      behaviour.current.scaleBy(select(element), factor)
+    }
+  }
+  const reset = (): void => {
+    const element = svg.current
+    if (element !== null && behaviour.current !== undefined) {
+      behaviour.current.transform(select(element), fit)
+    }
+  }
   return (
     <figure className="map">
-      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} aria-hidden="true">
+      <div className="map-tools">
+        <button type="button" className="link" onClick={by(1.5)}>
+          放大
+        </button>
+        <button type="button" className="link" onClick={by(1 / 1.5)}>
+          缩小
+        </button>
+        <button type="button" className="link" onClick={reset}>
+          看全部
+        </button>
+      </div>
+      <svg ref={svg} viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} aria-hidden="true">
         <defs>
           <marker
             id="map-arrow"
@@ -189,43 +260,52 @@ function UnderstandingMap({
             <path d="M0 0 L8 4 L0 8 z" className="map-arrow" />
           </marker>
         </defs>
-        {edges.map((edge) => {
-          const source = edge.source as Point
-          const target = edge.target as Point
-          return (
-            <line
-              key={`${source.node.nodeId}-${edge.type}-${target.node.nodeId}`}
-              className={`map-edge map-${edge.type}`}
-              x1={inside(source.x, MAP_WIDTH)}
-              y1={inside(source.y, MAP_HEIGHT)}
-              x2={inside(target.x, MAP_WIDTH)}
-              y2={inside(target.y, MAP_HEIGHT)}
-              {...(edge.type === 'evolves_to' || edge.type === 'forks_from'
-                ? { markerEnd: 'url(#map-arrow)' }
-                : {})}
-            />
-          )
-        })}
-        {points.map((point) => {
-          const { node } = point
-          const x = inside(point.x, MAP_WIDTH)
-          const y = inside(point.y, MAP_HEIGHT)
-          return (
-            // biome-ignore lint: the list below is the keyboard path to the same pages
-            <g key={node.nodeId} className="map-node" onClick={() => onSelect(node.nodeId)}>
-              <title>{node.label}</title>
-              <circle cx={x} cy={y} r={7} data-held={isHeld(node)} data-conflict={node.conflict} />
-              <text x={x} y={y + 19} textAnchor="middle">
-                {node.label.length > SHORT_LABEL
-                  ? `${node.label.slice(0, SHORT_LABEL)}…`
-                  : node.label}
-              </text>
-            </g>
-          )
-        })}
+        <g transform={view.toString()}>
+          {edges.map((edge) => {
+            const source = edge.source as Point
+            const target = edge.target as Point
+            return (
+              <line
+                key={`${source.node.nodeId}-${edge.type}-${target.node.nodeId}`}
+                className={`map-edge map-${edge.type}`}
+                x1={source.x ?? 0}
+                y1={source.y ?? 0}
+                x2={target.x ?? 0}
+                y2={target.y ?? 0}
+                {...(edge.type === 'evolves_to' || edge.type === 'forks_from'
+                  ? { markerEnd: 'url(#map-arrow)' }
+                  : {})}
+              />
+            )
+          })}
+          {points.map((point) => {
+            const { node } = point
+            const x = point.x ?? 0
+            const y = point.y ?? 0
+            return (
+              // biome-ignore lint: the list below is the keyboard path to the same pages
+              <g key={node.nodeId} className="map-node" onClick={() => onSelect(node.nodeId)}>
+                <title>{node.label}</title>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={7}
+                  data-held={isHeld(node)}
+                  data-conflict={node.conflict}
+                />
+                <text x={x} y={y + 19} textAnchor="middle">
+                  {node.label.length > SHORT_LABEL
+                    ? `${node.label.slice(0, SHORT_LABEL)}…`
+                    : node.label}
+                </text>
+              </g>
+            )
+          })}
+        </g>
       </svg>
       <figcaption className="hint">
-        实线：支持。粗虚线：矛盾。箭头：修正或分叉。黄点：有未解决的矛盾。空心：已修正或撤回。
+        实线：支持。粗虚线：矛盾。箭头：修正或分叉。黄点：有未解决的矛盾。空心：已修正或撤回。拖动可移动，按住
+        Ctrl 滚动或双指捏合可缩放。
       </figcaption>
     </figure>
   )

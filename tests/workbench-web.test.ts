@@ -524,6 +524,25 @@ describe.skipIf(browser === undefined)('the workbench in a browser', () => {
     await page.getByRole('button', { name: '我的理解（2）' }).waitFor()
     await page.getByRole('button', { name: '全部理解' }).click()
     await page.locator('.map circle').first().waitFor()
+    // The map opens with everything in view, and can be looked at closer and back.
+    const view = () => page.locator('.map svg > g').getAttribute('transform')
+    const allInView = () =>
+      page.evaluate<boolean>(`(() => {
+        const box = document.querySelector('.map svg').getBoundingClientRect()
+        return [...document.querySelectorAll('.map circle')].every((circle) => {
+          const at = circle.getBoundingClientRect()
+          return at.left >= box.left - 1 && at.right <= box.right + 1 && at.top >= box.top - 1 && at.bottom <= box.bottom + 1
+        })
+      })()`)
+    expect(await allInView()).toBe(true)
+    const whole = await view()
+    await page.getByRole('button', { name: '放大' }).click()
+    expect(await view()).not.toBe(whole)
+    await page.getByRole('button', { name: '看全部' }).click()
+    expect(await view()).toBe(whole)
+    await page.locator('.map-node', { hasText: '位置编码是必需' }).click()
+    await page.locator('.marks').getByText('未解决的矛盾').waitFor()
+    await page.getByRole('button', { name: '全部理解' }).click()
     await page.getByRole('button', { name: '开始新对话' }).click()
     await ask('位置编码是必需的吗')
     await page.locator('.recalled').getByText('未解决的矛盾').first().waitFor()

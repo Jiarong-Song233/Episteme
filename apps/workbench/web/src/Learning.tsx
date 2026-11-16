@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   api,
   type AnsweredAttempt,
@@ -244,6 +244,13 @@ export function PlanView(props: {
     })
   }
 
+  const dispute = (attempt: string, disputed: boolean): void => {
+    guard(async () => {
+      await api.disputeAttempt(attempt, disputed)
+      await reload()
+    })
+  }
+
   const setPaused = (paused: boolean): void => {
     guard(async () => {
       await api.updatePlan(plan.id, { status: paused ? 'paused' : 'active' })
@@ -302,12 +309,7 @@ export function PlanView(props: {
                   </span>
                   <Disputable
                     attempt={detail.attempts?.find((attempt) => attempt.step === candidate.id)}
-                    onChange={(attempt, disputed) =>
-                      guard(async () => {
-                        await api.disputeAttempt(attempt, disputed)
-                        await reload()
-                      })
-                    }
+                    onChange={dispute}
                   />
                 </li>
               ))}
@@ -323,12 +325,22 @@ export function PlanView(props: {
           turn.speaker === 'learner' ? (
             <LearnerTurn key={turn.id} turn={turn} thread={plan.thread} />
           ) : (
-            <AgentTurn
-              key={turn.id}
-              turn={turn}
-              onCite={props.onCite}
-              onCandidates={(reply) => props.onCandidates(plan.thread, reply)}
-            />
+            <Fragment key={turn.id}>
+              <AgentTurn
+                turn={turn}
+                onCite={props.onCite}
+                onCandidates={(reply) => props.onCandidates(plan.thread, reply)}
+              />
+              {/* Where the verdict is read, the person can say the question itself was wrong. */}
+              {detail.attempts?.some((attempt) => attempt.turn === turn.id) === true && (
+                <p className="turn-actions">
+                  <Disputable
+                    attempt={detail.attempts.find((attempt) => attempt.turn === turn.id)}
+                    onChange={dispute}
+                  />
+                </p>
+              )}
+            </Fragment>
           ),
         )}
         {working && (

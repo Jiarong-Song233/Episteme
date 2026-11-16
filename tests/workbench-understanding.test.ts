@@ -761,6 +761,37 @@ describe('reusing', () => {
     expect(elsewhere.answer?.recalled).toBeUndefined()
   })
 
+  it('points to what the person holds in another space, without the answer reading it', async () => {
+    const model = new ScriptedModel()
+    await start(model)
+    const first = await spaceWithNotes()
+    const { node } = await hold(first, '位置编码告诉模型词的顺序')
+    const second = await spaceWithNotes('另一门课')
+
+    const asked = await ask(second, '位置编码有什么用')
+    expect(asked.answer?.elsewhere).toEqual([
+      { space: first.id, spaceName: '机器学习', nodeId: node.nodeId, label: node.label },
+    ])
+    expect(
+      model.calls
+        .at(-1)
+        ?.map((message) => message.content)
+        .join('\n'),
+    ).not.toContain(node.label)
+    // It is kept with the answer, so the conversation shows it again when reopened.
+    const session = await call<{ turns: readonly { id: string; answer?: Answer }[] }>(
+      `${scene}/session?thread=${asked.thread}`,
+    )
+    expect(session.body.turns.find((turn) => turn.id === asked.reply)?.answer?.elsewhere).toEqual(
+      asked.answer?.elsewhere,
+    )
+
+    // Unrelated questions point nowhere, and a space the person set aside is not pointed to.
+    expect((await ask(second, '自注意力怎么计算相似度')).answer?.elsewhere).toBeUndefined()
+    await call(`${scene}/spaces/update`, { space: first.id, archived: true })
+    expect((await ask(second, '位置编码有什么用')).answer?.elsewhere).toBeUndefined()
+  })
+
   it('still shows what was confirmed when the material says nothing on it', async () => {
     const model = new ScriptedModel()
     await start(model)

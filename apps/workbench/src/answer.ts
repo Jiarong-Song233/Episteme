@@ -58,6 +58,18 @@ export interface Answer {
   readonly model: { readonly name: string; readonly simulated: boolean }
   /** What the person had already confirmed on this. Their own words, shown apart: it is never evidence. */
   readonly recalled?: readonly RecalledUnderstanding[]
+  /**
+   * What the person confirmed in their other spaces that bears on the question. Only pointed to: the answer never
+   * reads it, so each space's answers rest on that space alone.
+   */
+  readonly elsewhere?: readonly ElsewhereUnderstanding[]
+}
+
+export interface ElsewhereUnderstanding {
+  readonly space: string
+  readonly spaceName: string
+  readonly nodeId: string
+  readonly label: string
 }
 
 export interface RecalledUnderstanding {

@@ -12,6 +12,8 @@ export interface TurnLinks {
   /** The turn a node's page sent the person back to. */
   readonly focused: string | undefined
   readonly openNode: (node: string) => void
+  /** Opens an item the person holds in another of their spaces. */
+  readonly openElsewhere: (space: string, node: string) => void
   /** What to call whoever wrote something. */
   readonly nameOf: (actor: string) => string
   readonly refreshNames: () => Promise<void>
@@ -30,6 +32,7 @@ export const Links = createContext<TurnLinks>({
   nodes: [],
   focused: undefined,
   openNode: () => undefined,
+  openElsewhere: () => undefined,
   nameOf: () => '另一位用户',
   refreshNames: () => Promise.resolve(),
   openPublication: () => undefined,
@@ -124,6 +127,31 @@ export function LearnerTurn({ turn, thread }: { turn: Turn; thread: string | und
   )
 }
 
+/** What the person holds on this in their other spaces. Pointed to only: the answer did not read it. */
+function Elsewhere({ answer }: { answer: Answer }) {
+  const links = useContext(Links)
+  if (answer.elsewhere === undefined) return null
+  return (
+    <aside className="recalled elsewhere">
+      <p className="hint">你在别的空间也确认过相关的理解（这次回答没有用到）：</p>
+      <ul>
+        {answer.elsewhere.map((item) => (
+          <li key={`${item.space}-${item.nodeId}`}>
+            <button
+              type="button"
+              className="link"
+              onClick={() => links.openElsewhere(item.space, item.nodeId)}
+            >
+              {item.label}
+            </button>
+            <span className="hint">（在“{item.spaceName}”）</span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  )
+}
+
 /** What the person had confirmed on this, set apart from the answer, because it is not evidence. */
 function Recalled({ answer }: { answer: Answer }) {
   const links = useContext(Links)
@@ -191,6 +219,7 @@ export function AgentTurn(props: {
       data-focused={links.focused === turn.id}
     >
       <Recalled answer={turn.answer} />
+      <Elsewhere answer={turn.answer} />
       <AnswerBody answer={turn.answer} onCite={props.onCite} />
       {note !== undefined && <p className="hint">{note}</p>}
       <p className="turn-actions">

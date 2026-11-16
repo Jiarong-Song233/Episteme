@@ -7,10 +7,14 @@
 ### 新增
 
 - **客户端一级导航**：新增工作台、学习空间、知识网络、审阅中心、学习流程、共享成果、我的资料和客户端入口；桌面程序默认打开客户端页，可将本机 Agent 会话导入为待确认理解。
+- **终端与笔记入口**：`ep` 命令行客户端（`pnpm ep` 或安装后的 `ep`）用一行命令召回、提候选、确认和查看待确认项。Agent 用 `EPISTEME_AGENT_TOKEN` 只能读取和提出候选，确认必须由本人用 `EPISTEME_HUMAN_TOKEN` 完成。`--json` 供脚本使用，`--dry-run` 在写入前先看结果，`distill` / `thread distill` 可从标准输入接收宿主 Agent 提炼的候选。
+- **开发、学习、讨论三类沉淀**：新增 capture 复合场景，把开发经验（validity：未验证 / 已验证 / 生产中 / 已废弃）、学习理解和讨论（agreement：无 / 部分 / 完全）放进同一个服务；讨论的原话留在图谱之外，只有提炼出的理解进入图谱。
+- **Obsidian 插件与采集技能**：`integrations/obsidian` 提供侧边栏（召回、提候选、看待确认），`integrations/skills/episteme-capture` 是可安装到 Claude Code、Codex、Grok 的技能；`scripts/install-capture-client.mjs` 一条命令安装技能和 `ep` 启动器，遇到不认识的同名文件会拒绝覆盖。
 
 ### 修复
 
 - 无效的空间地址会明确提示并阻止写入，不再回退到其他空间。合并候选前展示完整文本，超过服务端长度限制时保留原候选，不再截断后撤回。
+- 浏览器测试等待页面切换时改为用 `expect.poll` 读取真实 DOM，不再因 Playwright 把字符串当作函数而提前通过。
 
 ## [0.2.0] - 2026-11-10
 

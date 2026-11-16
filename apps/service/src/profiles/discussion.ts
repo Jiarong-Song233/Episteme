@@ -2,7 +2,6 @@ import {
   defaultDistillationPolicy,
   defaultSessionPack,
   recordableDimensions,
-  SessionRefusal,
   type SessionScene,
 } from '@episteme/application'
 import {
@@ -11,7 +10,8 @@ import {
   type DimensionId,
   type StateDimensionDefinition,
 } from '@episteme/core'
-import { BLANK_TOPIC, type SceneProfile, type SceneRoute, type SeedTopic } from '../profile.js'
+import { BLANK_TOPIC, type SceneProfile, type SeedTopic } from '../profile.js'
+import { noteRoutes } from './notes.js'
 
 /**
  * The discussion scene: keeping the positions people take in a conversation, and how far they agree, so the
@@ -47,56 +47,12 @@ export const discussionScene: SessionScene = {
   ),
 }
 
-const PROPOSED_BY = 'ep-cli'
-
-function textOf(body: Readonly<Record<string, unknown>>, name: string): string {
-  const value = body[name]
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new SessionRefusal('invalid_request', `"${name}" is required`)
-  }
-  return value.trim()
-}
-
-const routes: readonly SceneRoute[] = [
-  {
-    // A proposed position (a claim). It becomes the person's understanding only after `accept`.
-    method: 'POST',
-    path: '/notes',
-    handle: async ({ view, body }) => {
-      const scope =
-        typeof body['scope'] === 'string' && body['scope'].trim() !== ''
-          ? { scope: body['scope'].trim() }
-          : {}
-      const outcome = await view.propose(
-        { kind: 'claim', label: textOf(body, 'text') },
-        {
-          proposedBy: PROPOSED_BY,
-          rationale:
-            typeof body['why'] === 'string' && body['why'].trim() !== ''
-              ? body['why'].trim()
-              : 'proposed from a discussion',
-          ...scope,
-        },
-      )
-      if (!outcome.ok) throw new SessionRefusal(outcome.refusal.code, outcome.refusal.message)
-      return { suggestionId: outcome.suggestion.id }
-    },
-  },
-  {
-    method: 'GET',
-    path: '/notes',
-    handle: ({ view }) => ({
-      notes: view.listNodes().map((node) => ({
-        nodeId: node.nodeId,
-        label: node.label,
-        agreement: view
-          .understandingOf(node.nodeId)
-          ?.find((dimension) => dimension.id === AGREEMENT.id)?.level,
-      })),
-    }),
-  },
-]
-
 export function discussionProfile(seed: SeedTopic = BLANK_TOPIC): SceneProfile {
-  return { name: 'discussion', seed, scene: discussionScene, routes }
+  return {
+    name: 'discussion',
+    seed,
+    scene: discussionScene,
+    routes: noteRoutes('discussion'),
+    proposingRoutes: ['/notes'],
+  }
 }

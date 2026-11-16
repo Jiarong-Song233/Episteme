@@ -2,7 +2,6 @@ import {
   defaultDistillationPolicy,
   defaultSessionPack,
   recordableDimensions,
-  SessionRefusal,
   type SessionScene,
 } from '@episteme/application'
 import {
@@ -11,7 +10,8 @@ import {
   type DimensionId,
   type StateDimensionDefinition,
 } from '@episteme/core'
-import { BLANK_TOPIC, type SceneProfile, type SceneRoute, type SeedTopic } from '../profile.js'
+import { BLANK_TOPIC, type SceneProfile, type SeedTopic } from '../profile.js'
+import { noteRoutes } from './notes.js'
 
 /**
  * The dev scene: keeping engineering decisions, lessons and the evidence behind them.
@@ -52,57 +52,12 @@ export const devScene: SessionScene = {
   ),
 }
 
-const PROPOSED_BY = 'ep-cli'
-
-function textOf(body: Readonly<Record<string, unknown>>, name: string): string {
-  const value = body[name]
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new SessionRefusal('invalid_request', `"${name}" is required`)
-  }
-  return value.trim()
-}
-
-const routes: readonly SceneRoute[] = [
-  {
-    // A proposed lesson. It becomes the person's understanding only after `accept`, through the one
-    // decision path every channel shares; an agent (or the CLI acting as one) never confirms its own draft.
-    method: 'POST',
-    path: '/notes',
-    handle: async ({ view, body }) => {
-      const scope =
-        typeof body['scope'] === 'string' && body['scope'].trim() !== ''
-          ? { scope: body['scope'].trim() }
-          : {}
-      const outcome = await view.propose(
-        { kind: 'claim', label: textOf(body, 'text') },
-        {
-          proposedBy: PROPOSED_BY,
-          rationale:
-            typeof body['why'] === 'string' && body['why'].trim() !== ''
-              ? body['why'].trim()
-              : 'proposed from ep cli',
-          ...scope,
-        },
-      )
-      if (!outcome.ok) throw new SessionRefusal(outcome.refusal.code, outcome.refusal.message)
-      return { suggestionId: outcome.suggestion.id }
-    },
-  },
-  {
-    method: 'GET',
-    path: '/notes',
-    handle: ({ view }) => ({
-      notes: view.listNodes().map((node) => ({
-        nodeId: node.nodeId,
-        label: node.label,
-        validity: view
-          .understandingOf(node.nodeId)
-          ?.find((dimension) => dimension.id === VALIDITY.id)?.level,
-      })),
-    }),
-  },
-]
-
 export function devProfile(seed: SeedTopic = BLANK_TOPIC): SceneProfile {
-  return { name: 'dev', seed, scene: devScene, routes }
+  return {
+    name: 'dev',
+    seed,
+    scene: devScene,
+    routes: noteRoutes('dev'),
+    proposingRoutes: ['/notes'],
+  }
 }

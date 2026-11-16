@@ -1,0 +1,9 @@
+{
+  "id": "episteme",
+  "name": "Episteme",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Recall and propose understanding from a local Episteme service.",
+  "author": "Jiarong Song",
+  "isDesktopOnly": true
+}

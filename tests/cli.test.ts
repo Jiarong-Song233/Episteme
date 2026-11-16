@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { devProfile, startService, type EpistemeService } from '@episteme/service'
+import { captureProfile, startService, type EpistemeService } from '@episteme/service'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 /**
@@ -25,6 +25,8 @@ async function ep(...args: readonly string[]): Promise<string> {
       ...process.env,
       EPISTEME_URL: service.url,
       EPISTEME_TOKEN: service.humanToken ?? '',
+      EPISTEME_HUMAN_TOKEN: service.humanToken ?? '',
+      EPISTEME_AGENT_TOKEN: '',
     },
   })
   return stdout
@@ -60,7 +62,7 @@ beforeEach(async () => {
   service = await startService({
     port: 0,
     graph: join(directory, 'dev.db'),
-    profile: devProfile(),
+    profile: captureProfile(),
   })
 })
 
@@ -121,6 +123,155 @@ describe('ep, end to end', () => {
     })
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('需要本人令牌')
+  })
+
+  it('captures Learn and discussion in the same service, and renders agreement and summaries', async () => {
+    for (const scene of ['learn', 'discussion']) {
+      const note = JSON.parse(
+        await ep('note', `SQLite ${scene} insight`, '--scene', scene, '--json'),
+      ) as { suggestionId: string }
+      await ep('accept', note.suggestionId)
+    }
+    const notes = JSON.parse(await ep('notes', '--scene', 'discussion', '--json')) as {
+      notes: { nodeId: string }[]
+    }
+    const id = notes.notes[0]!.nodeId
+    await ep('record', id, '--set', 'agreement=partial')
+    expect(await ep('notes', '--scene', 'discussion')).toContain('agreement=partial')
+    expect(await ep('recall', 'SQLite', '--summary')).toContain('SQLite')
+    const scoped = JSON.parse(
+      await ep('recall', 'SQLite', '--scope', 'scene:learn', '--only-scope', '--json'),
+    ) as { ranked: unknown[] }
+    expect(scoped.ranked).toHaveLength(1)
+  })
+
+  it('verifies host quotes over MCP and keeps a correction and its contradiction', async () => {
+    const text =
+      'User: SQLite always allows multiple writers.\nAssistant: SQLite serializes writers using locks.'
+    const input = {
+      text,
+      learner: 'User',
+      submissionId: 'cli-test-reading',
+      candidates: [
+        {
+          kind: 'node',
+          ref: 'old',
+          role: 'claim',
+          label: 'SQLite always allows multiple writers',
+          quote: 'SQLite always allows multiple writers',
+          basis: 'stated',
+          rationale: 'A position to review',
+        },
+        {
+          kind: 'node',
+          ref: 'new',
+          role: 'claim',
+          label: 'SQLite serializes writers using locks',
+          quote: 'SQLite serializes writers using locks',
+          basis: 'inferred',
+          rationale: 'A correction to review',
+        },
+        {
+          kind: 'relation',
+          from: 'cand:new',
+          to: 'cand:old',
+          relation: 'contradicts',
+          quote: 'SQLite serializes writers using locks',
+          basis: 'inferred',
+          rationale: 'Both positions remain visible',
+        },
+        {
+          kind: 'node',
+          ref: 'false',
+          role: 'claim',
+          label: 'A made-up fact',
+          quote: 'This text was never said',
+          basis: 'inferred',
+          rationale: 'Must be refused',
+        },
+      ],
+    }
+    const env = {
+      ...process.env,
+      EPISTEME_URL: service.url,
+      EPISTEME_HUMAN_TOKEN: '',
+      EPISTEME_TOKEN: '',
+      EPISTEME_AGENT_TOKEN: '',
+    }
+    const result = await epWithInput(
+      ['distill', '--from', '-', '--scene', 'discussion', '--json'],
+      JSON.stringify(input),
+      env,
+    )
+    expect(result.status, result.stderr).toBe(0)
+    const parsed = JSON.parse(result.stdout) as {
+      suggestions: { id: string }[]
+      refused: { code: string }[]
+    }
+    expect(parsed.suggestions).toHaveLength(3)
+    expect(parsed.refused.some((r) => r.code === 'quote_not_found')).toBe(true)
+    for (const suggestion of parsed.suggestions) await ep('accept', suggestion.id)
+    const recalled = JSON.parse(await ep('recall', 'SQLite', '--json')) as { ranked: unknown[] }
+    expect(recalled.ranked).toHaveLength(2)
+    const again = await epWithInput(
+      ['distill', '--from', '-', '--scene', 'discussion', '--json'],
+      JSON.stringify(input),
+      env,
+    )
+    expect(JSON.parse(again.stdout)).toHaveProperty('status', 'duplicate_submission')
+    const pending = JSON.parse(await ep('pending', '--json')) as { suggestions: unknown[] }
+    expect(pending.suggestions).toHaveLength(0)
+  })
+
+  it('validates all stdin items and leaves dry-run completely read-only', async () => {
+    const env = {
+      ...process.env,
+      EPISTEME_URL: service.url,
+      EPISTEME_HUMAN_TOKEN: '',
+      EPISTEME_TOKEN: '',
+      EPISTEME_AGENT_TOKEN: '',
+    }
+    const invalid = await epWithInput(
+      ['distill', '--from', '-', '--json'],
+      JSON.stringify([{ text: 'Valid note' }, { text: '' }]),
+      env,
+    )
+    expect(invalid.status).toBe(1)
+    expect(JSON.parse(invalid.stderr)).toHaveProperty('error.code', 'invalid_input')
+    const dry = await epWithInput(
+      ['distill', '--from', '-', '--dry-run', '--json'],
+      JSON.stringify([{ text: 'A preview note' }]),
+      { ...env, EPISTEME_URL: 'http://127.0.0.1:1' },
+    )
+    expect(dry.status).toBe(0)
+    expect(JSON.parse(dry.stdout)).toHaveProperty('dryRun', true)
+    const pending = JSON.parse(await ep('pending', '--json')) as { suggestions: unknown[] }
+    expect(pending.suggestions).toHaveLength(0)
+    expect(await ep('distill', '--from', 'git', '-n', '1', '--dry-run')).toMatch(/\[dry-run\]/)
+  })
+
+  it('keeps raw discussion turns outside the understanding graph', async () => {
+    const opened = JSON.parse(
+      await ep('thread', 'open', 'Database discussion', '--scene', 'discussion', '--json'),
+    ) as { thread: { id: string } }
+    const id = opened.thread.id
+    await ep('thread', 'turn', id, 'SQLite serializes writes.', '--speaker', 'learner')
+    await ep('thread', 'turn', id, 'A single writer keeps the lock.', '--speaker', 'agent')
+    const raw = JSON.parse(await ep('thread', 'show', id, '--json')) as {
+      turns: { text: string }[]
+    }
+    expect(raw.turns.map((turn) => turn.text)).toEqual([
+      'SQLite serializes writes.',
+      'A single writer keeps the lock.',
+    ])
+    const before = JSON.parse(await ep('reflect', '--json')) as { progress: { totalNodes: number } }
+    expect(before.progress.totalNodes).toBe(0)
+    const distilled = JSON.parse(
+      await ep('thread', 'distill', id, '--scene', 'discussion', '--json'),
+    ) as { sourceId: string }
+    expect(typeof distilled.sourceId).toBe('string')
+    const after = JSON.parse(await ep('reflect', '--json')) as { progress: { totalNodes: number } }
+    expect(after.progress.totalNodes).toBe(0)
   })
 
   it('says what to do when the service is not there', async () => {

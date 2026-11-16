@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { SceneView } from '@episteme/application'
 import { BUILT_IN_LIBRARY, type Library } from './blocks.js'
 import type { Plan } from './plans.js'
-import type { Attempt } from './practice.js'
+import { DISPUTE_PREFIX, disputedAttempts, type Attempt } from './practice.js'
 import { scopeOf } from './requests.js'
 import { heldNodes, wordsByTurn, type WordsBy } from './understanding.js'
 
@@ -203,11 +203,15 @@ export function evidenceOf(view: SceneView, space: string): readonly LearningEvi
       .filter((plan) => plan.space === space)
       .map((plan) => plan.id),
   )
+  // A question the person said was wrong is no evidence either way. Left out after numbering, so the rest keep theirs.
+  const disputed = disputedAttempts(view.records.list(DISPUTE_PREFIX))
   const answered = view.records
     .list('attempt/')
     .map((record) => record.value as Attempt)
     .filter((attempt) => plans.has(attempt.plan))
-    .flatMap((attempt, index) => fromPractice(attempt, space, index) ?? [])
+    .flatMap((attempt, index) =>
+      disputed.has(attempt.id) ? [] : (fromPractice(attempt, space, index) ?? []),
+    )
   return inOrder([...recorded, ...answered])
 }
 

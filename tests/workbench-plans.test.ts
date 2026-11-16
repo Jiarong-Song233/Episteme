@@ -371,6 +371,63 @@ describe('a speedrun', () => {
     // A mechanical check, so it says no model judged it.
     expect(turns.at(-1)?.by).toBe('workbench')
   })
+
+  it('leaves out a question the person says was wrong, and keeps their answer on record', async () => {
+    await start()
+    const space = await spaceWithNotes()
+    const { plan } = await propose(space, 'speedrun', 15, '位置编码')
+    let reply = await act(plan, 'begin')
+    reply = await act(reply.plan, 'next')
+    reply = await act(reply.plan, 'next')
+    expect(reply.question?.kind).toBe('cloze')
+    await act(reply.plan, 'answer', { text: '不是这个词' })
+
+    interface Counted {
+      checked: { correct: number; total: number }
+      disputed?: number
+      review: readonly unknown[]
+    }
+    const status = async (): Promise<Counted> =>
+      (await call<Counted>(`${scene}/status?space=${space.id}`)).body
+    const attempts = async () =>
+      (
+        await call<{ attempts: readonly { id: string; correct?: boolean; disputed: boolean }[] }>(
+          `${scene}/plan?id=${plan.id}`,
+        )
+      ).body.attempts
+    expect(await status()).toMatchObject({ checked: { correct: 0, total: 1 }, disputed: 0 })
+    const [attempt] = await attempts()
+    expect(attempt).toMatchObject({ correct: false, disputed: false })
+
+    const answers = async (): Promise<number> =>
+      (
+        await call<{
+          sessions: readonly { objectives: readonly { events: readonly { kind: string }[] }[] }[]
+        }>(`${scene}/outcomes?space=${space.id}`)
+      ).body.sessions
+        .flatMap((each) => each.objectives.flatMap((one) => one.events))
+        .filter((event) => event.kind === 'attempt').length
+    expect(await answers()).toBe(1)
+
+    const disputed = await call(`${scene}/practice/dispute`, { attempt: attempt?.id })
+    expect(disputed.status).toBe(200)
+    // Nor is it evidence about the person any more.
+    expect(await answers()).toBe(0)
+    expect(await status()).toMatchObject({ checked: { correct: 0, total: 0 }, disputed: 1 })
+    expect((await status()).review).toEqual([])
+    // The answer itself is still there, as it was given.
+    expect(await attempts()).toEqual([{ ...attempt, disputed: true }])
+
+    // The person can take it back, and it counts again.
+    await call(`${scene}/practice/dispute`, { attempt: attempt?.id, disputed: false })
+    expect(await status()).toMatchObject({ checked: { correct: 0, total: 1 }, disputed: 0 })
+    expect(await answers()).toBe(1)
+
+    // Only answered questions can be set aside.
+    expect((await call(`${scene}/practice/dispute`, { attempt: 'at_unknown' })).body.code).toBe(
+      'unknown_attempt',
+    )
+  })
 })
 
 describe('a deep plan', () => {

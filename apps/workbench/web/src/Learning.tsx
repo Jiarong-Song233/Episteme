@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   api,
+  type AnsweredAttempt,
   type BlockInfo,
   type Citation,
   type Evidence,
@@ -19,6 +20,44 @@ import { AgentTurn, messageOf, LearnerTurn } from './Turns.js'
 /** Plans in the shelf, a plan on the page, and what the record says so far. */
 
 const LOCKED: readonly Step['status'][] = ['done', 'active']
+
+const ESTIMATED: Readonly<Record<NonNullable<AnsweredAttempt['estimate']>, string>> = {
+  correct: '模型估计答对',
+  partial: '模型估计部分对',
+  wrong: '模型估计没答对',
+}
+
+/**
+ * How an answered question came out, and the person's say on whether the question itself was right. A model wrote
+ * its answer key, so the person may set it aside; it then counts nowhere, and the answer stays on record.
+ */
+function Disputable(props: {
+  attempt: AnsweredAttempt | undefined
+  onChange: (attempt: string, disputed: boolean) => void
+}) {
+  const { attempt } = props
+  if (attempt === undefined) return null
+  const outcome =
+    attempt.correct === undefined
+      ? attempt.estimate === undefined
+        ? '已作答'
+        : ESTIMATED[attempt.estimate]
+      : attempt.correct
+        ? '答对'
+        : '没答对'
+  return (
+    <span className="hint dispute">
+      {attempt.disputed ? '你标记这道题有问题，不计入。' : `${outcome}。`}
+      <button
+        type="button"
+        className="link"
+        onClick={() => props.onChange(attempt.id, !attempt.disputed)}
+      >
+        {attempt.disputed ? '撤回标记' : '这道题有问题'}
+      </button>
+    </span>
+  )
+}
 
 export function PlanShelf(props: {
   plans: readonly Plan[]
@@ -261,6 +300,15 @@ export function PlanView(props: {
                       ? (candidate.note ?? '跳过')
                       : `${candidate.minutes} 分钟${candidate.note === undefined ? '' : `。${candidate.note}`}`}
                   </span>
+                  <Disputable
+                    attempt={detail.attempts?.find((attempt) => attempt.step === candidate.id)}
+                    onChange={(attempt, disputed) =>
+                      guard(async () => {
+                        await api.disputeAttempt(attempt, disputed)
+                        await reload()
+                      })
+                    }
+                  />
                 </li>
               ))}
             </ol>
@@ -653,7 +701,10 @@ export function StatusView(props: { space: string | undefined; version: number }
               ? '还没有可判分的题'
               : `${status.checked.correct} / ${status.checked.total}`}
           </dd>
-          <dd className="hint">选择题和填空，由程序对照答案判定。</dd>
+          <dd className="hint">
+            选择题和填空，由程序对照答案判定。答案由模型从材料里出，可能有错。
+            {(status.disputed ?? 0) > 0 && `你标记有问题的 ${status.disputed} 道题不计入。`}
+          </dd>
         </div>
         <div>
           <dt>模型估计</dt>

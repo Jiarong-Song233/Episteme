@@ -398,6 +398,15 @@ describe('a speedrun', () => {
     expect(await status()).toMatchObject({ checked: { correct: 0, total: 1 }, disputed: 0 })
     const [attempt] = await attempts()
     expect(attempt).toMatchObject({ correct: false, disputed: false })
+    // It names the turn that gave the feedback, where the page offers to set the question aside.
+    const { turns } = (
+      await call<{ turns: readonly { id: string; speaker: string; text: string }[] }>(
+        `${scene}/plan?id=${plan.id}`,
+      )
+    ).body
+    const at = turns.findIndex((turn) => turn.id === (attempt as { turn?: string }).turn)
+    expect(turns[at]?.speaker).toBe('agent')
+    expect(turns[at - 1]?.text).toMatch(/^没答对。正确答案是/)
 
     const answers = async (): Promise<number> =>
       (

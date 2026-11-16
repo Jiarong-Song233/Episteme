@@ -42,6 +42,8 @@ export interface Attempt {
   readonly estimate?: Estimate
   readonly askedAt: number
   readonly answeredAt?: number
+  /** The turn that told the person how it came out. Answers kept before this was written have none. */
+  readonly feedbackTurn?: string
 }
 
 /**

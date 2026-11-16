@@ -163,6 +163,8 @@ export interface PlanDetail {
 export interface AnsweredAttempt {
   readonly id: string
   readonly step: string
+  /** The turn that said how it came out, where the person reads the verdict. */
+  readonly turn?: string
   readonly correct?: boolean
   readonly estimate?: 'correct' | 'partial' | 'wrong'
   readonly disputed: boolean

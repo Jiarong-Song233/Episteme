@@ -259,13 +259,14 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
     plan: Plan,
     answer: Answer,
     by = `model:${answer.model.name}`,
-  ): Promise<void> => {
+  ): Promise<string> => {
     const reply = await writes.appendTurn(plan.thread, {
       speaker: 'agent',
       text: answerText(answer),
       by,
     })
     await view.records.put(`${ANSWER_PREFIX}${reply.id}`, answer)
+    return reply.id
   }
 
   const historyOf = (view: SceneView, plan: Plan) =>
@@ -450,11 +451,12 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
       writtenWith: 'person', // `/plans/act` takes only the person's credential (ADR 0020)
     })
     if (verdict !== '') await say(writes, plan, verdict)
-    await keepAnswer(view, writes, plan, answer, by)
+    const feedbackTurn = await keepAnswer(view, writes, plan, answer, by)
     const answered: Attempt = {
       ...attempt,
       response,
       answeredAt: now(),
+      feedbackTurn,
       ...(correct === undefined ? {} : { correct }),
       ...(estimate === undefined ? {} : { estimate }),
     }
@@ -615,6 +617,7 @@ export function learningRoutes(options: LearningOptions): readonly SceneRoute[] 
           .map((attempt) => ({
             id: attempt.id,
             step: attempt.step,
+            ...(attempt.feedbackTurn === undefined ? {} : { turn: attempt.feedbackTurn }),
             ...(attempt.correct === undefined ? {} : { correct: attempt.correct }),
             ...(attempt.estimate === undefined ? {} : { estimate: attempt.estimate }),
             disputed: disputed.has(attempt.id),

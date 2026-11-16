@@ -47,7 +47,24 @@ node scripts/evaluate.mjs --repeats 3 --max-calls 300 --questions questions-roun
 
 ## 结果：贴全部材料
 
-这一轮**没有跑完**：14 次请求因为单次运行的 token 预算（默认 20 万）用完而失败。每次请求都贴全部材料，用量大，触发了预算上限。已经跑完的部分全部答对，和第三轮的 69/69 一致，但不完整，不作为比较依据。
+和 Episteme 一起跑的那一次**没有跑完**：每次请求都贴全部材料，用量大，触发了单次运行的 token 预算（默认 20 万），14 次请求失败。
+
+之后单独重跑了这一组，token 预算调到 60 万（`EPISTEME_MODEL_MAX_TOKENS=600000`），其余设置不变。原始结果：[results/round-4-paste-all.json](results/round-4-paste-all.json)。
+
+| 题型 | 第三轮 | 第四轮（重跑） |
+| ---- | ---- | ---- |
+| 直接题 | 30/30 | 30/30 |
+| 同义改写 | 18/18 | 18/18 |
+| 跨文档 | 3/3 | 3/3 |
+| 留出题 | 18/18 | 18/18 |
+| **合计答对** | **69/69** | **69/69** |
+| 无关问题拒答 | — | 12/12 |
+| 材料没有的问题拒答 | — | 12/12 |
+| 错误 | — | 0 |
+| 延迟 p50 / p95 | — | 2.6 s / 3.6 s |
+| 用量 | — | 93 次调用，约 24 万 token |
+
+作为对比，Episteme 的 84 次调用约用 15 万 token。小材料上，直接贴全部材料仍然答对最多，用量也更大。
 
 ## 结论
 
@@ -58,4 +75,4 @@ node scripts/evaluate.mjs --repeats 3 --max-calls 300 --questions questions-roun
 ## 下一轮依据
 
 - 有嵌入模型可用时，用同一套题比较关键词和语义检索，重点看 p1。
-- 贴全部材料的对照需要调高 token 预算（`EPISTEME_MODEL_MAX_TOKENS`）再跑一次。
+- 贴全部材料的对照，要一开始就调高 token 预算（`EPISTEME_MODEL_MAX_TOKENS`），不然会中途停下。

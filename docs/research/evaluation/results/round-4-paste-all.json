@@ -1,0 +1,2629 @@
+{
+  "round": 3,
+  "startedAt": "2026-11-16T08:59:08.114Z",
+  "finishedAt": "2026-11-16T09:03:23.927Z",
+  "simulated": false,
+  "questionSet": 3,
+  "repeats": 3,
+  "material": ["海盐面包配方.md", "潮汐缓存协议.md", "灯塔事故复盘.md", "珊瑚调度器.md"],
+  "node": "v24.21.0",
+  "results": [
+    {
+      "system": "paste-all",
+      "describe": "同一模型，把全部材料贴进提示词，无检索",
+      "model": "auto/deepseek-v4.1-flash",
+      "spent": {
+        "calls": 93,
+        "tokens": 239159,
+        "failures": 0
+      },
+      "summary": {
+        "direct": {
+          "n": 30,
+          "correct": 1,
+          "correctAndCited": 0.967,
+          "falselyAbstained": 0,
+          "correctAndPointed": 0.967
+        },
+        "paraphrase": {
+          "n": 18,
+          "correct": 1,
+          "correctAndCited": 1,
+          "falselyAbstained": 0,
+          "correctAndPointed": 1
+        },
+        "cross": {
+          "n": 3,
+          "correct": 1,
+          "correctAndCited": 1,
+          "falselyAbstained": 0,
+          "correctAndPointed": 1
+        },
+        "heldout": {
+          "n": 18,
+          "correct": 1,
+          "correctAndCited": 0.889,
+          "falselyAbstained": 0,
+          "correctAndPointed": 0.889
+        },
+        "offtopic": {
+          "n": 12,
+          "abstained": 1,
+          "answeredAnyway": 0
+        },
+        "absent": {
+          "n": 12,
+          "abstained": 1,
+          "citedAnything": 0
+        },
+        "citationPrecision": 0.975,
+        "medianQuoteChars": 31,
+        "medianPointedChars": 31,
+        "errors": 0,
+        "latencyMs": {
+          "p50": 2639,
+          "p95": 3649
+        }
+      },
+      "runs": [
+        {
+          "id": "d1",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "潮汐缓存协议由林望舒在 2031 年提出。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "潮汐缓存协议由林望舒在 2031 年提出，目的是让缓存容量随负载像潮水一样涨落。"
+              }
+            ],
+            "evidence": [
+              "潮汐缓存协议由林望舒在 2031 年提出，目的是让缓存容量随负载像潮水一样涨落。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [40],
+            "pointedAtGold": true,
+            "pointedChars": [40]
+          },
+          "ms": 2755
+        },
+        {
+          "id": "d2",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "浅潮层的默认容量是 64 MB。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 2096
+        },
+        {
+          "id": "d3",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "浅潮层的淘汰周期是 17 秒。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 2263
+        },
+        {
+          "id": "d4",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "中潮层的日志保留 9 小时。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "日志保留 9 小时。"
+              }
+            ],
+            "evidence": ["日志保留 9 小时。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [10],
+            "pointedAtGold": true,
+            "pointedChars": [10]
+          },
+          "ms": 1989
+        },
+        {
+          "id": "d5",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "材料显示，深潮层每 6 小时合并一次。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "深潮层只读，每 6 小时合并一次。"
+              }
+            ],
+            "evidence": ["深潮层只读，每 6 小时合并一次。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [17],
+            "pointedAtGold": true,
+            "pointedChars": [17]
+          },
+          "ms": 1990
+        },
+        {
+          "id": "d6",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "当命中率连续 3 个周期低于 72% 时，发出涨潮信号。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"
+              }
+            ],
+            "evidence": ["当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [38],
+            "pointedAtGold": true,
+            "pointedChars": [38]
+          },
+          "ms": 2584
+        },
+        {
+          "id": "d7",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "珊瑚调度器的时间片长度是 **23 毫秒**。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "时间片长度是 23 毫秒。"
+              }
+            ],
+            "evidence": ["时间片长度是 23 毫秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [13],
+            "pointedAtGold": true,
+            "pointedChars": [13]
+          },
+          "ms": 2556
+        },
+        {
+          "id": "d8",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "海葵任务最多被抢占 4 次。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "海葵任务最多被抢占 4 次，第 5 次到来前升级为礁石任务，防止它一直得不到执行。"
+              }
+            ],
+            "evidence": [
+              "海葵任务最多被抢占 4 次，第 5 次到来前升级为礁石任务，防止它一直得不到执行。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [41],
+            "pointedAtGold": true,
+            "pointedChars": [41]
+          },
+          "ms": 2449
+        },
+        {
+          "id": "d9",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "灯塔集群服务中断持续 41 分钟。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "2033 年 3 月 14 日，灯塔集群发生服务中断，持续 41 分钟。"
+              }
+            ],
+            "evidence": ["2033 年 3 月 14 日，灯塔集群发生服务中断，持续 41 分钟。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [36],
+            "pointedAtGold": true,
+            "pointedChars": [36]
+          },
+          "ms": 2452
+        },
+        {
+          "id": "d10",
+          "kind": "direct",
+          "repeat": 0,
+          "answer": {
+            "text": "灯塔事故的值班负责人是周砚。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "值班负责人周砚先停掉了备份，服务在 12 分钟后开始恢复。"
+              }
+            ],
+            "evidence": ["值班负责人周砚先停掉了备份，服务在 12 分钟后开始恢复。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [29],
+            "pointedAtGold": true,
+            "pointedChars": [29]
+          },
+          "ms": 3006
+        },
+        {
+          "id": "p1",
+          "kind": "paraphrase",
+          "repeat": 0,
+          "answer": {
+            "text": "最靠近调用方的是浅潮层，默认容量为 64 MB。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 2757
+        },
+        {
+          "id": "p2",
+          "kind": "paraphrase",
+          "repeat": 0,
+          "answer": {
+            "text": "材料没有给出“完全收回”的总时长。按协议：负载低于 40% 并持续 5 分钟才触发退潮；退潮后也不是立刻释放，而是在接下来的淘汰周期里逐步交还（浅潮层淘汰周期为 17 秒）。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当负载低于 40% 并持续 5 分钟时，协议发出退潮信号，容量回到默认值。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": [
+              "当负载低于 40% 并持续 5 分钟时，协议发出退潮信号，容量回到默认值。",
+              "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。",
+              "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 3,
+            "citationsOnSource": 3,
+            "quoteChars": [37, 42, 27],
+            "pointedAtGold": true,
+            "pointedChars": [37, 42, 27]
+          },
+          "ms": 3506
+        },
+        {
+          "id": "p3",
+          "kind": "paraphrase",
+          "repeat": 0,
+          "answer": {
+            "text": "等候执行的工作最多排 1024 个任务。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "队列上限是 1024 个任务。"
+              }
+            ],
+            "evidence": ["队列上限是 1024 个任务。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [15],
+            "pointedAtGold": true,
+            "pointedChars": [15]
+          },
+          "ms": 2608
+        },
+        {
+          "id": "p4",
+          "kind": "paraphrase",
+          "repeat": 0,
+          "answer": {
+            "text": "礁石任务。材料说它“不可抢占”，“一旦开始就会运行到自己主动让出”。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "调度器把任务分为三种：礁石任务不可抢占，海葵任务可以抢占，浮游任务是批处理。"
+              }
+            ],
+            "evidence": [
+              "调度器把任务分为三种：礁石任务不可抢占，海葵任务可以抢占，浮游任务是批处理。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [38],
+            "pointedAtGold": true,
+            "pointedChars": [38]
+          },
+          "ms": 2953
+        },
+        {
+          "id": "p5",
+          "kind": "paraphrase",
+          "repeat": 0,
+          "answer": {
+            "text": "灯塔事故复盘里提到，合并窗口移到了凌晨 3 点。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "合并窗口移到凌晨 3 点，并且规定合并期间禁止启动全量备份。"
+              }
+            ],
+            "evidence": ["合并窗口移到凌晨 3 点，并且规定合并期间禁止启动全量备份。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [30],
+            "pointedAtGold": true,
+            "pointedChars": [30]
+          },
+          "ms": 2453
+        },
+        {
+          "id": "p6",
+          "kind": "paraphrase",
+          "repeat": 0,
+          "answer": {
+            "text": "应该以较浅的一层为准，也就是相信浅潮层的数据。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "代价是一条数据可能同时存在于两层，读取时必须以较浅的一层为准。"
+              }
+            ],
+            "evidence": ["代价是一条数据可能同时存在于两层，读取时必须以较浅的一层为准。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [31],
+            "pointedAtGold": true,
+            "pointedChars": [31]
+          },
+          "ms": 2783
+        },
+        {
+          "id": "c1",
+          "kind": "cross",
+          "repeat": 0,
+          "answer": {
+            "text": "命中率连续 3 个周期低于 72% 时会发出涨潮信号；调度器收到涨潮信号后，会暂停所有浮游任务（批处理），把内存让给缓存。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"
+              },
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "收到涨潮信号时，调度器暂停所有浮游任务，把内存让给缓存。"
+              }
+            ],
+            "evidence": [
+              "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。",
+              "收到涨潮信号时，调度器暂停所有浮游任务，把内存让给缓存。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 2,
+            "citationsOnSource": 1,
+            "quoteChars": [38, 28],
+            "pointedAtGold": true,
+            "pointedChars": [38, 28]
+          },
+          "ms": 3649
+        },
+        {
+          "id": "a1",
+          "kind": "absent",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有提到深潮层的默认容量。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2482
+        },
+        {
+          "id": "a2",
+          "kind": "absent",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有提到潮汐缓存协议采用的开源许可证。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 1860
+        },
+        {
+          "id": "a3",
+          "kind": "absent",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有提到珊瑚调度器支持哪些操作系统。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2596
+        },
+        {
+          "id": "a4",
+          "kind": "absent",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有周砚的工号信息。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2391
+        },
+        {
+          "id": "h1",
+          "kind": "heldout",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里说，退潮时多出来的容量不会立刻释放，而是标记为可回收，在后续淘汰周期里逐步交还；原因是避免退潮后马上又涨潮时，白白丢掉刚加载的数据。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "这样做是为了避免退潮之后马上又涨潮时白白丢掉刚加载的数据。"
+              }
+            ],
+            "evidence": [
+              "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。",
+              "这样做是为了避免退潮之后马上又涨潮时白白丢掉刚加载的数据。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 2,
+            "citationsOnSource": 2,
+            "quoteChars": [42, 29],
+            "pointedAtGold": true,
+            "pointedChars": [42, 29]
+          },
+          "ms": 3560
+        },
+        {
+          "id": "h2",
+          "kind": "heldout",
+          "repeat": 0,
+          "answer": {
+            "text": "靠中潮层的日志重放：数据先写日志，再写主存，崩溃后可按写入顺序重放日志恢复。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "日志的存在让中潮层在崩溃之后可以重放，而不需要从深潮层重新加载。"
+              }
+            ],
+            "evidence": [
+              "中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。",
+              "日志的存在让中潮层在崩溃之后可以重放，而不需要从深潮层重新加载。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 2,
+            "citationsOnSource": 2,
+            "quoteChars": [32, 32],
+            "pointedAtGold": true,
+            "pointedChars": [32, 32]
+          },
+          "ms": 4189
+        },
+        {
+          "id": "h3",
+          "kind": "heldout",
+          "repeat": 0,
+          "answer": {
+            "text": "队列满时，被挡在外面的是**新的浮游任务（批处理任务）**；礁石任务和海葵任务仍可进入。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"
+              }
+            ],
+            "evidence": ["队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [29],
+            "pointedAtGold": true,
+            "pointedChars": [29]
+          },
+          "ms": 3374
+        },
+        {
+          "id": "h4",
+          "kind": "heldout",
+          "repeat": 0,
+          "answer": {
+            "text": "每轮时间片长度是 23 毫秒。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "时间片长度是 23 毫秒。"
+              }
+            ],
+            "evidence": ["时间片长度是 23 毫秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [13],
+            "pointedAtGold": true,
+            "pointedChars": [13]
+          },
+          "ms": 3643
+        },
+        {
+          "id": "h5",
+          "kind": "heldout",
+          "repeat": 0,
+          "answer": {
+            "text": "根据《灯塔事故复盘》，最先出现异常的是**报表服务**，它的请求超时设置最短。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "最先出现异常的是报表服务，它的请求超时设置最短。"
+              }
+            ],
+            "evidence": ["最先出现异常的是报表服务，它的请求超时设置最短。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [24],
+            "pointedAtGold": true,
+            "pointedChars": [24]
+          },
+          "ms": 2593
+        },
+        {
+          "id": "h6",
+          "kind": "heldout",
+          "repeat": 0,
+          "answer": {
+            "text": "同一请求最多重试一次，也就是最多再发 1 遍。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "此外，网关的重试策略改成了带退避的方式，并且规定同一个请求最多重试一次。"
+              }
+            ],
+            "evidence": ["此外，网关的重试策略改成了带退避的方式，并且规定同一个请求最多重试一次。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [36],
+            "pointedAtGold": true,
+            "pointedChars": [36]
+          },
+          "ms": 2736
+        },
+        {
+          "id": "o1",
+          "kind": "offtopic",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有提到法国的首都。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2338
+        },
+        {
+          "id": "o2",
+          "kind": "offtopic",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有提到光合作用需要的原料。",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2278
+        },
+        {
+          "id": "o3",
+          "kind": "offtopic",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有关于勾股定理的内容。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2133
+        },
+        {
+          "id": "o4",
+          "kind": "offtopic",
+          "repeat": 0,
+          "answer": {
+            "text": "材料里没有关于数据库索引的内容，无法据此回答。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2135
+        },
+        {
+          "id": "d1",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "潮汐缓存协议由林望舒在 2031 年提出。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "潮汐缓存协议由林望舒在 2031 年提出，目的是让缓存容量随负载像潮水一样涨落。"
+              }
+            ],
+            "evidence": [
+              "潮汐缓存协议由林望舒在 2031 年提出，目的是让缓存容量随负载像潮水一样涨落。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [40],
+            "pointedAtGold": true,
+            "pointedChars": [40]
+          },
+          "ms": 3232
+        },
+        {
+          "id": "d2",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "浅潮层的默认容量是 64 MB。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": false,
+            "citations": 0,
+            "citationsOnSource": 0,
+            "quoteChars": [],
+            "pointedAtGold": false,
+            "pointedChars": []
+          },
+          "ms": 2853
+        },
+        {
+          "id": "d3",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "材料显示，浅潮层的淘汰周期是 **17 秒**。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 2252
+        },
+        {
+          "id": "d4",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "材料中写的是：中潮层日志保留 9 小时。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。"
+              }
+            ],
+            "evidence": ["中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [32],
+            "pointedAtGold": true,
+            "pointedChars": [32]
+          },
+          "ms": 1886
+        },
+        {
+          "id": "d5",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "深潮层每 6 小时合并一次。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "深潮层只读，每 6 小时合并一次。"
+              }
+            ],
+            "evidence": ["深潮层只读，每 6 小时合并一次。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [17],
+            "pointedAtGold": true,
+            "pointedChars": [17]
+          },
+          "ms": 2400
+        },
+        {
+          "id": "d6",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"
+              }
+            ],
+            "evidence": ["当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [38],
+            "pointedAtGold": true,
+            "pointedChars": [38]
+          },
+          "ms": 3115
+        },
+        {
+          "id": "d7",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "珊瑚调度器的时间片长度是 23 毫秒。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "时间片长度是 23 毫秒。"
+              }
+            ],
+            "evidence": ["时间片长度是 23 毫秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [13],
+            "pointedAtGold": true,
+            "pointedChars": [13]
+          },
+          "ms": 2639
+        },
+        {
+          "id": "d8",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "海葵任务最多被抢占 4 次，第 5 次到来前会升级为礁石任务。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "海葵任务最多被抢占 4 次，第 5 次到来前升级为礁石任务，防止它一直得不到执行。"
+              }
+            ],
+            "evidence": [
+              "海葵任务最多被抢占 4 次，第 5 次到来前升级为礁石任务，防止它一直得不到执行。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [41],
+            "pointedAtGold": true,
+            "pointedChars": [41]
+          },
+          "ms": 2812
+        },
+        {
+          "id": "d9",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "灯塔集群服务中断持续了 41 分钟。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "2033 年 3 月 14 日，灯塔集群发生服务中断，持续 41 分钟。"
+              }
+            ],
+            "evidence": ["2033 年 3 月 14 日，灯塔集群发生服务中断，持续 41 分钟。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [36],
+            "pointedAtGold": true,
+            "pointedChars": [36]
+          },
+          "ms": 2816
+        },
+        {
+          "id": "d10",
+          "kind": "direct",
+          "repeat": 1,
+          "answer": {
+            "text": "灯塔事故的值班负责人是周砚。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "值班负责人周砚先停掉了备份，服务在 12 分钟后开始恢复。"
+              }
+            ],
+            "evidence": ["值班负责人周砚先停掉了备份，服务在 12 分钟后开始恢复。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [29],
+            "pointedAtGold": true,
+            "pointedChars": [29]
+          },
+          "ms": 3480
+        },
+        {
+          "id": "p1",
+          "kind": "paraphrase",
+          "repeat": 1,
+          "answer": {
+            "text": "最靠近调用方的是浅潮层，默认容量为 **64 MB**。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 3065
+        },
+        {
+          "id": "p2",
+          "kind": "paraphrase",
+          "repeat": 1,
+          "answer": {
+            "text": "材料说，负载低于 40% 并持续 5 分钟才会发出退潮信号；退潮后也不是立刻释放，而是在接下来的淘汰周期里逐步交还。材料没有给出完全收回所需的总时长。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当负载低于 40% 并持续 5 分钟时，协议发出退潮信号，容量回到默认值。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。"
+              }
+            ],
+            "evidence": [
+              "当负载低于 40% 并持续 5 分钟时，协议发出退潮信号，容量回到默认值。",
+              "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 2,
+            "citationsOnSource": 2,
+            "quoteChars": [37, 42],
+            "pointedAtGold": true,
+            "pointedChars": [37, 42]
+          },
+          "ms": 3638
+        },
+        {
+          "id": "p3",
+          "kind": "paraphrase",
+          "repeat": 1,
+          "answer": {
+            "text": "最多 1024 个任务。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "队列上限是 1024 个任务。"
+              }
+            ],
+            "evidence": ["队列上限是 1024 个任务。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [15],
+            "pointedAtGold": true,
+            "pointedChars": [15]
+          },
+          "ms": 2456
+        },
+        {
+          "id": "p4",
+          "kind": "paraphrase",
+          "repeat": 1,
+          "answer": {
+            "text": "礁石任务绝不会被别的工作打断：它不可抢占，一旦开始就会运行到自己主动让出。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "礁石任务不可抢占，海葵任务可以抢占，浮游任务是批处理。"
+              },
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "礁石任务一旦开始就会运行到自己主动让出"
+              }
+            ],
+            "evidence": [
+              "礁石任务不可抢占，海葵任务可以抢占，浮游任务是批处理。",
+              "礁石任务一旦开始就会运行到自己主动让出"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 2,
+            "citationsOnSource": 2,
+            "quoteChars": [27, 19],
+            "pointedAtGold": true,
+            "pointedChars": [27, 19]
+          },
+          "ms": 3089
+        },
+        {
+          "id": "p5",
+          "kind": "paraphrase",
+          "repeat": 1,
+          "answer": {
+            "text": "那次宕机后，合并窗口改到了凌晨 3 点。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "合并窗口移到凌晨 3 点，并且规定合并期间禁止启动全量备份。"
+              }
+            ],
+            "evidence": ["合并窗口移到凌晨 3 点，并且规定合并期间禁止启动全量备份。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [30],
+            "pointedAtGold": true,
+            "pointedChars": [30]
+          },
+          "ms": 3503
+        },
+        {
+          "id": "p6",
+          "kind": "paraphrase",
+          "repeat": 1,
+          "answer": {
+            "text": "应以较浅的一层为准。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "代价是一条数据可能同时存在于两层，读取时必须以较浅的一层为准。"
+              }
+            ],
+            "evidence": ["代价是一条数据可能同时存在于两层，读取时必须以较浅的一层为准。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [31],
+            "pointedAtGold": true,
+            "pointedChars": [31]
+          },
+          "ms": 2446
+        },
+        {
+          "id": "c1",
+          "kind": "cross",
+          "repeat": 1,
+          "answer": {
+            "text": "命中率持续偏低会触发涨潮信号；调度器收到后暂停所有浮游任务（批处理任务），把内存让给缓存。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "收到涨潮信号时，调度器暂停所有浮游任务，把内存让给缓存。"
+              }
+            ],
+            "evidence": ["收到涨潮信号时，调度器暂停所有浮游任务，把内存让给缓存。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [28],
+            "pointedAtGold": true,
+            "pointedChars": [28]
+          },
+          "ms": 2815
+        },
+        {
+          "id": "a1",
+          "kind": "absent",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有提到深潮层的默认容量；只写了浅潮层的默认容量是 64 MB。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2771
+        },
+        {
+          "id": "a2",
+          "kind": "absent",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有提到潮汐缓存协议采用什么开源许可证。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2147
+        },
+        {
+          "id": "a3",
+          "kind": "absent",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有提到珊瑚调度器支持哪些操作系统。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2227
+        },
+        {
+          "id": "a4",
+          "kind": "absent",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有提到周砚的工号。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2269
+        },
+        {
+          "id": "h1",
+          "kind": "heldout",
+          "repeat": 1,
+          "answer": {
+            "text": "是为了避免退潮之后马上又涨潮时，白白丢掉刚加载的数据。退潮时只是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还，而不是立刻释放内存。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。这样做是为了避免退潮之后马上又涨潮时白白丢掉刚加载的数据。"
+              }
+            ],
+            "evidence": [
+              "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。这样做是为了避免退潮之后马上又涨潮时白白丢掉刚加载的数据。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [71],
+            "pointedAtGold": true,
+            "pointedChars": [71]
+          },
+          "ms": 2788
+        },
+        {
+          "id": "h2",
+          "kind": "heldout",
+          "repeat": 1,
+          "answer": {
+            "text": "材料中相关机制是：中潮层“先写日志，再写主存”，崩溃之后可以重放日志来恢复，而不需要从深潮层重新加载。材料没有直接说“写到一半的内容”，但说明了靠日志重放。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": false,
+            "citations": 0,
+            "citationsOnSource": 0,
+            "quoteChars": [],
+            "pointedAtGold": false,
+            "pointedChars": []
+          },
+          "ms": 4954
+        },
+        {
+          "id": "h3",
+          "kind": "heldout",
+          "repeat": 1,
+          "answer": {
+            "text": "排满后，新的**浮游任务（批处理）**会被拒绝；礁石任务和海葵任务仍可进入。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"
+              }
+            ],
+            "evidence": ["队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [29],
+            "pointedAtGold": true,
+            "pointedChars": [29]
+          },
+          "ms": 2871
+        },
+        {
+          "id": "h4",
+          "kind": "heldout",
+          "repeat": 1,
+          "answer": {
+            "text": "时间片长度是 23 毫秒。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "时间片长度是 23 毫秒。"
+              }
+            ],
+            "evidence": ["时间片长度是 23 毫秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [13],
+            "pointedAtGold": true,
+            "pointedChars": [13]
+          },
+          "ms": 2869
+        },
+        {
+          "id": "h5",
+          "kind": "heldout",
+          "repeat": 1,
+          "answer": {
+            "text": "最早出现异常的是报表服务，它的请求超时设置最短，因此最先暴露出来。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "最先出现异常的是报表服务，它的请求超时设置最短。"
+              }
+            ],
+            "evidence": ["最先出现异常的是报表服务，它的请求超时设置最短。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [24],
+            "pointedAtGold": true,
+            "pointedChars": [24]
+          },
+          "ms": 2401
+        },
+        {
+          "id": "h6",
+          "kind": "heldout",
+          "repeat": 1,
+          "answer": {
+            "text": "最多再发一遍：同一个请求最多重试一次。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "此外，网关的重试策略改成了带退避的方式，并且规定同一个请求最多重试一次。"
+              }
+            ],
+            "evidence": ["此外，网关的重试策略改成了带退避的方式，并且规定同一个请求最多重试一次。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [36],
+            "pointedAtGold": true,
+            "pointedChars": [36]
+          },
+          "ms": 2487
+        },
+        {
+          "id": "o1",
+          "kind": "offtopic",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有关于法国首都的内容。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2195
+        },
+        {
+          "id": "o2",
+          "kind": "offtopic",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有关于光合作用的内容。  \n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 1904
+        },
+        {
+          "id": "o3",
+          "kind": "offtopic",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有关于勾股定理的内容。\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2637
+        },
+        {
+          "id": "o4",
+          "kind": "offtopic",
+          "repeat": 1,
+          "answer": {
+            "text": "材料里没有关于数据库索引的内容，无法据此回答。  \n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2461
+        },
+        {
+          "id": "d1",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "潮汐缓存协议由林望舒在 2031 年提出。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "潮汐缓存协议由林望舒在 2031 年提出，目的是让缓存容量随负载像潮水一样涨落。"
+              }
+            ],
+            "evidence": [
+              "潮汐缓存协议由林望舒在 2031 年提出，目的是让缓存容量随负载像潮水一样涨落。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [40],
+            "pointedAtGold": true,
+            "pointedChars": [40]
+          },
+          "ms": 2410
+        },
+        {
+          "id": "d2",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "浅潮层的默认容量是 64 MB。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 2574
+        },
+        {
+          "id": "d3",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "浅潮层的淘汰周期是 17 秒。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 2734
+        },
+        {
+          "id": "d4",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "材料显示：中潮层采用回落写入，数据先写日志再写主存，日志保留 9 小时。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。"
+              }
+            ],
+            "evidence": ["中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [32],
+            "pointedAtGold": true,
+            "pointedChars": [32]
+          },
+          "ms": 2812
+        },
+        {
+          "id": "d5",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "深潮层每 6 小时合并一次。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "深潮层只读，每 6 小时合并一次。"
+              }
+            ],
+            "evidence": ["深潮层只读，每 6 小时合并一次。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [17],
+            "pointedAtGold": true,
+            "pointedChars": [17]
+          },
+          "ms": 2554
+        },
+        {
+          "id": "d6",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "当命中率连续 3 个周期低于 72% 时，发出涨潮信号。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"
+              }
+            ],
+            "evidence": ["当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [38],
+            "pointedAtGold": true,
+            "pointedChars": [38]
+          },
+          "ms": 2700
+        },
+        {
+          "id": "d7",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "珊瑚调度器的时间片长度是 23 毫秒。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "时间片长度是 23 毫秒。"
+              }
+            ],
+            "evidence": ["时间片长度是 23 毫秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [13],
+            "pointedAtGold": true,
+            "pointedChars": [13]
+          },
+          "ms": 2493
+        },
+        {
+          "id": "d8",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "最多被抢占 4 次；第 5 次到来前会升级为礁石任务。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "海葵任务最多被抢占 4 次，第 5 次到来前升级为礁石任务，防止它一直得不到执行。"
+              }
+            ],
+            "evidence": [
+              "海葵任务最多被抢占 4 次，第 5 次到来前升级为礁石任务，防止它一直得不到执行。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [41],
+            "pointedAtGold": true,
+            "pointedChars": [41]
+          },
+          "ms": 2536
+        },
+        {
+          "id": "d9",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "灯塔集群服务中断持续 41 分钟。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "2033 年 3 月 14 日，灯塔集群发生服务中断，持续 41 分钟。"
+              }
+            ],
+            "evidence": ["2033 年 3 月 14 日，灯塔集群发生服务中断，持续 41 分钟。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [36],
+            "pointedAtGold": true,
+            "pointedChars": [36]
+          },
+          "ms": 2802
+        },
+        {
+          "id": "d10",
+          "kind": "direct",
+          "repeat": 2,
+          "answer": {
+            "text": "灯塔事故的值班负责人是周砚。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "值班负责人周砚先停掉了备份，服务在 12 分钟后开始恢复。"
+              }
+            ],
+            "evidence": ["值班负责人周砚先停掉了备份，服务在 12 分钟后开始恢复。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [29],
+            "pointedAtGold": true,
+            "pointedChars": [29]
+          },
+          "ms": 3195
+        },
+        {
+          "id": "p1",
+          "kind": "paraphrase",
+          "repeat": 2,
+          "answer": {
+            "text": "最靠近调用方的是浅潮层，默认容量为 64 MB。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"
+              }
+            ],
+            "evidence": ["浅潮层的默认容量是 64 MB，淘汰周期是 17 秒。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [27],
+            "pointedAtGold": true,
+            "pointedChars": [27]
+          },
+          "ms": 3532
+        },
+        {
+          "id": "p2",
+          "kind": "paraphrase",
+          "repeat": 2,
+          "answer": {
+            "text": "材料没有给出“完全收回”所需的总时长。只说负载低于 40% 并持续 5 分钟后会发出退潮信号，容量回到默认值；但不是立刻释放，而是在接下来的淘汰周期里逐步交还。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当负载低于 40% 并持续 5 分钟时，协议发出退潮信号，容量回到默认值。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。"
+              }
+            ],
+            "evidence": [
+              "当负载低于 40% 并持续 5 分钟时，协议发出退潮信号，容量回到默认值。",
+              "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 2,
+            "citationsOnSource": 2,
+            "quoteChars": [37, 42],
+            "pointedAtGold": true,
+            "pointedChars": [37, 42]
+          },
+          "ms": 4331
+        },
+        {
+          "id": "p3",
+          "kind": "paraphrase",
+          "repeat": 2,
+          "answer": {
+            "text": "最多 1024 个任务；队列满时拒绝新的浮游任务，礁石任务和海葵任务仍可进入。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "队列上限是 1024 个任务。队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"
+              }
+            ],
+            "evidence": [
+              "队列上限是 1024 个任务。队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [44],
+            "pointedAtGold": true,
+            "pointedChars": [44]
+          },
+          "ms": 2665
+        },
+        {
+          "id": "p4",
+          "kind": "paraphrase",
+          "repeat": 2,
+          "answer": {
+            "text": "礁石任务不可抢占，一旦开始就会运行到主动让出。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "礁石任务一旦开始就会运行到自己主动让出"
+              }
+            ],
+            "evidence": ["礁石任务一旦开始就会运行到自己主动让出"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [19],
+            "pointedAtGold": true,
+            "pointedChars": [19]
+          },
+          "ms": 2507
+        },
+        {
+          "id": "p5",
+          "kind": "paraphrase",
+          "repeat": 2,
+          "answer": {
+            "text": "材料中提到，那次事故后“合并窗口移到凌晨 3 点”。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "合并窗口移到凌晨 3 点，并且规定合并期间禁止启动全量备份。"
+              }
+            ],
+            "evidence": ["合并窗口移到凌晨 3 点，并且规定合并期间禁止启动全量备份。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [30],
+            "pointedAtGold": true,
+            "pointedChars": [30]
+          },
+          "ms": 2627
+        },
+        {
+          "id": "p6",
+          "kind": "paraphrase",
+          "repeat": 2,
+          "answer": {
+            "text": "应以较浅的一层为准。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "代价是一条数据可能同时存在于两层，读取时必须以较浅的一层为准。"
+              }
+            ],
+            "evidence": ["代价是一条数据可能同时存在于两层，读取时必须以较浅的一层为准。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [31],
+            "pointedAtGold": true,
+            "pointedChars": [31]
+          },
+          "ms": 3273
+        },
+        {
+          "id": "c1",
+          "kind": "cross",
+          "repeat": 2,
+          "answer": {
+            "text": "材料中的机制是：潮汐缓存命中率连续 3 个周期低于 72% 时发出涨潮信号；珊瑚调度器收到涨潮信号后，会暂停所有浮游任务（即批处理任务），把内存让给缓存。调度器本身不直接判断命中率。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。"
+              },
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "收到涨潮信号时，调度器暂停所有浮游任务，把内存让给缓存。"
+              },
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "调度器把任务分为三种：礁石任务不可抢占，海葵任务可以抢占，浮游任务是批处理。"
+              }
+            ],
+            "evidence": [
+              "当命中率连续 3 个周期低于 72% 时，协议发出涨潮信号，浅潮层容量翻倍。",
+              "收到涨潮信号时，调度器暂停所有浮游任务，把内存让给缓存。",
+              "调度器把任务分为三种：礁石任务不可抢占，海葵任务可以抢占，浮游任务是批处理。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 3,
+            "citationsOnSource": 2,
+            "quoteChars": [38, 28, 38],
+            "pointedAtGold": true,
+            "pointedChars": [38, 28, 38]
+          },
+          "ms": 3649
+        },
+        {
+          "id": "a1",
+          "kind": "absent",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有提到深潮层的默认容量；只写了深潮层只读、每 6 小时合并一次。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2180
+        },
+        {
+          "id": "a2",
+          "kind": "absent",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有提到潮汐缓存协议采用什么开源许可证。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2296
+        },
+        {
+          "id": "a3",
+          "kind": "absent",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有提到珊瑚调度器支持哪些操作系统。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2825
+        },
+        {
+          "id": "a4",
+          "kind": "absent",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有提到周砚的工号。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 1937
+        },
+        {
+          "id": "h1",
+          "kind": "heldout",
+          "repeat": 2,
+          "answer": {
+            "text": "退潮时不会立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。这样做是为了避免退潮之后马上又涨潮时，白白丢掉刚加载的数据。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。这样做是为了避免退潮之后马上又涨潮时白白丢掉刚加载的数据。"
+              }
+            ],
+            "evidence": [
+              "退潮不是立刻释放内存，而是把多出来的部分标记为可回收，在接下来的淘汰周期里逐步交还。这样做是为了避免退潮之后马上又涨潮时白白丢掉刚加载的数据。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [71],
+            "pointedAtGold": true,
+            "pointedChars": [71]
+          },
+          "ms": 2689
+        },
+        {
+          "id": "h2",
+          "kind": "heldout",
+          "repeat": 2,
+          "answer": {
+            "text": "靠中潮层“先写日志，再写主存”；崩溃后通过日志重放恢复，重放时按写入顺序逐条应用，遇到校验和不对的记录就停下，后面的记录一律丢弃。\n\n",
+            "citations": [
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "日志的存在让中潮层在崩溃之后可以重放，而不需要从深潮层重新加载。"
+              },
+              {
+                "file": "潮汐缓存协议.md",
+                "quote": "重放时按写入顺序逐条应用，遇到校验和不对的记录就停下，后面的记录一律丢弃，宁可少恢复一些，也不恢复错的内容。"
+              }
+            ],
+            "evidence": [
+              "中潮层采用回落写入：数据先写日志，再写主存。日志保留 9 小时。",
+              "日志的存在让中潮层在崩溃之后可以重放，而不需要从深潮层重新加载。",
+              "重放时按写入顺序逐条应用，遇到校验和不对的记录就停下，后面的记录一律丢弃，宁可少恢复一些，也不恢复错的内容。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 3,
+            "citationsOnSource": 3,
+            "quoteChars": [32, 32, 54],
+            "pointedAtGold": true,
+            "pointedChars": [32, 32, 54]
+          },
+          "ms": 3873
+        },
+        {
+          "id": "h3",
+          "kind": "heldout",
+          "repeat": 2,
+          "answer": {
+            "text": "队列排满后，新的**浮游任务**会被拒绝；礁石任务和海葵任务仍然可以进入。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"
+              }
+            ],
+            "evidence": ["队列满时拒绝新的浮游任务，礁石任务和海葵任务仍然可以进入。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [29],
+            "pointedAtGold": true,
+            "pointedChars": [29]
+          },
+          "ms": 2930
+        },
+        {
+          "id": "h4",
+          "kind": "heldout",
+          "repeat": 2,
+          "answer": {
+            "text": "材料写明时间片长度是 23 毫秒；礁石任务一旦开始会运行到自己主动让出，但材料没有给出它的具体单次上限。\n\n",
+            "citations": [
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "时间片长度是 23 毫秒。"
+              },
+              {
+                "file": "珊瑚调度器.md",
+                "quote": "礁石任务一旦开始就会运行到自己主动让出，所以规范要求它的单次运行时间有明确上限，超过上限的任务会被记录下来，交给提交者修改。"
+              }
+            ],
+            "evidence": [
+              "时间片长度是 23 毫秒。",
+              "礁石任务一旦开始就会运行到自己主动让出，所以规范要求它的单次运行时间有明确上限，超过上限的任务会被记录下来，交给提交者修改。"
+            ]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 2,
+            "citationsOnSource": 2,
+            "quoteChars": [13, 62],
+            "pointedAtGold": true,
+            "pointedChars": [13, 62]
+          },
+          "ms": 3504
+        },
+        {
+          "id": "h5",
+          "kind": "heldout",
+          "repeat": 2,
+          "answer": {
+            "text": "灯塔事故复盘中写的是：报表服务最先出现异常。",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": false,
+            "citations": 0,
+            "citationsOnSource": 0,
+            "quoteChars": [],
+            "pointedAtGold": false,
+            "pointedChars": []
+          },
+          "ms": 2528
+        },
+        {
+          "id": "h6",
+          "kind": "heldout",
+          "repeat": 2,
+          "answer": {
+            "text": "出事以后（灯塔事故复盘中），失败调用最多再重试 **1 次**，也就是最多再发 **一遍**。\n\n",
+            "citations": [
+              {
+                "file": "灯塔事故复盘.md",
+                "quote": "此外，网关的重试策略改成了带退避的方式，并且规定同一个请求最多重试一次。"
+              }
+            ],
+            "evidence": ["此外，网关的重试策略改成了带退避的方式，并且规定同一个请求最多重试一次。"]
+          },
+          "score": {
+            "correct": true,
+            "falselyAbstained": false,
+            "citedGold": true,
+            "citations": 1,
+            "citationsOnSource": 1,
+            "quoteChars": [36],
+            "pointedAtGold": true,
+            "pointedChars": [36]
+          },
+          "ms": 2841
+        },
+        {
+          "id": "o1",
+          "kind": "offtopic",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2805
+        },
+        {
+          "id": "o2",
+          "kind": "offtopic",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有提到光合作用的原料。",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2526
+        },
+        {
+          "id": "o3",
+          "kind": "offtopic",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有关于勾股定理的内容。\n\n",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 1888
+        },
+        {
+          "id": "o4",
+          "kind": "offtopic",
+          "repeat": 2,
+          "answer": {
+            "text": "材料里没有关于数据库索引的内容。",
+            "citations": [],
+            "evidence": []
+          },
+          "score": {
+            "abstained": true,
+            "citedAnything": false,
+            "answeredAnyway": false
+          },
+          "ms": 2907
+        }
+      ]
+    }
+  ],
+  "journey": null,
+  "retrieval": [
+    {
+      "id": "d1",
+      "kind": "direct",
+      "hits": 6,
+      "bestCoverage": 0.83,
+      "passedGate": 6,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d2",
+      "kind": "direct",
+      "hits": 6,
+      "bestCoverage": 0.83,
+      "passedGate": 4,
+      "goldRank": 2,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d3",
+      "kind": "direct",
+      "hits": 5,
+      "bestCoverage": 0.83,
+      "passedGate": 3,
+      "goldRank": 2,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d4",
+      "kind": "direct",
+      "hits": 6,
+      "bestCoverage": 0.8,
+      "passedGate": 6,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d5",
+      "kind": "direct",
+      "hits": 5,
+      "bestCoverage": 0.83,
+      "passedGate": 5,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d6",
+      "kind": "direct",
+      "hits": 3,
+      "bestCoverage": 0.5,
+      "passedGate": 2,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d7",
+      "kind": "direct",
+      "hits": 6,
+      "bestCoverage": 0.86,
+      "passedGate": 4,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d8",
+      "kind": "direct",
+      "hits": 5,
+      "bestCoverage": 0.8,
+      "passedGate": 5,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d9",
+      "kind": "direct",
+      "hits": 2,
+      "bestCoverage": 0.75,
+      "passedGate": 2,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "d10",
+      "kind": "direct",
+      "hits": 5,
+      "bestCoverage": 0.83,
+      "passedGate": 2,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "p1",
+      "kind": "paraphrase",
+      "hits": 6,
+      "bestCoverage": 0.27,
+      "passedGate": 1,
+      "goldRank": 2,
+      "goldPassedGate": false,
+      "goldVisibleInQuote": false
+    },
+    {
+      "id": "p2",
+      "kind": "paraphrase",
+      "hits": 6,
+      "bestCoverage": 0.5,
+      "passedGate": 6,
+      "goldRank": 2,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "p3",
+      "kind": "paraphrase",
+      "hits": 4,
+      "bestCoverage": 0.22,
+      "passedGate": 3,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "p4",
+      "kind": "paraphrase",
+      "hits": 6,
+      "bestCoverage": 0.25,
+      "passedGate": 3,
+      "goldRank": 2,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "p5",
+      "kind": "paraphrase",
+      "hits": 6,
+      "bestCoverage": 0.29,
+      "passedGate": 3,
+      "goldRank": 2,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "p6",
+      "kind": "paraphrase",
+      "hits": 6,
+      "bestCoverage": 0.73,
+      "passedGate": 5,
+      "goldRank": 2,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "c1",
+      "kind": "cross",
+      "hits": 6,
+      "bestCoverage": 0.57,
+      "passedGate": 6,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "a1",
+      "kind": "absent",
+      "hits": 6,
+      "bestCoverage": 0.83,
+      "passedGate": 4
+    },
+    {
+      "id": "a2",
+      "kind": "absent",
+      "hits": 6,
+      "bestCoverage": 0.56,
+      "passedGate": 6
+    },
+    {
+      "id": "a3",
+      "kind": "absent",
+      "hits": 4,
+      "bestCoverage": 0.67,
+      "passedGate": 2
+    },
+    {
+      "id": "a4",
+      "kind": "absent",
+      "hits": 1,
+      "bestCoverage": 0.4,
+      "passedGate": 1
+    },
+    {
+      "id": "h1",
+      "kind": "heldout",
+      "hits": 6,
+      "bestCoverage": 0.36,
+      "passedGate": 5,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "h2",
+      "kind": "heldout",
+      "hits": 5,
+      "bestCoverage": 0.33,
+      "passedGate": 1,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "h3",
+      "kind": "heldout",
+      "hits": 6,
+      "bestCoverage": 0.25,
+      "passedGate": 2,
+      "goldRank": 1,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "h4",
+      "kind": "heldout",
+      "hits": 6,
+      "bestCoverage": 0.5,
+      "passedGate": 5,
+      "goldRank": 3,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "h5",
+      "kind": "heldout",
+      "hits": 6,
+      "bestCoverage": 0.38,
+      "passedGate": 2,
+      "goldRank": 2,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "h6",
+      "kind": "heldout",
+      "hits": 6,
+      "bestCoverage": 0.55,
+      "passedGate": 3,
+      "goldRank": 3,
+      "goldPassedGate": true,
+      "goldVisibleInQuote": true
+    },
+    {
+      "id": "o1",
+      "kind": "offtopic",
+      "hits": 0,
+      "bestCoverage": 0,
+      "passedGate": 0
+    },
+    {
+      "id": "o2",
+      "kind": "offtopic",
+      "hits": 4,
+      "bestCoverage": 0.17,
+      "passedGate": 0
+    },
+    {
+      "id": "o3",
+      "kind": "offtopic",
+      "hits": 3,
+      "bestCoverage": 0.17,
+      "passedGate": 0
+    },
+    {
+      "id": "o4",
+      "kind": "offtopic",
+      "hits": 3,
+      "bestCoverage": 0.5,
+      "passedGate": 1
+    }
+  ]
+}

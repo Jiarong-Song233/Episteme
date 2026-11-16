@@ -8,10 +8,25 @@ import {
   type Turn,
 } from '@episteme/application'
 import type { SceneRoute, SceneRouteContext } from '@episteme/service'
-import { relevant, type Answer, type RecalledUnderstanding } from './answer.js'
+import {
+  relevant,
+  type Answer,
+  type ElsewhereUnderstanding,
+  type RecalledUnderstanding,
+} from './answer.js'
 import type { MaterialStore, SearchHit } from './materials.js'
 import { ModelFailure, type ModelClient } from './model.js'
-import { ANSWER_PREFIX, openSpaceOf, refuse, required, scopeOf, spaceOf, text } from './requests.js'
+import {
+  ANSWER_PREFIX,
+  openSpaceOf,
+  refuse,
+  required,
+  scopeOf,
+  SPACE_PREFIX,
+  spaceOf,
+  text,
+  type Space,
+} from './requests.js'
 import { coverage } from './tokens.js'
 
 /**
@@ -502,6 +517,41 @@ export async function recalledFor(
       ? {}
       : { from: { author: adoptedFrom.author, publication: adoptedFrom.publication } }),
   }))
+}
+
+/** How many items from other spaces an answer points to, at most. */
+const MAX_ELSEWHERE = 2
+
+/**
+ * What the person holds in their other open spaces that bears on a question: the same word test as within a space,
+ * best first. Only pointed to beside the answer, never given to the model, so a space's answers rest on it alone.
+ */
+export function elsewhereFor(
+  view: SceneView,
+  space: string,
+  question: string,
+): readonly ElsewhereUnderstanding[] {
+  const others = view.records
+    .list(SPACE_PREFIX)
+    .map((record) => record.value as Space)
+    .filter((other) => other.id !== space && !other.archived)
+  return others
+    .flatMap((other) =>
+      stillHeld(heldNodes(view, other.id)).map((node) => ({
+        other,
+        node,
+        score: coverage(question, node.label),
+      })),
+    )
+    .filter(({ score }) => score >= MIN_RECALL_COVERAGE)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, MAX_ELSEWHERE)
+    .map(({ other, node }) => ({
+      space: other.id,
+      spaceName: other.name,
+      nodeId: node.nodeId,
+      label: node.label,
+    }))
 }
 
 function trailOf(

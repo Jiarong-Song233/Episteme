@@ -20,7 +20,7 @@ import { ModelFailure, type ModelClient, type ModelMessage } from './model.js'
 import type { ModelSettings } from './model-settings.js'
 import { MAX_MATERIAL_BYTES, MaterialRefusal, parseMaterial } from './parse.js'
 import { sharingRoutes } from './sharing.js'
-import { heldNodes, recalledFor, understandingRoutes } from './understanding.js'
+import { elsewhereFor, heldNodes, recalledFor, understandingRoutes } from './understanding.js'
 import {
   ANSWER_PREFIX,
   openSpaceOf,
@@ -161,6 +161,9 @@ export function workbenchRoutes(options: WorkbenchRouteOptions): readonly SceneR
     let answer: Answer
     try {
       answer = await answerFrom({ question, hits, history: historyOf(earlier), model, recalled })
+      // Pointed to after the answer is made, so the model never reads another space.
+      const elsewhere = elsewhereFor(view, space.id, question)
+      if (elsewhere.length > 0) answer = { ...answer, elsewhere }
     } catch (error) {
       if (!(error instanceof ModelFailure)) throw error
       return {

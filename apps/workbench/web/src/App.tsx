@@ -584,6 +584,10 @@ function Desk({
     if (spaceId !== undefined) moveTo({ kind: 'understanding', space: spaceId, node })
   }
 
+  const openElsewhere = (space: string, node: string): void => {
+    moveTo({ kind: 'understanding', space, node })
+  }
+
   const openPublication = (id: string): void => {
     go({ kind: 'commons', publication: id }, panel)
     setPane('talk')
@@ -663,6 +667,7 @@ function Desk({
     nodes: understanding.nodes,
     focused: focusedTurn,
     openNode,
+    openElsewhere,
     nameOf,
     refreshNames,
     openPublication,

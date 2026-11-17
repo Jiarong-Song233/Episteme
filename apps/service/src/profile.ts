@@ -5,6 +5,7 @@ import {
   type SessionScene,
 } from '@episteme/application'
 import type { SceneTool } from '@episteme/mcp'
+import { noteRoutes } from './profiles/notes.js'
 
 /**
  * What the service is composed with for one scene (ADR 0010, decision 8).
@@ -152,7 +153,13 @@ export function assertSceneRoutes(routes: readonly SceneRoute[]): void {
  * @deprecated Its scene is the deprecated built-in Learn scene. A scene's own launcher supplies its profile.
  */
 export function defaultProfile(seed: SeedTopic = BLANK_TOPIC): SceneProfile {
-  return { name: 'default', seed, scene: learnScene }
+  return {
+    name: 'default',
+    seed,
+    scene: learnScene,
+    routes: noteRoutes('learn'),
+    proposingRoutes: ['/notes'],
+  }
 }
 
 /**
@@ -161,5 +168,11 @@ export function defaultProfile(seed: SeedTopic = BLANK_TOPIC): SceneProfile {
  * @deprecated MindLink supplies the Learn profile (ADR 0013); this one is removed in step M6.
  */
 export function learnProfile(topic: SeedTopic = TRANSFORMERS): SceneProfile {
-  return { name: 'learn', seed: topic, scene: learnScene }
+  return {
+    name: 'learn',
+    seed: topic,
+    scene: learnScene,
+    routes: noteRoutes('learn'),
+    proposingRoutes: ['/notes'],
+  }
 }

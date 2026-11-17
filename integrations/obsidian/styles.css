@@ -1,0 +1,27 @@
+.epi-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.epi-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.epi-meta {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  margin-bottom: 2px;
+}
+
+.epi-error {
+  color: var(--text-error);
+}
+
+.epi-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}

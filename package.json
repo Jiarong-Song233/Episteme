@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "tsc -b",
+    "ep": "node packages/cli/bin/ep.mjs",
     "clean": "tsc -b --clean",
     "typecheck": "tsc -b --force",
     "pretest": "tsc -b --force",

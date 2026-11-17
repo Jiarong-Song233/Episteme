@@ -51,6 +51,16 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.serviceworker } },
   },
   {
+    // Obsidian supplies its host API at runtime; this distributable is plain CommonJS.
+    files: ['integrations/obsidian/*.js'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    rules: {
+      // Obsidian loads the plugin as CommonJS, so `require('obsidian')` is the only way in.
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     files: ['apps/workbench/web/src/**'],
     languageOptions: { globals: { ...globals.browser } },
   },

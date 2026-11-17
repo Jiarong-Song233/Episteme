@@ -61,6 +61,22 @@ flowchart TD
 | G6 第一轮发现的修复 | Review | G6 基线 | 同义改写题从 6/18 到 15/18，引用不再截断，对话步骤的空回复查明根因。见[第二轮报告](../research/evaluation/round-2.md) | `fix/evaluation-findings` |
 | G6 与成熟产品对比 | Review | G6 基线 | 经用户授权运行 Open WebUI 0.12.5，四种配置，含能力走查。结果和局限见[第三轮报告](../research/evaluation/round-3.md) | `feat/evaluation-openwebui` |
 
+## 终端与笔记入口（2026-11-16）
+
+| 任务 | 状态 | 验收 | 分支 |
+| ---- | ---- | ---- | ---- |
+| CLI + dev 场景最小闭环 | Done（未验收真人） | `ep note → pending → accept → record → recall`；来源与原文保留 | `feat/cli-dev-scene` |
+| CLI 双令牌、JSON、宿主蒸馏 | Done（未验收真人） | agent 只读/提议；human 才决定；MCP 引文校验 | `feat/cli-dev-scene` |
+| discussion 场景 | Done（未验收真人） | 立场、`agreement`、冲突保留 | `feat/cli-dev-scene` |
+| Obsidian 薄插件 | Done（真实桌面脚本验证，未真人日常使用） | 提议带来源、确认/驳回、召回原因、服务错误；无源码/依赖入 vault | `feat/cli-dev-scene` |
+| capture 组合 profile + 场景短笔记 | Done（自动测试） | 一个服务、一个图谱、三场景；agent 可提议、本人决定 | `feat/cli-dev-scene` |
+| 讨论原文与提炼 | Done（自动测试） | 原文在线程；候选待确认；接受后进图 | `feat/cli-dev-scene` |
+| capture skill 与安装器 | Done（自动 + 全局安装） | 三宿主技能一致；不覆盖已有文件 | `feat/cli-dev-scene` |
+| 检索固定语料对照 | Done（离线基线） | lexical top1/top3 6/18；真实语义未验证 | `feat/cli-dev-scene` |
+| 浏览器等待条件修复 | Done（待 CI 复跑） | 等待真实 DOM 属性，去掉字符串函数等待 | `feat/cli-dev-scene` |
+
+设计决定见 [0018](../research/reuse-decisions/0018-terminal-capture.md)。
+
 ## 后续任务（2026-11-13）
 
 上表各项的 PR 已全部合并进 main（到 #51 为止，v0.2.0 草稿已构建、未发布）。状态仍写 Review，因为都还没有真人验收。

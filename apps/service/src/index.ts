@@ -1,6 +1,9 @@
 export { startService, DEFAULT_GRAPH } from './server.js'
 export type { EpistemeService, ServiceOptions } from './server.js'
 export { defaultProfile, defaultProfile as learnProfile, BLANK_TOPIC } from './profile.js'
+export { devProfile } from './profiles/dev.js'
+export { discussionProfile } from './profiles/discussion.js'
+export { captureProfile } from './profiles/capture.js'
 export { assertSceneRoutes } from './profile.js'
 export type {
   SceneProfile,

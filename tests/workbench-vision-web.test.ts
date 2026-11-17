@@ -338,14 +338,12 @@ describe('the published workbench in a browser', () => {
     )
     await page.goto(`${service.workspaceUrl ?? ''}#/desk/${space.id}`)
     await page.getByRole('heading', { name: '今日概览' }).waitFor()
-    await page.waitForFunction(
-      `(count) => Number(document.querySelector('[data-stat="materials"]')?.textContent) === count`,
-      firstMaterials.body.materials.length,
-    )
-    await page.waitForFunction(
-      `(count) => Number(document.querySelector('[data-stat="nodes"]')?.textContent) === count`,
-      before.nodes.length,
-    )
+    await expect
+      .poll(() => page.locator('[data-stat="materials"]').textContent())
+      .toBe(String(firstMaterials.body.materials.length))
+    await expect
+      .poll(() => page.locator('[data-stat="nodes"]').textContent())
+      .toBe(String(before.nodes.length))
     expect(await page.locator('[data-stat="materials"]').textContent()).toBe(
       String(firstMaterials.body.materials.length),
     )
@@ -365,14 +363,14 @@ describe('the published workbench in a browser', () => {
     ] as const
     for (const view of firstLevel) {
       await page.getByRole('link', { name: view.label, exact: true }).click()
-      await page.waitForFunction(
-        `(kind) => document.querySelector('.vision-shell')?.getAttribute('data-page') === kind`,
-        view.kind,
-      )
-      await page.waitForFunction(
-        `(label) => document.querySelector('.vision-nav-link[aria-current="page"]')?.getAttribute('aria-label') === label`,
-        view.label,
-      )
+      await expect
+        .poll(() => page.locator('.vision-shell').getAttribute('data-page'))
+        .toBe(view.kind)
+      await expect
+        .poll(() =>
+          page.locator('.vision-nav-link[aria-current="page"]').getAttribute('aria-label'),
+        )
+        .toBe(view.label)
       expect(
         await page.locator('.vision-nav-link[aria-current="page"]').getAttribute('aria-label'),
       ).toBe(view.label)
@@ -381,10 +379,9 @@ describe('the published workbench in a browser', () => {
     }
     for (const view of firstLevel) {
       await page.getByRole('link', { name: view.label, exact: true }).click()
-      await page.waitForFunction(
-        `(kind) => document.querySelector('.vision-shell')?.getAttribute('data-page') === kind`,
-        view.kind,
-      )
+      await expect
+        .poll(() => page.locator('.vision-shell').getAttribute('data-page'))
+        .toBe(view.kind)
       await page.getByRole('heading', { name: view.heading, exact: false }).first().waitFor()
     }
 
@@ -403,10 +400,9 @@ describe('the published workbench in a browser', () => {
     )
     await page.reload()
     await page.getByRole('heading', { name: '今日概览' }).waitFor()
-    await page.waitForFunction(
-      `(count) => Number(document.querySelector('[data-stat="nodes"]')?.textContent) === count`,
-      after.nodes.length,
-    )
+    await expect
+      .poll(() => page.locator('[data-stat="nodes"]').textContent())
+      .toBe(String(after.nodes.length))
     expect(await page.locator('[data-stat="materials"]').textContent()).toBe(
       String(afterMaterials.body.materials.length),
     )
@@ -441,10 +437,9 @@ describe('the published workbench in a browser', () => {
     }
     const beforeAccept = await stateOf(service, space.id)
     await page.getByRole('button', { name: '接受', exact: true }).click()
-    await page.waitForFunction(
-      `(count) => document.querySelectorAll('.vision-candidate-list button').length < count`,
-      beforeAccept.pending.length,
-    )
+    await expect
+      .poll(() => page.locator('.vision-candidate-list button').count())
+      .toBeLessThan(beforeAccept.pending.length)
     const afterAccept = await stateOf(service, space.id)
     expect(afterAccept.nodes.length).toBe(beforeAccept.nodes.length + 1)
     expect(afterAccept.pending.length).toBe(beforeAccept.pending.length - 1)
@@ -594,10 +589,9 @@ describe('the published workbench in a browser', () => {
       .waitFor()
 
     await page.getByRole('button', { name: '同意', exact: true }).click()
-    await page.waitForFunction(
-      `(count) => document.querySelectorAll('.vision-candidate-list button').length < count`,
-      before.pending.length,
-    )
+    await expect
+      .poll(() => page.locator('.vision-candidate-list button').count())
+      .toBeLessThan(before.pending.length)
     const after = await stateOf(service, space.id)
     expect(after.nodes.length).toBe(before.nodes.length)
     expect(after.pending).toHaveLength(0)
@@ -610,10 +604,9 @@ describe('the published workbench in a browser', () => {
     await page.goto(`${service.workspaceUrl ?? ''}#/review-center/${space.id}`)
     await page.getByRole('heading', { name: '候选理解队列' }).waitFor()
     await page.getByRole('button', { name: '不同意', exact: true }).click()
-    await page.waitForFunction(
-      `(count) => document.querySelectorAll('.vision-candidate-list button').length < count`,
-      before.pending.length,
-    )
+    await expect
+      .poll(() => page.locator('.vision-candidate-list button').count())
+      .toBeLessThan(before.pending.length)
     const after = await stateOf(service, space.id)
     expect(after.nodes.length).toBe(before.nodes.length)
     expect(after.pending).toHaveLength(0)

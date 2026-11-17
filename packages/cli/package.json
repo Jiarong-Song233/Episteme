@@ -1,0 +1,13 @@
+{
+  "name": "@episteme/cli",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "ep — a thin terminal client for the Episteme service: recall, reflect, propose, review and record.",
+  "bin": {
+    "ep": "./bin/ep.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -470,6 +470,7 @@ function help() {
         'pending',
         'accept',
         'reject',
+        'add',
         'record',
         'distill',
         'thread',
@@ -478,6 +479,7 @@ function help() {
     `ep · Episteme 终端客户端\n启动：pnpm serve --scene capture --blank\n\n` +
       `ep recall <问题> [--scope scene:dev:project] [--only-scope] [--summary]\n` +
       `ep note <内容> [--scene dev|learn|discussion] [--scope project] [--source 路径] [--why 理由]\n` +
+      `ep add <本人内容> [--kind claim|concept]\n` +
       `ep notes [--scene ...] [--scope ...]\nep pending | reflect\nep accept|reject <id>\nep record <nodeId> --set dimension=level\n` +
       `ep distill --from git [-n 1..100] [--dry-run]\nep distill --from - [--scene ...] [--dry-run]\n` +
       `ep thread open <标题> | show <id> | turn <id> <原文> --speaker learner|agent | distill <id>\n` +
